@@ -5,11 +5,13 @@ from fastapi_users_db_sqlalchemy import (
     SQLAlchemyUserDatabase as SQLAlchemyUserDatabaseGeneric,
 )
 from sqlalchemy import select
-from sqlalchemy.orm import relationship, Mapped
+from sqlalchemy.dialects.postgresql import ENUM as PgEnum
+from sqlalchemy.orm import relationship, Mapped, mapped_column
 
 from core.types.user_id import UserIdType
 from .base import Base
-from .mixins.id_int_pk import IdIntPkMixin
+from .mixins.id_int_pk import IdUuidPkMixin
+from utils.role import UserRole
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
@@ -24,9 +26,14 @@ class SQLAlchemyUserDatabase(SQLAlchemyUserDatabaseGeneric):
         return list(results.all())
 
 
-class User(Base, IdIntPkMixin, SQLAlchemyBaseUserTable[UserIdType]):
+class User(Base, IdUuidPkMixin, SQLAlchemyBaseUserTable[UserIdType]):
     access_tokens: Mapped[list["AccessToken"]] = relationship(
         back_populates="user",
+    )
+
+    role: Mapped[UserRole] = mapped_column(
+        PgEnum(UserRole),
+        default=UserRole.user,
     )
 
     @classmethod

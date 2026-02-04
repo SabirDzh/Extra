@@ -1,15 +1,17 @@
 from fastapi_users import schemas
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+from utils.role import UserRole
+
 
 from core.types.user_id import UserIdType
 
 
 class UserRead(schemas.BaseUser[UserIdType]):
-    pass
+    role: UserRole
 
 
 class UserCreate(schemas.BaseUserCreate):
-    pass
+    role: UserRole
 
 
 class UserUpdate(schemas.BaseUserUpdate):

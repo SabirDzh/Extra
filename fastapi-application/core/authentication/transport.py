@@ -9,7 +9,7 @@ bearer_transport = BearerTransport(
     tokenUrl=settings.api.bearer_token_url,
 )
 cookie_transport = CookieTransport(
-    # TODO: move to settings
-    cookie_max_age=3600,
-    cookie_secure=False,
+    cookie_name=settings.cookie.name,
+    cookie_max_age=settings.cookie.lifetime_seconds,
+    cookie_secure=settings.cookie.secure,
 )

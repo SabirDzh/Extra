@@ -14,6 +14,7 @@ log = logging.getLogger(__name__)
 ALLOW_ORIGINS = [
     "http://localhost",
     "http://localhost:8000",
+    "http://localhost:8080",
 ]
 
 

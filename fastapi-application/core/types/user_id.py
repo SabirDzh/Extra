@@ -1,1 +1,3 @@
-UserIdType = int
+import uuid
+
+UserIdType = uuid.UUID

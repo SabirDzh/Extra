@@ -105,6 +105,12 @@ class CacheConfig(BaseModel):
     namespace: CacheNamespace = CacheNamespace()
 
 
+class CookieConfig(BaseModel):
+    lifetime_seconds: int = 3600
+    secure: bool = False  # TODO когда будет использоваться https поменять на True
+    name: str = "auth_user"
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=(
@@ -123,6 +129,7 @@ class Settings(BaseSettings):
     access_token: AccessToken
     redis: RedisConfig = RedisConfig()
     cache: CacheConfig = CacheConfig()
+    cookie: CookieConfig = CookieConfig()
 
 
 settings = Settings()
