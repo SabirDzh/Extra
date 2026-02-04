@@ -5,7 +5,10 @@ from fastapi_users_db_sqlalchemy import (
     SQLAlchemyUserDatabase as SQLAlchemyUserDatabaseGeneric,
 )
 from sqlalchemy import select
-from sqlalchemy.dialects.postgresql import ENUM as PgEnum
+from sqlalchemy.dialects.postgresql import (
+    ENUM as PgEnum,
+    JSONB,
+)
 from sqlalchemy.orm import relationship, Mapped, mapped_column
 
 from core.types.user_id import UserIdType
@@ -27,6 +30,17 @@ class SQLAlchemyUserDatabase(SQLAlchemyUserDatabaseGeneric):
 
 
 class User(Base, IdUuidPkMixin, SQLAlchemyBaseUserTable[UserIdType]):
+    # stores first_name, last_name, and middle_name
+    username: Mapped[dict[str, str | None]] = mapped_column(
+        JSONB,
+        nullable=False,
+        default=lambda: {
+            "first_name": None,
+            "last_name": None,
+            "middle_name": None,
+        },
+    )
+
     access_tokens: Mapped[list["AccessToken"]] = relationship(
         back_populates="user",
     )
