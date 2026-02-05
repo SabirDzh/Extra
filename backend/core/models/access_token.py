@@ -11,17 +11,18 @@ from sqlalchemy.orm import (
     relationship,
 )
 
-from core.types.user_id import UserIdType
+from core.types.user_id import UuIDMixin
 
 from .base import Base
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
+
     from core.models import User
 
 
-class AccessToken(Base, SQLAlchemyBaseAccessTokenTable[UserIdType]):
-    user_id: Mapped[UserIdType] = mapped_column(
+class AccessToken(Base, SQLAlchemyBaseAccessTokenTable[UuIDMixin]):
+    user_id: Mapped[UuIDMixin] = mapped_column(
         ForeignKey("users.id", ondelete="cascade"),
         nullable=False,
     )

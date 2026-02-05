@@ -1,21 +1,23 @@
 from fastapi_users import schemas
 from pydantic import (
     BaseModel,
+    Field,
     model_validator,
 )
-from typing_extensions import Self
 from utils.role import UserRole
 
-from core.types.user_id import UserIdType
+from core.types.user_id import UuIDMixin
 
 
 class UserUsername(BaseModel):  # structures for working with names
-    first_name: str | None = None
+    first_name: str = Field(..., min_length=1, max_length=128)
     last_name: str | None = None
     middle_name: str | None = None
+    # TODO сделать поля обязательными (хотя бы одно из полей точно должно быть заполнено, можно оставить first_name)
+    # я хз, добавлять паттер pattern="^[A-Za-z0-9-_]+$" тут или нет, сам уже реши
 
 
-class UserRead(schemas.BaseUser[UserIdType]):
+class UserRead(schemas.BaseUser[UuIDMixin]):
     role: UserRole
     username: UserUsername  # response
 

@@ -1,6 +1,5 @@
 import hashlib
 from typing import (
-    TYPE_CHECKING,
     Annotated,
     Any,
     Awaitable,
@@ -22,9 +21,6 @@ from fastapi import APIRouter, Depends, Request, Response
 from fastapi_cache.decorator import cache
 
 from api.dependencies.authentication import get_users_db
-
-if TYPE_CHECKING:
-    from core.models import User
 
 router = APIRouter(
     prefix=settings.api.v1.users,

@@ -1,6 +1,5 @@
 from typing import TYPE_CHECKING
 
-from fastapi_users.db import SQLAlchemyBaseUserTable
 from fastapi_users_db_sqlalchemy import (
     SQLAlchemyUserDatabase as SQLAlchemyUserDatabaseGeneric,
 )
@@ -14,7 +13,7 @@ from sqlalchemy.dialects.postgresql import (
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from utils.role import UserRole
 
-from core.types.user_id import UserIdType
+from core.types.user_id import UuIDMixin
 
 from .base import Base
 from .mixins.id_int_pk import IdUuidPkMixin

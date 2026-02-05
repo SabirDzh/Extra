@@ -1,34 +1,35 @@
 import logging
-from typing import Optional, TYPE_CHECKING
+import uuid
+from typing import TYPE_CHECKING, Optional
 
 from fastapi_cache import FastAPICache
 from fastapi_users import (
     BaseUserManager,
-    IntegerIDMixin,
+    UUIDIDMixin,
 )
 from fastapi_users.db import BaseUserDatabase
-
-from core.config import settings
-from core.types.user_id import UserIdType
-from core.models import User
 from mailing.send_email_confirmed import send_email_confirmed
 from mailing.send_verification_email import send_verification_email
 from utils.webhooks.user import send_new_user_notification
 
+from core.config import settings
+from core.models import User
+from core.types.user_id import UuIDMixin
+
 if TYPE_CHECKING:
-    from fastapi import Request, BackgroundTasks
+    from fastapi import BackgroundTasks, Request
     from fastapi_users.password import PasswordHelperProtocol
 
 log = logging.getLogger(__name__)
 
 
-class UserManager(IntegerIDMixin, BaseUserManager[User, UserIdType]):
+class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
     reset_password_token_secret = settings.access_token.reset_password_token_secret
     verification_token_secret = settings.access_token.verification_token_secret
 
     def __init__(
         self,
-        user_db: BaseUserDatabase[User, UserIdType],
+        user_db: BaseUserDatabase[User, UuIDMixin],
         password_helper: Optional["PasswordHelperProtocol"] = None,
         background_tasks: Optional["BackgroundTasks"] = None,
     ):
