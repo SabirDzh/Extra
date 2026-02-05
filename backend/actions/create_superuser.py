@@ -9,6 +9,7 @@ from core.models import (
     db_helper,
 )
 from core.schemas.user import UserCreate, UserUsername
+from fastapi import BackgroundTasks
 from utils.role import UserRole
 
 # from fastapi_users.exceptions import UserAlreadyExists
@@ -54,9 +55,12 @@ async def create_superuser(
         role=role,
         username=username,
     )
+    bg = BackgroundTasks()
     async with db_helper.session_factory() as session:
         async with get_users_db_context(session) as users_db:
-            async with get_user_manager_context(users_db) as user_manager:
+            async with get_user_manager_context(
+                users_db, background_tasks=bg
+            ) as user_manager:
                 return await create_user(
                     user_manager=user_manager,
                     user_create=user_create,

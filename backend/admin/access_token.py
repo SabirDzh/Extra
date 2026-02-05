@@ -1,17 +1,17 @@
 import secrets
 from typing import Any
 
+from core.models import AccessToken
 from sqladmin import ModelView
 from starlette.requests import Request
 
 from admin.converter import ModelConverter
-from core.models import AccessToken
 
 
 class AccessTokenAdmin(ModelView, model=AccessToken):
     column_list = [
         AccessToken.token,
-        AccessToken.created_at,
+        str(AccessToken.created_at),
         AccessToken.user,
     ]
     form_converter = ModelConverter
@@ -22,7 +22,7 @@ class AccessTokenAdmin(ModelView, model=AccessToken):
     can_edit = False
     form_excluded_columns = [
         AccessToken.user_id,
-        AccessToken.created_at,
+        str(AccessToken.created_at),
     ]
     form_create_rules = [
         "user",
