@@ -38,28 +38,14 @@ http OPTIONS http://localhost:8000/api/v1/auth/login 'Access-Control-Request-Met
 7. подумать над логикой выдачи ролей пользователям, если оставить выбор за пользователем, все будут админами, нам нужна система которая будет проверять, можно сделать так, назначить на определенного человека статус суперюзера, и он уже будет выдавать кому надо роль администратора, но как это реализовать правильно надо еще подумать
 8. у нас выдается аксес токен только после входа в зарегистрированный аккаунт, можно сделать чтобы при регистрации тоже выдавался, что думаешь
 
-9. решить ошибку в backend/core/schemas/user.py, описание в TODO внутри комментария (просто чекни)
-10. решить вопрос в backend/core/schemas/user.py, описано в TODO
-11. контроллер /api/v1/users/me выдает ошибку (такую же как ниже)
-12. контроллер /api/v1/auth/logout выдает ошибку: 
-`sqlalchemy.exc.ProgrammingError: (sqlalchemy.dialects.postgresql.asyncpg.ProgrammingError) <class 'asyncpg.exceptions.UndefinedFunctionError'>: operator does not exist: uuid = bigint
-HINT:  No operator matches the given name and argument types. You might need to add explicit type casts.
-[SQL: SELECT users.email, users.hashed_password, users.is_active, users.is_superuser, users.is_verified, users.username, users.role, users.id
-FROM users
-WHERE users.id = $1::BIGINT]
-[parameters: (2140135120920776520886332186080348797,)]
-(Background on this error at: https://sqlalche.me/e/20/f405)` при попытке выйти из аккаунте 
-13. контроллер /api/v1/users/me (patch), такая же ошибка 
-14. контроллер /api/v1/users/{user_id}, также 
-15. контроллер /api/v1/users/{user_id} (patch), также 
-16. контроллер /api/v1/users/{user_id} (delete), также 
-17. контроллер /api/v1/messages, также 
-18. контроллер /api/v1/messages/secrets, также 
+9. решить ошибку, описание в TODO внутри комментария (просто чекни) backend/core/schemas/user.py
+10. решить вопрос, описано в TODO, backend/core/schemas/user.py
 19. контроллер /api/v1/auth/request-verify-token возвращает null и токен верификации с uuid пользователя в терминал (сообщение от user_manager)
-20. контроллер /api/v1/auth/verify возвращает 400 ошибку, как с указанным токеном, так и без него 
-21. контроллер /api/v1/auth/forgot-password возвращает 400 ошибку, вместе с токеном сброса и uuid пользователя в терминал (сообщение от user_manager), в самом ответе идет null
-22. контроллер /api/v1/auth/reset-password возвращает 400 ошибку, как с использованием reset-токена, так и без него 
-
+21. контроллер /api/v1/auth/forgot-password возвращает вместе с токеном сброса и uuid пользователя в терминал (сообщение от user_manager), в самом ответе идет null
+22. контроллер /api/v1/auth/reset-password возвращает как с использованием reset-токена, так и без него 
+23. ввести валидацию для пароля, по стандарту, не меньше 12 символов и ввести определенный паттерн
+24. блять, убрать надо вывод в терминал с вебхука данных о пользователе и теле http, заебало меня, путь backend/utils/webhooks/user.py
+25. возможно сделать отпарвку 404 код вместо 403, чтобы скрыть существования контроллеров которые не может использовать пользователь если он попытается отправить запрос 
 ---
 
 МОДУЛЬ 2
@@ -98,7 +84,7 @@ WHERE users.id = $1::BIGINT]
 - возможность просмотривать средние баллы за все тесты по каждому курсу
 - возможность просмотреть на каких вопросах возникает чаще всего затруднение у пользователей, где они часто допускают ошибку/ошбики
 
-# COMPLETED
+# COMPLETED (Zerno)
 
 5. добавить поле username (внутри которого будут поля first_name, last_name, patronymic or middle_name) 
 class UserUsername(BaseModel):
@@ -113,3 +99,11 @@ lifetime_seconds: int = 600
 6.  проверить, идет ли проверка повторного пароля для проверку на фронтенде, если нет, ввести новое поле в схеме для валидации
 role: UserRole
 password_confirm: str
+
+# COMPLETED (Sabir)
+
+9. добавил обязательное поля first_name, остальные оставил по желанию  
+10. исправил ошибку во всех контроллерах auth
+11. исправил ошибки миграции и совместимости
+12. устанил ошибку 400 при логине 
+13. все контроллеры Users, Messages, Service и Webhooks работают исправно (также провести проверки с использованием суперюзер аккаунта)

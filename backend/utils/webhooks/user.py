@@ -2,8 +2,6 @@ import logging
 import time
 
 import aiohttp
-from fastapi.encoders import jsonable_encoder
-
 from core.models import User
 from core.schemas.user import UserRead, UserRegisteredNotification
 

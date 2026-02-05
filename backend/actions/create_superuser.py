@@ -2,15 +2,14 @@ import asyncio
 import contextlib
 from os import getenv
 
-from api.dependencies.authentication import get_users_db
-from api.dependencies.authentication import get_user_manager
+from api.dependencies.authentication import get_user_manager, get_users_db
 from core.authentication.user_manager import UserManager
 from core.models import (
-    db_helper,
     User,
+    db_helper,
 )
-
-from core.schemas.user import UserCreate
+from core.schemas.user import UserCreate, UserUsername
+from utils.role import UserRole
 
 # from fastapi_users.exceptions import UserAlreadyExists
 
@@ -24,6 +23,8 @@ default_password = getenv("DEFAULT_PASSWORD", "abc")
 default_is_active = True
 default_is_superuser = True
 default_is_verified = True
+role = UserRole.admin
+username = UserUsername(first_name="admin", last_name=None, middle_name=None)
 
 
 async def create_user(
@@ -50,6 +51,8 @@ async def create_superuser(
         is_active=is_active,
         is_superuser=is_superuser,
         is_verified=is_verified,
+        role=role,
+        username=username,
     )
     async with db_helper.session_factory() as session:
         async with get_users_db_context(session) as users_db:
