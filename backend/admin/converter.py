@@ -9,15 +9,14 @@ from sqladmin.forms import (
 from sqladmin.forms import (
     converts,
 )
-from sqlalchemy.orm import ColumnProperty
 
 
 class ModelConverter(ModelConverterGeneric):
+    @staticmethod
     @converts("TIMESTAMPAware")
     def conv_timestamp_aware(
-        self,
         model: type,
-        prop: ColumnProperty,
+        prop: Any,
         kwargs: dict[str, Any],
-    ):
+    ) -> Any:
         return DateTimeField(**kwargs)
