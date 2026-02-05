@@ -81,7 +81,7 @@ class DatabaseConfig(BaseModel):
 
 
 class AccessToken(BaseModel):
-    lifetime_seconds: int = 3600
+    lifetime_seconds: int = 600
     reset_password_token_secret: str
     verification_token_secret: str
 
@@ -106,7 +106,7 @@ class CacheConfig(BaseModel):
 
 
 class CookieConfig(BaseModel):
-    lifetime_seconds: int = 3600
+    lifetime_seconds: int = 600
     secure: bool = False  # TODO когда будет использоваться https поменять на True
     name: str = "auth_user"
 
