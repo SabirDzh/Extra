@@ -1,12 +1,16 @@
-from typing import TYPE_CHECKING, Annotated
-
-from fastapi import APIRouter, Depends, Response, Request
-from fastapi_cache.decorator import cache
-
 import hashlib
-from typing import Any, Callable, Dict, Optional, Tuple
+from typing import (
+    TYPE_CHECKING,
+    Annotated,
+    Any,
+    Awaitable,
+    Callable,
+    Dict,
+    Optional,
+    Tuple,
+    Union,
+)
 
-from api.dependencies.authentication import get_users_db
 from core.authentication.fastapi_users import fastapi_users
 from core.config import settings
 from core.models.user import SQLAlchemyUserDatabase
@@ -14,6 +18,10 @@ from core.schemas.user import (
     UserRead,
     UserUpdate,
 )
+from fastapi import APIRouter, Depends, Request, Response
+from fastapi_cache.decorator import cache
+
+from api.dependencies.authentication import get_users_db
 
 if TYPE_CHECKING:
     from core.models import User
@@ -26,13 +34,13 @@ router = APIRouter(
 
 def users_list_key_builder(
     func: Callable[..., Any],
-    namespace: str,
+    namespace: str = "",
     *,
     request: Optional[Request] = None,
     response: Optional[Response] = None,
     args: Tuple[Any, ...],
     kwargs: Dict[str, Any],
-) -> str:
+) -> Union[str, Awaitable[str]]:
     exclude_types = (SQLAlchemyUserDatabase,)
     cache_kw = {}
     for name, value in kwargs.items():

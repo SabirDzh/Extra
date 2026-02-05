@@ -1,35 +1,46 @@
 from typing import TYPE_CHECKING
 
+from fastapi_users.db import SQLAlchemyBaseUserTable
 from fastapi_users_db_sqlalchemy import (
-    SQLAlchemyBaseUserTable,
     SQLAlchemyUserDatabase as SQLAlchemyUserDatabaseGeneric,
 )
-from sqlalchemy import select
+from sqlalchemy import Boolean, String, select
 from sqlalchemy.dialects.postgresql import (
     ENUM as PgEnum,
+)
+from sqlalchemy.dialects.postgresql import (
     JSONB,
 )
-from sqlalchemy.orm import relationship, Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+from utils.role import UserRole
 
 from core.types.user_id import UserIdType
+
 from .base import Base
 from .mixins.id_int_pk import IdUuidPkMixin
-from utils.role import UserRole
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
+
     from core.models import AccessToken
 
 
 class SQLAlchemyUserDatabase(SQLAlchemyUserDatabaseGeneric):
-
     async def get_users(self) -> list["User"]:
         statement = select(User).order_by(User.id)
         results = await self.session.scalars(statement)
         return list(results.all())
 
 
-class User(Base, IdUuidPkMixin, SQLAlchemyBaseUserTable[UserIdType]):
+class User(IdUuidPkMixin, Base):
+    email: Mapped[str] = mapped_column(
+        String(length=320), unique=True, index=True, nullable=False
+    )
+    hashed_password: Mapped[str] = mapped_column(String(length=1024), nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    is_superuser: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    is_verified: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+
     # stores first_name, last_name, and middle_name
     username: Mapped[dict[str, str | None]] = mapped_column(
         JSONB,

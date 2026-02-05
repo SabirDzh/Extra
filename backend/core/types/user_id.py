@@ -1,3 +1,3 @@
-import uuid
+from uuid import UUID
 
-UserIdType = uuid.UUID
+UserIdType = UUID

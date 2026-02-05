@@ -23,13 +23,15 @@ class UserRead(schemas.BaseUser[UserIdType]):
 class UserCreate(schemas.BaseUserCreate):
     role: UserRole
     username: UserUsername  # registration
-    password_confirm: str
+    # password_confirm: str | None = None
 
-    @model_validator(mode="after")
-    def check_passwords_match(self) -> Self:
-        if self.password != self.password_confirm:
-            raise ValueError("passwords do not match")
-        return self
+    # @model_validator(mode="after")
+    # def check_passwords_match(self) -> Self:
+    #     if self.password != self.password_confirm:
+    #         raise ValueError("passwords do not match")
+    #     return self
+
+    # TODO устани конфликты полей, из-за того что второе поле пароля обязательное, в крудах при использовании схемы не передается поле password_confirm возникает ошибка
 
 
 class UserUpdate(schemas.BaseUserUpdate):

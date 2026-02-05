@@ -1,7 +1,7 @@
-from sqlalchemy.orm import Mapped
-from sqlalchemy.orm import mapped_column
 import uuid
+
 import uuid_utils
+from sqlalchemy.orm import Mapped, mapped_column
 
 
 class IdUuidPkMixin:
