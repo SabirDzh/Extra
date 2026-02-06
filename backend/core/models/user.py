@@ -3,13 +3,11 @@ from typing import TYPE_CHECKING
 from fastapi_users_db_sqlalchemy import (
     SQLAlchemyUserDatabase as SQLAlchemyUserDatabaseGeneric,
 )
-from sqlalchemy import Boolean, String, select
+from sqlalchemy import JSON, Boolean, String, select
 from sqlalchemy.dialects.postgresql import (
     ENUM as PgEnum,
 )
-from sqlalchemy.dialects.postgresql import (
-    JSONB,
-)
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from utils.role import UserRole
 
@@ -41,11 +39,12 @@ class User(IdUuidPkMixin, Base):
     is_verified: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     # stores first_name, last_name, and middle_name
+    # TODO заменить на JSONB, используется JSON для тестирования
     username: Mapped[dict[str, str | None]] = mapped_column(
         JSONB,
         nullable=False,
         default=lambda: {
-            "first_name": None,
+            "first_name": str,
             "last_name": None,
             "middle_name": None,
         },

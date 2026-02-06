@@ -10,9 +10,9 @@ from core.types.user_id import UuIDMixin
 
 
 class UserUsername(BaseModel):  # structures for working with names
-    first_name: str = Field(..., min_length=1, max_length=128)
-    last_name: str | None = None
-    middle_name: str | None = None
+    first_name: str = Field(..., min_length=1, max_length=128, pattern="^[A-Za-z-_]+$")
+    last_name: str | None = Field(None, max_length=128, pattern="^[A-Za-z-_]+$")
+    middle_name: str | None = Field(None, max_length=128, pattern="^[A-Za-z-_]+$")
     # TODO сделать поля обязательными (хотя бы одно из полей точно должно быть заполнено, можно оставить first_name)
     # я хз, добавлять паттер pattern="^[A-Za-z0-9-_]+$" тут или нет, сам уже реши
 
