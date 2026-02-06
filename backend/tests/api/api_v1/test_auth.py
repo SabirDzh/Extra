@@ -5,7 +5,7 @@ from httpx import AsyncClient
 async def test_register_user(client: AsyncClient):
     payload = {
         "email": "test@example.com",
-        "password": "password123",
+        "password": "password12345",
         "role": "user",
         "username": {
             "first_name": "TestUser"
@@ -25,7 +25,7 @@ async def test_login_user(client: AsyncClient):
     # First register
     payload = {
         "email": "login@example.com",
-        "password": "password123",
+        "password": "password12345",
         "role": "user",
         "username": {
             "first_name": "LoginUser"
@@ -44,7 +44,7 @@ async def test_login_user(client: AsyncClient):
     # Login
     login_data = {
         "username": "login@example.com",
-        "password": "password123"
+        "password": "password12345"
     }
     response = await client.post("/api/v1/auth/login", data=login_data)
     # If fails, it might be because user is not active or verified.

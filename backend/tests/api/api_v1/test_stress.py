@@ -8,7 +8,7 @@ async def test_register_user_with_emojis(client: AsyncClient):
     """Test registration with emojis in text fields. Should be handled gracefully (accepted or rejected properly), not 500."""
     payload = {
         "email": "emoji_user@example.com",
-        "password": "password123",
+        "password": "password12345",
         "role": "user",
         "username": {
             "first_name": "😊User🚀",
@@ -36,7 +36,7 @@ async def test_register_user_with_huge_input(client: AsyncClient):
     huge_string = "a" * 1000  # Schema max is 128
     payload = {
         "email": "huge_input@example.com",
-        "password": "password123",
+        "password": "password12345",
         "role": "user",
         "username": {
             "first_name": huge_string
@@ -58,7 +58,7 @@ async def test_register_user_sql_injection_payload(client: AsyncClient):
     """Test registration with SQL injection payloads. Pydantic/ORM should sanitize this."""
     payload = {
         "email": "sql_inject@example.com",
-        "password": "password123",
+        "password": "password12345",
         "role": "user",
         "username": {
             "first_name": "Robert'); DROP TABLE users; --"
@@ -83,7 +83,7 @@ async def test_register_user_xss_payload(client: AsyncClient):
     """Test registration with XSS payloads."""
     payload = {
         "email": "xss@example.com",
-        "password": "password123",
+        "password": "password12345",
         "role": "user",
         "username": {
             "first_name": "<script>alert('XSS')</script>"
@@ -105,7 +105,7 @@ async def test_register_invalid_email_format(client: AsyncClient):
     """Test registration with invalid email format."""
     payload = {
         "email": "not-an-email",
-        "password": "password123",
+        "password": "password12345",
         "role": "user",
         "username": {
             "first_name": "User"
@@ -126,7 +126,7 @@ async def test_register_invalid_role(client: AsyncClient):
     """Test registration with a role that is not in the Enum."""
     payload = {
         "email": "bad_role@example.com",
-        "password": "password123",
+        "password": "password12345",
         "role": "god_emperor",
         "username": {
             "first_name": "User"
@@ -148,7 +148,7 @@ async def test_register_empty_first_name(client: AsyncClient):
     """Test registration with empty first name string."""
     payload = {
         "email": "empty_name@example.com",
-        "password": "password123",
+        "password": "password12345",
         "role": "user",
         "username": {
             "first_name": ""

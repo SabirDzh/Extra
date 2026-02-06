@@ -21,6 +21,7 @@ class UserRead(schemas.BaseUser[UuIDMixin]):
 
 
 class UserCreate(schemas.BaseUserCreate):
+    password: str = Field(..., min_length=12, max_length=128)
     role: UserRole
     username: UserUsername  # registration
     # password_confirm: str | None = None

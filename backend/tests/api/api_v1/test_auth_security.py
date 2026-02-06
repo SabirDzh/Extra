@@ -13,7 +13,7 @@ async def test_security_privilege_escalation_attempt(client: AsyncClient):
     """
     payload = {
         "email": "hacker_admin@example.com",
-        "password": "password123",
+        "password": "password12345",
         "role": "user",
         "username": {"first_name": "Hacker"},
         # Attempt to inject flags
@@ -43,7 +43,7 @@ async def test_security_role_escalation(client: AsyncClient):
     """
     payload = {
         "email": "hacker_role@example.com",
-        "password": "password123",
+        "password": "password12345",
         "role": "administrator", # Try to grab admin role
         "username": {"first_name": "Hacker"}
     }
@@ -72,7 +72,7 @@ async def test_security_type_confusion_email(client: AsyncClient):
     """
     payload = {
         "email": {"$ne": "something"}, # Mongo-style injection attempt
-        "password": "password123",
+        "password": "password12345",
         "role": "user",
         "username": {"first_name": "Hacker"}
     }
@@ -112,7 +112,7 @@ async def test_security_os_command_injection(client: AsyncClient):
     for cmd in payloads:
         payload = {
             "email": "cmd_inject@example.com",
-            "password": "password123",
+            "password": "password12345",
             "role": "user",
             "username": {"first_name": cmd}
         }
@@ -136,7 +136,7 @@ async def test_security_path_traversal(client: AsyncClient):
     for path in paths:
         payload = {
             "email": "path@example.com",
-            "password": "password123",
+            "password": "password12345",
             "role": "user",
             "username": {"first_name": path}
         }
@@ -186,7 +186,7 @@ async def test_security_unknown_fields_stripping(client: AsyncClient):
     """
     payload = {
         "email": "strip_fields@example.com",
-        "password": "password123",
+        "password": "password12345",
         "role": "user",
         "username": {"first_name": "Test"},
         
@@ -231,7 +231,7 @@ async def test_security_huge_json_dos(client: AsyncClient):
     massive_list = ["a"] * 5000
     payload = {
         "email": "dos@example.com",
-        "password": "password123",
+        "password": "password12345",
         "role": "user",
         "username": {"first_name": "Test", "middle_name": str(massive_list)}
     }

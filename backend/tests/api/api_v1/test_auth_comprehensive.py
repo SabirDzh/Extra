@@ -41,8 +41,7 @@ INVALID_USERNAMES = [
 async def test_register_invalid_emails_strict(client: AsyncClient, email):
     """Attempt to register with strictly invalid email addresses."""
     payload = {
-        "email": email,
-        "password": "password123",
+        "password": "password12345",
         "role": "user",
         "username": {"first_name": "Test"},
         "is_active": True,
@@ -57,7 +56,7 @@ async def test_register_complex_emails(client: AsyncClient, input_email, expecte
     """Check how system handles complex email formats (e.g. normalization)."""
     payload = {
         "email": input_email,
-        "password": "password123",
+        "password": "password12345",
         "role": "user",
         "username": {"first_name": "Test"},
         "is_active": True,
@@ -80,7 +79,7 @@ async def test_register_invalid_username_structure(client: AsyncClient, username
     """Attempt to register with malformed username dictionary."""
     payload = {
         "email": "valid@example.com",
-        "password": "password123",
+        "password": "password12345",
         "role": "user",
         "username": username_payload,
         "is_active": True,
@@ -94,7 +93,7 @@ async def test_register_duplicate_email(client: AsyncClient):
     """Test that registering the same email twice fails."""
     payload = {
         "email": "duplicate@example.com",
-        "password": "password123",
+        "password": "password12345",
         "role": "user",
         "username": {"first_name": "First"}
     }
@@ -108,7 +107,7 @@ async def test_register_missing_fields(client: AsyncClient):
     """Test payloads with missing top-level fields."""
     base_payload = {
         "email": "missing@example.com",
-        "password": "password123",
+        "password": "password12345",
         "role": "user",
         "username": {"first_name": "Test"}
     }
@@ -151,7 +150,7 @@ async def test_register_case_insensitivity(client: AsyncClient):
     """Test that email registration is likely case-insensitive regarding duplicates."""
     payload1 = {
         "email": "CASE@example.com",
-        "password": "password123",
+        "password": "password12345",
         "role": "user",
         "username": {"first_name": "Test"}
     }
@@ -169,7 +168,7 @@ async def test_register_valid_roles(client: AsyncClient, role_value):
     """Test that all defined roles are accepted."""
     payload = {
         "email": f"role_{role_value}@example.com",
-        "password": "password123",
+        "password": "password12345",
         "role": role_value,
         "username": {"first_name": "Test"}
     }
@@ -225,7 +224,7 @@ async def test_reset_password_bad_token(client: AsyncClient):
     """Test reset password with invalid token."""
     payload = {
         "token": "invalid_token",
-        "password": "newpassword123"
+        "password": "newpassword12345"
     }
     response = await client.post("/api/v1/auth/reset-password", json=payload)
     assert response.status_code == 400
@@ -321,21 +320,21 @@ async def test_secrets_role_access(client: AsyncClient, create_user):
     # 1. User
     u_email = "u@test.com"
     await create_user(u_email, role="user")
-    await client.post("/api/v1/auth/login", data={"username": u_email, "password": "password"})
+    await client.post("/api/v1/auth/login", data={"username": u_email, "password": "password12345"})
     resp = await client.get("/api/v1/messages/secrets")
     assert resp.status_code == 403 # Forbidden
     
     # 2. Client (assuming client also forbidden)
     c_email = "c@test.com"
     await create_user(c_email, role="client")
-    await client.post("/api/v1/auth/login", data={"username": c_email, "password": "password"})
+    await client.post("/api/v1/auth/login", data={"username": c_email, "password": "password12345"})
     resp = await client.get("/api/v1/messages/secrets")
     assert resp.status_code == 403
     
     # 3. Administrator
     a_email = "a@test.com"
     await create_user(a_email, role="administrator", is_superuser=True) # Superuser check in dependency
-    await client.post("/api/v1/auth/login", data={"username": a_email, "password": "password"})
+    await client.post("/api/v1/auth/login", data={"username": a_email, "password": "password12345"})
     resp = await client.get("/api/v1/messages/secrets")
     assert resp.status_code == 200
 

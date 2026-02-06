@@ -71,7 +71,7 @@ async def client(session) -> AsyncGenerator[AsyncClient, None]:
 async def create_user(session):
     async def _create_user(
         email: str,
-        password: str = "password",
+        password: str = "password12345",
         is_superuser: bool = False,
         role: str = "user",
     ):
@@ -97,7 +97,7 @@ async def create_user(session):
 @pytest.fixture
 async def normal_user_token_headers(client, create_user):
     email = "normal@example.com"
-    password = "password"
+    password = "password12345"
     await create_user(email, password)
 
     resp = await client.post(
@@ -122,7 +122,7 @@ async def normal_user_token_headers(client, create_user):
 @pytest.fixture
 async def superuser_token_headers(client, create_user):
     email = "super@example.com"
-    password = "password"
+    password = "password12345"
     await create_user(email, password, is_superuser=True, role="administrator")
 
     resp = await client.post(

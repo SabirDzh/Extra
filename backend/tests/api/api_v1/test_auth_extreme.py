@@ -47,7 +47,7 @@ async def test_register_extreme_usernames(client: AsyncClient, desc, name_value)
     """Test registration with various unicode scripts and whitespace."""
     payload = {
         "email": f"extreme_{desc.replace(' ', '_')}@example.com",
-        "password": "password123",
+        "password": "password12345",
         "role": "user",
         "username": {"first_name": name_value},
         "is_active": True,
@@ -101,7 +101,7 @@ async def test_register_weird_emails(client: AsyncClient, email):
     """Test registration with valid but unusual emails."""
     payload = {
         "email": email,
-        "password": "password123",
+        "password": "password12345",
         "role": "user",
         "username": {"first_name": "Test"},
         "is_active": True,
@@ -122,7 +122,7 @@ async def test_null_byte_attack(client: AsyncClient):
     # but many backends reject them because text fields in DBs (like Postgres) don't support null bytes.
     payload = {
         "email": "nullbyte@example.com",
-        "password": "password123",
+        "password": "password12345",
         "role": "user",
         "username": {"first_name": "User\u0000Name"},
         "is_active": True,
