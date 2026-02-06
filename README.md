@@ -1,4 +1,4 @@
-# FastAPI Example App
+# FastAPI App
 
 FastAPI-Users:
 
@@ -8,6 +8,9 @@ FastAPI-Users:
 FastAPI Base app:
 
 - https://github.com/mahenzon/FastAPI-base-app
+
+# Miro
+- [ссылка](https://miro.com/welcomeonboard/a1NwdEkvV3N5eWlOSXlCT1MyV1hSamlsbUQ0UjlEVm5ia2ZkQkRtNy9xM1Vqcng0WmZ3RWUyY1NTcndrVTFvNzQ2THFzTDZkVUdlNDg1dXFJRGZ6TkxaTk9XdnkxNHViaDJqUGpXc3RqdDZaay9wZWtmTGN3bEpvSDBxMVJmb0ZNakdSWkpBejJWRjJhRnhhb1UwcS9BPT0hdjE=?share_link_id=942239675421)
 
 Run with usage of env params:
 
@@ -29,7 +32,7 @@ gunicorn main:main_app --workers 4 --worker-class uvicorn.workers.UvicornWorker 
 http OPTIONS http://localhost:8000/api/v1/auth/login 'Access-Control-Request-Method:GET' 'Origin: http://localhost:8000'
 ```
 
-# Запуск cron для очистки таблицы access_tokens от устаревших токенов 
+Запуск cron для очистки таблицы access_tokens от устаревших токенов 
 ```psql 
 crontab -e
 
@@ -37,27 +40,13 @@ crontab -e
 -c "DELETE FROM access_tokens WHERE created_at < now() - interval '600 seconds';"
 ```
 
-# ЗАДАЧИ
+# Тесты 
+- `Перед запуском тестов сменить тип данных с JSONB на JSON в поле username для таблицы базы данных User`
+- backend/core/models/user.py
 
-1. добавить refresh токен 
-2. написать на celery/schedule/cron очистку таблицы access_tokens от устаревших токенов 
-3. назначить для десериализации и сериализации по умолчанию с использованием jsonb формата (написан на rust)
-4. добавить подтверждение по email
-7. подумать над логикой выдачи ролей пользователям, если оставить выбор за пользователем, все будут админами, нам нужна система которая будет проверять, можно сделать так, назначить на определенного человека статус суперюзера, и он уже будет выдавать кому надо роль администратора, но как это реализовать правильно надо еще подумать
-8. у нас выдается аксес токен только после входа в зарегистрированный аккаунт, можно сделать чтобы при регистрации тоже выдавался, что думаешь
-9. решить ошибку, описание в TODO внутри комментария (просто чекни) backend/core/schemas/user.py
-10. решить вопрос, описано в TODO, backend/core/schemas/user.py
-19. контроллер /api/v1/auth/request-verify-token возвращает null (`посмотреть, может стоит статус 200 выдавать с json ответом какой нибудь, также с остальными которые указал ниже, на твое усмотрение`) и токен верификации с uuid пользователя в терминал (сообщение от user_manager)
-21. контроллер /api/v1/auth/forgot-password возвращает вместе с токеном сброса и uuid пользователя в терминал (сообщение от user_manager), в самом ответе идет null
-22. контроллер /api/v1/auth/reset-password возвращает как с использованием reset-токена, так и без него 
-23. ввести валидацию для пароля, по стандарту, не меньше 12 символов и ввести определенный паттерн
-24. блять, убрать надо вывод в терминал с вебхука данных о пользователе и теле http, заебало меня, путь backend/utils/webhooks/user.py
-25. возможно сделать отпарвку 404 код вместо 403, чтобы скрыть существования контроллеров которые не может использовать пользователь если он попытается отправить запрос 
----
+# МОДУЛЬ 2 (`будут перенесены в miro`)
 
-МОДУЛЬ 2
-
-# Реализовать профиль
+## Реализовать профиль
 
 - фио
 - email
@@ -73,9 +62,9 @@ crontab -e
 
 ---
 
-МОДУЛЬ 4
+# МОДУЛЬ 4 (`будут перенесены в miro`)
 
-# Реализовать админку
+## Реализовать админку
 
 - возможность администратора выдавать роли любому пользователю, также их понижать
 - возможность открывать доступ к курсам для пользователя или группы пользователей
@@ -90,27 +79,3 @@ crontab -e
 - возможность просмотреть сколько людей какой курс начали и сколько закончили
 - возможность просмотривать средние баллы за все тесты по каждому курсу
 - возможность просмотреть на каких вопросах возникает чаще всего затруднение у пользователей, где они часто допускают ошибку/ошбики
-
-# COMPLETED (Zerno)
-
-5. добавить поле username (внутри которого будут поля first_name, last_name, patronymic or middle_name) 
-class UserUsername(BaseModel):
-class User(Base, IdUuidPkMixin, SQLAlchemyBaseUserTable[UserIdType]):
-
-1. уменьшено время жизни access токена с 3600 секунд до 600-300
-class AccessToken(BaseModel):
-lifetime_seconds: int = 600
-class CookieConfig(BaseModel):
-lifetime_seconds: int = 600
-
-6.  проверить, идет ли проверка повторного пароля для проверку на фронтенде, если нет, ввести новое поле в схеме для валидации
-role: UserRole
-password_confirm: str
-
-# COMPLETED (Sabir)
-
-9. добавил обязательное поля first_name, остальные оставил по желанию  
-10. исправил ошибку во всех контроллерах auth
-11. исправил ошибки миграции и совместимости
-12. устанил ошибку 400 при логине 
-13. все контроллеры Users, Messages, Service и Webhooks работают исправно (также провести проверки с использованием суперюзер аккаунта)
