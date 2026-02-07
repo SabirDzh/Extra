@@ -26,18 +26,3 @@ services:
       driver: "json-file"
       options:
         max-size: "1m"
-
-  # пока не трогать, скрипт по использованию крон в readme.md
-  cleanup-cron:
-    image: postgres:14-alpine
-    depends_on:
-      - pg
-    volumes:
-      - ./cleanup_access_tokens.sql:/cleanup.sql
-    command: >
-      bash -c "
-      echo '*/5 * * * * psql $DATABASE_URL -f /cleanup.sql' | crontab - &&
-      crond -f
-      "
-    environment:
-      DATABASE_URL: postgresql://user:password@pg-1:5432/shop

@@ -1,8 +1,10 @@
+import re
+
 from fastapi_users import schemas
 from pydantic import (
     BaseModel,
     Field,
-    model_validator,
+    field_validator,
 )
 from utils.role import UserRole
 
@@ -21,7 +23,11 @@ class UserRead(schemas.BaseUser[UuIDMixin]):
 
 
 class UserCreate(schemas.BaseUserCreate):
-    password: str = Field(..., min_length=12, max_length=128)
+    password: str = Field(
+        ...,
+        min_length=12,
+        max_length=128,
+    )
     role: UserRole
     username: UserUsername  # registration
     # password_confirm: str | None = None
@@ -33,6 +39,22 @@ class UserCreate(schemas.BaseUserCreate):
     #     return self
 
     # TODO устани конфликты полей, из-за того что второе поле пароля обязательное, в крудах при использовании схемы не передается поле password_confirm возникает ошибка
+    @field_validator("password")
+    @classmethod
+    def validate_password(cls, v: str) -> str:
+        if not re.search(r"\d", v):
+            raise ValueError("Пароль должен содержать хотя бы одну цифру")
+
+        if not re.search(r"[a-zA-Z]", v):
+            raise ValueError("Пароль должен содержать буквы")
+
+        if not re.search(r"[A-Z]", v):
+            raise ValueError("Пароль должен содержать заглавную букву")
+
+        if not re.search(r"[\W_]", v):
+            raise ValueError("Пароль должен содержать спецсимвол (например, ! @ # $)")
+
+        return v
 
 
 class UserUpdate(schemas.BaseUserUpdate):
