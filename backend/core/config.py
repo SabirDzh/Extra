@@ -1,9 +1,8 @@
 import logging
-from typing import Literal
 from pathlib import Path
+from typing import Literal
 
-from pydantic import BaseModel
-from pydantic import PostgresDsn
+from pydantic import BaseModel, PostgresDsn
 from pydantic_settings import (
     BaseSettings,
     SettingsConfigDict,
@@ -49,6 +48,11 @@ class ApiV1Prefix(BaseModel):
     users: str = "/users"
     messages: str = "/messages"
     service: str = "/service"
+    courses: str = "/courses"
+    profile: str = "/profile"
+    blocks: str = "/blocks"
+    certificates: str = "/certificates"
+    admin: str = "/admin"
 
 
 class ApiPrefix(BaseModel):
@@ -132,4 +136,4 @@ class Settings(BaseSettings):
     cookie: CookieConfig = CookieConfig()
 
 
-settings = Settings()
+settings = Settings()  # pyright: ignore [reportCallIssue]
