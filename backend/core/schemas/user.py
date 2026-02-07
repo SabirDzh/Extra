@@ -42,20 +42,16 @@ class UserCreate(schemas.BaseUserCreate):
     @field_validator("password")
     @classmethod
     def validate_password(cls, v: str) -> str:
-        # 1. Проверка на наличие цифр
         if not re.search(r"\d", v):
             raise ValueError("Пароль должен содержать хотя бы одну цифру")
 
-            # 2. Проверка на наличие букв (защита от паролей типа "12345678")
         if not re.search(r"[a-zA-Z]", v):
             raise ValueError("Пароль должен содержать буквы")
 
-            # 3. (Опционально) Заглавная буква
         if not re.search(r"[A-Z]", v):
             raise ValueError("Пароль должен содержать заглавную букву")
 
-            # 4. (Опционально) Спецсимвол (!@#$%^&*)
-        if not re.search(r"[\W_]", v):  # \W - любой не буквенно-цифровой символ
+        if not re.search(r"[\W_]", v):
             raise ValueError("Пароль должен содержать спецсимвол (например, ! @ # $)")
 
         return v
