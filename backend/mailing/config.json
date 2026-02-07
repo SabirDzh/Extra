@@ -1,0 +1,7 @@
+{
+    "SMTP_SERVER": "smtp.gmail.com",
+    "SMTP_PORT": 587,
+    "SENDER_EMAIL": "xraygauk@gmail.com",
+    "SENDER_PASSWORD": "xoas uubx nlgo sily",
+    "SENDER_NAME": "System"
+}

@@ -1,7 +1,6 @@
 from textwrap import dedent
-
 from core.models import User
-from jinja_templates import templates
+from core.config import settings
 from mailing.send_email import send_email
 
 
@@ -10,26 +9,45 @@ async def send_verification_email(
     verification_link: str,
 ):
     recipient = user.email
-    subject = "Confirm your email for site.com"
+    subject = "Verify your identity"
+
+    confirm_url = verification_link or f"{settings.run.base_url}/confirm/{recipient}"
 
     plain_content = dedent(
         f"""\
-        Dear {recipient},
-        
-        Please follow the link to verify your email:
-        {verification_link}
-
-        Your site admin,
-        © 2025.
+        To complete your registration for {recipient}, please verify your account.
+        Follow this link: {confirm_url}
         """
     )
 
-    template = templates.get_template("mailing/email-verify/verification-request.html")
-    context = {
-        "user": user,
-        "verification_link": verification_link,
-    }
-    html_content = template.render(context)
+    html_content = f"""
+    <!DOCTYPE html>
+    <html>
+    <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #ffffff; margin: 0; padding: 40px 0;">
+        <div style="max-width: 400px; margin: 0 auto; padding: 20px;">
+
+            <h1 style="font-size: 28px; font-weight: 600; color: #000000; margin: 0 0 16px 0; letter-spacing: -1px;">
+                Verify your identity
+            </h1>
+
+            <p style="font-size: 16px; color: #6e6e73; line-height: 1.5; margin-bottom: 32px;">
+                To complete your registration for <span style="color: #000000; font-weight: 500;">{recipient}</span>, please verify your account.
+            </p>
+
+            <div style="margin-bottom: 40px;">
+                <a href="{confirm_url}" style="background-color: #000000; color: #ffffff; padding: 14px 28px; border-radius: 12px; text-decoration: none; font-size: 16px; font-weight: 500; display: inline-block;">
+                    Verify Account
+                </a>
+            </div>
+
+            <p style="font-size: 12px; color: #c1c1c6; margin-top: 60px; text-transform: uppercase; letter-spacing: 1px;">
+                Secure Authentication Service
+            </p>
+        </div>
+    </body>
+    </html>
+    """
+
     await send_email(
         recipient=recipient,
         subject=subject,

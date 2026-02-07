@@ -1,7 +1,14 @@
+import json
+import os
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
 import aiosmtplib
+
+# Load config from JSON
+CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config.json")
+with open(CONFIG_PATH, "r") as f:
+    config = json.load(f)
 
 
 async def send_email(
@@ -10,30 +17,25 @@ async def send_email(
     plain_content: str,
     html_content: str = "",
 ):
-    admin_email = "admin@site.com"
-
     message = MIMEMultipart("alternative")
-    message["From"] = admin_email
+    message["From"] = f"{config['SENDER_NAME']} <{config['SENDER_EMAIL']}>"
     message["To"] = recipient
     message["Subject"] = subject
 
-    plain_text_message = MIMEText(
-        plain_content,
-        "plain",
-        "utf-8",
-    )
-    message.attach(plain_text_message)
+    message.attach(MIMEText(plain_content, "plain", "utf-8"))
 
     if html_content:
-        html_message = MIMEText(
-            html_content,
-            "html",
-            "utf-8",
-        )
-        message.attach(html_message)
+        message.attach(MIMEText(html_content, "html", "utf-8"))
 
-    await aiosmtplib.send(
-        message,
-        hostname="0.0.0.0",
-        port=1025,
-    )
+    try:
+        await aiosmtplib.send(
+            message,
+            hostname=config["SMTP_SERVER"],
+            port=config["SMTP_PORT"],
+            username=config["SENDER_EMAIL"],
+            password=config["SENDER_PASSWORD"],
+            start_tls=True,
+        )
+        print(f"Success: Email delivered to {recipient}")
+    except Exception as e:
+        print(f"Error: Delivery failed to {recipient}. Reason: {e}")
