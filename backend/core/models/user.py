@@ -11,8 +11,6 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from utils.role import UserRole
 
-from core.types.user_id import UuIDMixin
-
 from .base import Base
 from .mixins.id_int_pk import IdUuidPkMixin
 
@@ -20,6 +18,8 @@ if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
 
     from core.models import AccessToken
+    from core.models.block import UserBlockProgress
+    from core.models.certificate import Certificate
 
 
 class SQLAlchemyUserDatabase(SQLAlchemyUserDatabaseGeneric):
@@ -58,6 +58,9 @@ class User(IdUuidPkMixin, Base):
         PgEnum(UserRole),
         default=UserRole.user,
     )
+
+    certificate: Mapped[list["Certificate"]] = relationship(back_populates="user")
+    progress: Mapped[list["UserBlockProgress"]] = relationship(back_populates="user")
 
     @classmethod
     def get_db(cls, session: "AsyncSession"):
