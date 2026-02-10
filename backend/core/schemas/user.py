@@ -12,9 +12,15 @@ from core.types.user_id import UuIDMixin
 
 
 class UserUsername(BaseModel):  # structures for working with names
-    first_name: str = Field(..., min_length=1, max_length=128, pattern="^[A-Za-z-_]+$")
-    last_name: str | None = Field(None, max_length=128, pattern="^[A-Za-z-_]+$")
-    middle_name: str | None = Field(None, max_length=128, pattern="^[A-Za-z-_]+$")
+    first_name: str = Field(
+        ..., min_length=1, max_length=64, pattern="^[A-Za-zА-Яа-яёЁ0-9_-]+$"
+    )
+    last_name: str | None = Field(
+        None, max_length=64, pattern="^[A-Za-zА-Яа-яёЁ0-9_-]+$"
+    )
+    middle_name: str | None = Field(
+        None, max_length=64, pattern="^[A-Za-zА-Яа-яёЁ0-9_-]+$"
+    )
 
 
 class UserRead(schemas.BaseUser[UuIDMixin]):
@@ -37,18 +43,18 @@ class UserCreate(schemas.BaseUserCreate):
     #     if self.password != self.password_confirm:
     #         raise ValueError("passwords do not match")
     #     return self
-
     # TODO устани конфликты полей, из-за того что второе поле пароля обязательное, в крудах при использовании схемы не передается поле password_confirm возникает ошибка
+    #
     @field_validator("password")
     @classmethod
     def validate_password(cls, v: str) -> str:
         if not re.search(r"\d", v):
             raise ValueError("Пароль должен содержать хотя бы одну цифру")
 
-        if not re.search(r"[a-zA-Z]", v):
+        if not re.search(r"[a-zA-Zа-яА-ЯёЁ]", v):
             raise ValueError("Пароль должен содержать буквы")
 
-        if not re.search(r"[A-Z]", v):
+        if not re.search(r"[A-ZА-Я]", v):
             raise ValueError("Пароль должен содержать заглавную букву")
 
         if not re.search(r"[\W_]", v):
