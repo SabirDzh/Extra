@@ -1,10 +1,10 @@
+import json
 import logging
 
 from fastapi import FastAPI, Request, status
 from fastapi.responses import ORJSONResponse
 from pydantic import ValidationError
 from sqlalchemy.exc import DatabaseError
-
 
 log = logging.getLogger(__name__)
 
@@ -16,11 +16,12 @@ def register_errors_handlers(app: FastAPI) -> None:
         request: Request,
         exc: ValidationError,
     ) -> ORJSONResponse:
+        errors_data = json.loads(exc.json())
         return ORJSONResponse(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             content={
                 "message": "Unhandled error",
-                "error": exc.errors(),
+                "error": errors_data,  # exc.errors()
             },
         )
 

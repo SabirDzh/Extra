@@ -54,6 +54,7 @@ class ApiV1Prefix(BaseModel):
     blocks: str = "/blocks"
     certificates: str = "/certificates"
     admin: str = "/admin"
+    product: str = "/product"
 
 
 class ApiPrefix(BaseModel):

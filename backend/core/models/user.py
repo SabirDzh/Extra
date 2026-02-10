@@ -59,7 +59,7 @@ class User(IdUuidPkMixin, Base):
         default=UserRole.user,
     )
 
-    certificate: Mapped[list["Certificate"]] = relationship(back_populates="user")
+    certificates: Mapped[list["Certificate"]] = relationship(back_populates="user")
     progress: Mapped[list["UserBlockProgress"]] = relationship(back_populates="user")
 
     @classmethod

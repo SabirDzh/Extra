@@ -1,8 +1,7 @@
 import uuid
 
 from pydantic import BaseModel
-
-from backend.utils.qestion import QuestionType
+from utils.question import QuestionType
 
 
 class QuestionOptionRead(BaseModel):
