@@ -49,7 +49,7 @@ async def get_product_by_id(
 
 
 @router.get(
-    "/search/search_query",
+    "/search/",
     response_model=list[ProductRead],
     status_code=status.HTTP_200_OK,
 )
