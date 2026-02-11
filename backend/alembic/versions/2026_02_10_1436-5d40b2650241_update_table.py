@@ -40,8 +40,7 @@ def upgrade() -> None:
     )
     op.drop_column("products", "search_product")
 
-    # Добавляем новую с правильным вычислением
-    # Важно: используем sa.text для передачи SQL-выражения генерации
+    # Add a new column with correct computed expression
     op.add_column(
         "products",
         sa.Column(
@@ -55,7 +54,7 @@ def upgrade() -> None:
         ),
     )
 
-    # Создаем индекс
+    # Create index
     op.create_index(
         "idx_search_product", "products", ["search_product"], postgresql_using="gin"
     )

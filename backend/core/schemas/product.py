@@ -10,8 +10,8 @@ class ProductRead(BaseModel):
     description: str
     documentation: (
         str | None
-    )  # уточнить, в кнопке документации будет храниться ссылка на документацию, или сама документация
-    schema_connect: str | None  # еще раз рассмотреть это поле
+    )  # TODO clarify whether this stores a link or the documentation content
+    schema_connect: str | None  # TODO revisit this field
     attributes: dict[str, Any]
     image_url: list[str]
 
@@ -19,19 +19,19 @@ class ProductRead(BaseModel):
 class ProductCreate(BaseModel):
     title: str = Field(
         ..., max_length=256
-    )  # проверить возможность указания паттерна для исключения лишних символов
+    )  # TODO validate whether a pattern should be used to restrict characters
     description: str = Field(..., max_length=2048)
     documentation: str | None = None
-    schema_connect: str | None = None  # посмотреть, надо ли использовать HttpUrl
-    attributes: dict[str, Any]  # добавить DTO внутрь pydantic модели
-    image_url: list[str]  # посмотреть, надо ли использовать HttpUrl
+    schema_connect: str | None = None  # TODO consider using HttpUrl
+    attributes: dict[str, Any]  # TODO add DTO inside the pydantic model
+    image_url: list[str]  # TODO consider using HttpUrl
 
     model_config = ConfigDict(
         from_attributes=True,
         json_schema_extra={
             "example": {
-                "title": "Тестовый товар",
-                "description": "Описание...",
+                "title": "Test product",
+                "description": "Description...",
                 "documentation": "http://doc...",
                 "schema_connect": "http://schema...",
                 "attributes": {"price": 1000, "weight": "500g", "size": "M"},

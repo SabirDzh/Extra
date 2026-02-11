@@ -1,0 +1,107 @@
+2026-02-11
+
+Goal
+- Add user avatar upload and persist relative URL to DB (field: users.image_url)
+
+High-level changes
+
+1) API: user avatar upload
+- File: api/api_v1/users.py
+- Added endpoint: POST /api/v1/users/me/avatar
+  - Auth: requires an active user (Depends(current_active_user))
+  - Input: multipart/form-data field 'file' (UploadFile)
+  - Behavior:
+    - Saves file to disk via profile/main.py::save_user_avatar(user_id, file)
+    - Stores returned relative URL (e.g. /media/user_img/<user_id>.<ext>) into User.image_url
+    - Persists to DB via users_db.session.commit() + refresh()
+    - Clears cache namespace: settings.cache.namespace.users_list
+  - Output: UserRead (includes image_url)
+
+2) File storage helper (no duplication)
+- File: profile/main.py
+- Reused existing save_user_avatar(user_id, file) -> str
+  - Saves to: <BASE_DIR>/media/user_img/
+  - Returns relative URL: /media/user_img/<filename>
+- Removed Russian-language comments (no logic changes)
+
+3) DB schema: add users.image_url column
+- File: core/models/user.py
+- User model contains field: image_url: Mapped[str | None]
+
+- Migration file added:
+  - File: alembic/versions/2026_02_11_1900-a3c1f2d4e6b8_add_user_image_url.py
+  - upgrade(): op.add_column("users", Column("image_url", String, nullable=True))
+  - downgrade(): op.drop_column("users", "image_url")
+
+4) Static file serving fix (/media)
+- File: create_fastapi_app.py
+- Fixed bug: replaced settings.BASE_DIR (non-existent) with BASE_DIR constant
+- Media is mounted as:
+  - /media -> <BASE_DIR>/media
+
+5) Auth/cookie usage clarification + CORS for cookie-based auth
+- File: middlewares/middlewares.py
+- CORS updated to support cookie transport in browser clients:
+  - Added origins for 127.0.0.1
+  - Enabled allow_credentials=True
+
+6) Alembic robustness for partially-initialized DBs
+- File: alembic/versions/2026_02_10_1544-8bb42682dc1c_create_new_table_product.py
+- Made products table creation idempotent:
+  - If 'products' already exists, skip create_table/create_index
+  - Reason: avoid DuplicateTableError in DBs where products were created outside Alembic history
+
+7) Non-functional edits: comment language cleanup
+- Russian-language comments were removed/translated to English in:
+  - core/models/db_helper.py
+  - core/models/product.py
+  - core/schemas/product.py
+  - core/schemas/user.py (TODO comment only)
+  - middlewares/requests_count_middleware.py
+  - utils/webhooks/user.py
+  - api/api_v1/product.py
+  - alembic/versions/2026_02_10_1436-5d40b2650241_update_table.py
+- Note: Russian strings inside validation errors were not changed (they are runtime messages, not comments)
+
+How to apply migrations
+- Run:
+  - alembic upgrade head
+
+How to verify (manual checklist)
+
+1) App start
+- python main.py
+
+2) Register + login (registration does not imply authentication)
+- POST /api/v1/auth/register
+- POST /api/v1/auth/login
+  - In Swagger OAuth2 form: grant_type=password, username=<email>, password=<password>
+  - Expect Set-Cookie for auth_user (cookie transport)
+
+3) Check auth works
+- GET /api/v1/users/me
+
+4) Upload avatar
+- POST /api/v1/users/me/avatar
+  - multipart/form-data: file=@avatar.jpg
+  - Expect response UserRead with non-null image_url
+
+5) Check static access
+- Open returned URL:
+  - http://127.0.0.1:8000<image_url>
+  - Example: http://127.0.0.1:8000/media/user_img/<uuid>.jpg
+
+Security / risk review (current behavior)
+
+- Upload endpoint is protected by auth (current_active_user)
+- CORS now allows credentials; origins list remains explicit (not '*')
+- File upload currently does not validate:
+  - content-type
+  - allowed extensions
+  - file size limits
+  - image decoding
+  Recommended hardening (optional): validate MIME/extension, enforce max size, generate safe extension, and/or re-encode image.
+
+Git hygiene note
+- Do not commit uploaded runtime files (media/user_img/*).
+- Recommended: add media/user_img/ to .gitignore and remove already staged file from git index.

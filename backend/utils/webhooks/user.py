@@ -25,4 +25,7 @@ try:
 
 except Exception as e:
     log.exception("Failed to send webhook for new user")
-# TODO без этого тут выходит ошибка сериализации UUID, запрос обрабатывается скорее всего медленнее из-за того что я указал model_dump(mode="json"), надо исправить, как вариант, вообще убрать этот код, смысл его?
+
+# TODO without this there is a UUID serialization error.
+# The request is likely slower due to model_dump(mode="json"). Revisit this implementation
+# or consider removing it if it has no value.

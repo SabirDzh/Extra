@@ -10,17 +10,24 @@ from typing import (
     Union,
 )
 
-from core.authentication.fastapi_users import fastapi_users
+from fastapi import APIRouter, Depends, File, Request, Response, UploadFile
+from fastapi_cache import FastAPICache
+
+from core.authentication.fastapi_users import (
+    current_active_user,
+    fastapi_users,
+)
 from core.config import settings
+from core.models import User
 from core.models.user import SQLAlchemyUserDatabase
 from core.schemas.user import (
     UserRead,
     UserUpdate,
 )
-from fastapi import APIRouter, Depends, Request, Response
 from fastapi_cache.decorator import cache
 
 from api.dependencies.authentication import get_users_db
+from profile.main import save_user_avatar
 
 router = APIRouter(
     prefix=settings.api.v1.users,
@@ -68,6 +75,34 @@ async def get_users_list(
 ) -> list[UserRead]:
     users = await users_db.get_users()
     return [UserRead.model_validate(user) for user in users]
+
+
+@router.post(
+    "/me/avatar",
+    response_model=UserRead,
+)
+async def upload_my_avatar(
+    user: Annotated[User, Depends(current_active_user)],
+    users_db: Annotated[
+        "SQLAlchemyUserDatabase",
+        Depends(get_users_db),
+    ],
+    file: UploadFile = File(...),
+) -> UserRead:
+    image_url = save_user_avatar(
+        user_id=str(user.id),
+        file=file,
+    )
+    user.image_url = image_url
+
+    users_db.session.add(user)
+    await users_db.session.commit()
+    await users_db.session.refresh(user)
+
+    await FastAPICache.clear(
+        namespace=settings.cache.namespace.users_list,
+    )
+    return UserRead.model_validate(user)
 
 
 # /me

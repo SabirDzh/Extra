@@ -39,7 +39,7 @@ class User(IdUuidPkMixin, Base):
     is_verified: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     # stores first_name, last_name, and middle_name
-    # TODO заменить на JSONB, используется JSON для тестирования
+    # TODO replace with JSONB; JSON is used for testing
     username: Mapped[dict[str, str | None]] = mapped_column(
         JSONB,
         nullable=False,
@@ -58,6 +58,8 @@ class User(IdUuidPkMixin, Base):
         PgEnum(UserRole),
         default=UserRole.user,
     )
+
+    image_url: Mapped[str | None] = mapped_column(String, nullable=True)
 
     certificates: Mapped[list["Certificate"]] = relationship(back_populates="user")
     progress: Mapped[list["UserBlockProgress"]] = relationship(back_populates="user")

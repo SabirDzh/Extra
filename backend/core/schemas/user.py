@@ -26,6 +26,7 @@ class UserUsername(BaseModel):  # structures for working with names
 class UserRead(schemas.BaseUser[UuIDMixin]):
     role: UserRole
     username: UserUsername  # response
+    image_url: str | None = None
 
 
 class UserCreate(schemas.BaseUserCreate):
@@ -36,6 +37,7 @@ class UserCreate(schemas.BaseUserCreate):
     )
     role: UserRole
     username: UserUsername  # registration
+    image_url: str | None = None
     # password_confirm: str | None = None
 
     # @model_validator(mode="after")
@@ -43,7 +45,8 @@ class UserCreate(schemas.BaseUserCreate):
     #     if self.password != self.password_confirm:
     #         raise ValueError("passwords do not match")
     #     return self
-    # TODO устани конфликты полей, из-за того что второе поле пароля обязательное, в крудах при использовании схемы не передается поле password_confirm возникает ошибка
+    # TODO resolve field conflicts: since the second password field is required,
+    # CRUD usage without password_confirm triggers a validation error
     #
     @field_validator("password")
     @classmethod
@@ -65,6 +68,7 @@ class UserCreate(schemas.BaseUserCreate):
 
 class UserUpdate(schemas.BaseUserUpdate):
     username: UserUsername | None = None
+    image_url: str | None = None
 
 
 class UserRegisteredNotification(BaseModel):

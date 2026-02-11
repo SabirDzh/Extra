@@ -113,7 +113,7 @@ class CacheConfig(BaseModel):
 
 class CookieConfig(BaseModel):
     lifetime_seconds: int = 600
-    secure: bool = False  # TODO когда будет использоваться https поменять на True
+    secure: bool = False  # TODO set to True when HTTPS is enabled
     name: str = "auth_user"
 
 

@@ -8,7 +8,9 @@ from fastapi import Request, Response
 type CallNext = Callable[[Request], Awaitable[Response]]
 
 
-# TODO заменить работу этого файла на Grafana + Prometheus, так как он выполняют такую же логику, также при перезапуске сервера вся статистика будет сброшена + из-за того что используется gunicorn (который запускает независимые процессы (воркеры) имеют свою память, то есть, когда мы захотим увидеть статистику, увдим лишь от одного из воркеров которые запущены (если запущены)), тем более grafana добавляет удобство при отрисовке графиков, минусов больше чем плюсов
+# TODO replace this with Grafana + Prometheus.
+# This in-memory counter resets on restart and doesn't work correctly with gunicorn workers
+# (each worker has its own memory), so the metrics are incomplete.
 
 
 @dataclass
