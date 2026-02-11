@@ -1,48 +1,41 @@
-import uuid
-from typing import TYPE_CHECKING
+import enum
+from datetime import datetime
 
-from sqlalchemy import ForeignKey, String, Text
+from sqlalchemy import DateTime, Enum, ForeignKey, Integer, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from core.models.base import Base
-from core.models.mixins.id_int_pk import IdUuidPkMixin
 
-if TYPE_CHECKING:
-    from core.models.course import CourseBlock
-    from core.models.user import User
+from .mixins.id_int_pk import IdUuidPkMixin
 
 
-class UserBlockProgress(IdUuidPkMixin, Base):
-    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"))
-    block_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("course_blocks.id"))
-
-    is_unlocked: Mapped[bool] = mapped_column(default=False)
-    video_watched: Mapped[bool] = mapped_column(default=False)
-    test_passed: Mapped[bool] = mapped_column(default=False)
-
-    # last_attempt_date: Mapped[datetime] = mapped_column(nullable=False)
-
-    user: Mapped["User"] = relationship(back_populates="progress")
-    block: Mapped["CourseBlock"] = relationship(back_populates="user_progress")
+class BlockType(str, enum.Enum):
+    lesson = "lesson"
+    auto_test = "auto_test"
+    manual_test = "manual_test"
 
 
-class TestSubmission(IdUuidPkMixin, Base):
-    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"))
-    block_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("course_blocks.id"))
-
-    status: Mapped[str] = mapped_column(String, default="pending")
-    inspection_comment: Mapped[str | None] = mapped_column(Text)
-
-    answers: Mapped[list["UserAnswer"]] = relationship(back_populates="submission")
-
-
-class UserAnswer(IdUuidPkMixin, Base):
-    submission_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("test_submissions.id"))
-    question_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("test_questions.id"))
-
-    selected_option_id: Mapped[uuid.UUID | None] = mapped_column(
-        ForeignKey("question_options.id")
+class Block(IdUuidPkMixin, Base):
+    course_id: Mapped[int] = mapped_column(ForeignKey("courses.id"))
+    order_index: Mapped[int] = mapped_column(Integer, default=0)
+    title: Mapped[str] = mapped_column(String(500))
+    block_type: Mapped[BlockType] = mapped_column(Enum(BlockType))
+    text_content: Mapped[str | None] = mapped_column(Text, nullable=True)
+    video_url: Mapped[str | None] = mapped_column(String(1000), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
     )
-    text_answer: Mapped[str | None] = mapped_column(Text)
 
-    submission: Mapped["TestSubmission"] = relationship(back_populates="answers")
+    course = relationship("Course", back_populates="blocks")
+    questions = relationship(
+        "Question",
+        back_populates="block",
+        cascade="all, delete-orphan",
+        order_by="Question.order_index",
+    )
+    submissions = relationship(
+        "TestSubmission", back_populates="block", cascade="all, delete-orphan"
+    )
+    progress_records = relationship(
+        "UserBlockProgress", back_populates="block", cascade="all, delete-orphan"
+    )

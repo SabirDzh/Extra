@@ -1,6 +1,19 @@
 import uuid
+from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, Field
+
+
+class CourseCreate(BaseModel):
+    title: str = Field(..., max_length=256)
+    description: str = Field("", max_length=1024)
+    is_published: bool = True
+
+
+class CourseUpdate(BaseModel):
+    title: str | None = Field(None, max_length=256)
+    description: str | None = Field(None, max_length=1024)
+    is_published: bool | None = None
 
 
 class CourseRead(BaseModel):
@@ -8,41 +21,14 @@ class CourseRead(BaseModel):
     title: str
     description: str
     is_published: bool
+    created_by: uuid.UUID
+    created_at: datetime
+    updated_at: datetime
 
-    model_config = ConfigDict(from_attributes=True)
-
-
-class CourseBlockRead(BaseModel):
-    id: uuid.UUID
-    title: str
-    order: int = Field(validation_alias="order_index")
-    is_locked: bool = True
-    video_watched: bool = False
-    test_passed: bool = False
-
-    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+    model_config = {"from_attributes": True}
 
 
-class CourseBlockCreated(BaseModel):
-    title: str = Field(..., max_length=128)
-    order: int = Field(..., ge=0)
-
-
-class CourseDetailRead(CourseRead):
-    progress_percent: float = 0.0
-    blocks: list[CourseBlockRead] = []
-
-    model_config = ConfigDict(from_attributes=True)
-
-
-class CourseDetailCreate(BaseModel):
-    title: str = Field(..., max_length=128)
-    description: str = Field(..., max_length=1024)
-    is_published: bool = False
-
-
-class CourseBlockCreate(BaseModel):
-    title: str = Field(..., max_length=128)
-    order_index: int = Field(..., ge=0)
-    video_url: str | None = None
-    text_content: str | None = None
+class CourseProgress(BaseModel):
+    completed: int | None
+    total: int
+    percent: float

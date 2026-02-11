@@ -3,24 +3,25 @@ __all__ = (
     "Base",
     "User",
     "AccessToken",
-    "TestSubmission",
-    "UserAnswer",
-    "UserBlockProgress",
-    "Course",
-    "CourseBlock",
-    "QuestionOption",
-    "TestQuestion",
-    "Certificate",
-    "ReferenceItem",
     "Product",
+    "Block",
+    "Certificate",
+    "Course",
+    "CourseEnrollment",
+    "UserBlockProgress",
+    "AnswerOption",
+    "Question",
+    "TestAnswer",
+    "TestSubmission",
 )
 
 from .access_token import AccessToken
 from .base import Base
-from .block import TestSubmission, UserAnswer, UserBlockProgress
-from .certificate import Certificate, ReferenceItem
-from .course import Course, CourseBlock
+from .block import Block
+from .certificates import Certificate
+from .course import Course, CourseEnrollment
 from .db_helper import db_helper
 from .product import Product
-from .question import QuestionOption, TestQuestion
+from .progress import UserBlockProgress
+from .test import AnswerOption, Question, TestAnswer, TestSubmission
 from .user import User
