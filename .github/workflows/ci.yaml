@@ -38,6 +38,7 @@ jobs:
 
       - name: Run tests
         run: |
+          cd backend
           pytest --junitxml=../reports/junit.xml
 
       - name: Upload test-report (optional)
