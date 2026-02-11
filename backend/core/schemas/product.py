@@ -15,6 +15,10 @@ class ProductRead(BaseModel):
     attributes: dict[str, Any]
     image_url: list[str]
 
+    model_config = ConfigDict(
+        from_attributes=True,
+    )
+
 
 class ProductCreate(BaseModel):
     title: str = Field(
@@ -48,3 +52,7 @@ class ProductUpdate(BaseModel):
     schema_connect: str | None = None
     attributes: dict[str, Any] | None = None
     image_url: list[str] | None = None
+
+    model_config = ConfigDict(
+        from_attributes=True,
+    )

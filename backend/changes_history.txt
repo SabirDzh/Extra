@@ -105,3 +105,23 @@ Security / risk review (current behavior)
 Git hygiene note
 - Do not commit uploaded runtime files (media/user_img/*).
 - Recommended: add media/user_img/ to .gitignore and remove already staged file from git index.
+
+8) DTO (schemas) full verification
+- Files reviewed:
+  - core/schemas/user.py
+  - core/schemas/product.py
+  - core/models/user.py
+  - core/models/product.py
+  - api/api_v1/users.py
+  - api/api_v1/product.py
+  - crud/product.py
+- Fix applied (required for ORM -> DTO serialization):
+  - File: core/schemas/product.py
+  - Added model_config = ConfigDict(from_attributes=True) to:
+    - ProductRead
+    - ProductUpdate
+- Note / pending decision:
+  - Product.image_url type mismatch:
+    - ORM: Mapped[list[dict]] (JSONB)
+    - DTO: list[str]
+  - Choose a single contract (list[str] or list[dict]) and align ORM + DTO accordingly.
