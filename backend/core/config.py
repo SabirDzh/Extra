@@ -137,5 +137,7 @@ class Settings(BaseSettings):
     cache: CacheConfig = CacheConfig()
     cookie: CookieConfig = CookieConfig()
 
+    UPLOAD_DIR: str = "uploads/videos"
+
 
 settings = Settings()  # pyright: ignore [reportCallIssue]

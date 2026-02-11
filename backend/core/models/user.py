@@ -27,6 +27,7 @@ class SQLAlchemyUserDatabase(SQLAlchemyUserDatabaseGeneric):
         return list(results.all())
 
 
+# надо добавить проверку если название уже существует, то выкидывать HTTPExceptions(status_code=status.HTTP_409_CONFLICT, detail="Product exists")
 class User(IdUuidPkMixin, Base):
     email: Mapped[str] = mapped_column(
         String(length=320), unique=True, index=True, nullable=False
@@ -56,6 +57,25 @@ class User(IdUuidPkMixin, Base):
         PgEnum(UserRole),
         default=UserRole.user,
     )
+
+    enrollments = relationship("CourseEnrollment", back_populates="user")
+    created_courses = relationship("Course", back_populates="creator")
+    submissions = relationship(
+        "TestSubmission", back_populates="user", foreign_keys="TestSubmission.user_id"
+    )
+    block_progress = relationship("UserBlockProgress", back_populates="user")
+    certificates = relationship("Certificate", back_populates="user")
+
+    @property
+    def full_name(self) -> str:
+        if not self.username:
+            return "Unknown User"
+
+        first = self.username.get("first_name", "") or ""
+        last = self.username.get("last_name", "") or ""
+        middle = self.username.get("middle_name", "") or ""
+
+        return f"{last} {first} {middle}".strip()
 
     @classmethod
     def get_db(cls, session: "AsyncSession"):

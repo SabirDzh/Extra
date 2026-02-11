@@ -34,7 +34,7 @@ class ProductCreate(BaseModel):
                 "description": "Описание...",
                 "documentation": "http://doc...",
                 "schema_connect": "http://schema...",
-                "attributes": {"price": 1000, "weight": "500g", "size": "M"},
+                "attributes": {"weight": "500g", "size": "M"},
                 "image_url": ["http://img..."],
             }
         },
