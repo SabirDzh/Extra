@@ -27,7 +27,7 @@ from sqlalchemy.orm import selectinload
 from utils.product import current_admin
 from utils.role import UserRole
 
-router = APIRouter(prefix="/api/tests", tags=["tests"])
+router = APIRouter(prefix="/api/tests", tags=["Tests"])
 
 Session = Annotated[AsyncSession, Depends(db_helper.session_getter)]
 

@@ -1,0 +1,48 @@
+name: CI
+
+on:
+  push:
+    branches: [sb_dev] # <- ветка, при пуше в которую запускается CI
+  pull_request:
+    branches: [sb_dev] # <- PR в эту ветку тоже будет проверяться
+
+jobs:
+  pytest:
+    name: pytest # <- именно это имя появится в статусах — его и выбирают в branch protection
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./backend
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('backend/req.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r req.txt
+
+      - name: Run tests
+        run: |
+          pytest --junitxml=../reports/junit.xml
+
+      - name: Upload test-report (optional)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pytest-report
+          path: backend/reports/junit.xml
