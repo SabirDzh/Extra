@@ -78,7 +78,10 @@ class User(IdUuidPkMixin, Base):
     )
 
     certificates: Mapped[list["Certificate"]] = relationship(back_populates="user")
-    progress: Mapped[list["UserBlockProgress"]] = relationship(back_populates="user")
+    progress: Mapped[list["UserBlockProgress"]] = relationship(
+        back_populates="user",
+        overlaps="block_progress",
+    )
 
     @property
     def full_name(self) -> str:
