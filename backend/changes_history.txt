@@ -125,3 +125,13 @@ Git hygiene note
     - ORM: Mapped[list[dict]] (JSONB)
     - DTO: list[str]
   - Choose a single contract (list[str] or list[dict]) and align ORM + DTO accordingly.
+
+9) Avatar image processing (crop/resize + validation)
+- File: profile/main.py
+- Updated save_user_avatar(user_id, file) to:
+  - Validate content-type starts with image/
+  - Enforce max upload size: 5MB
+  - Center-crop to square and resize to 256x256
+  - Convert to RGB and save as JPEG (quality=85)
+  - Write file atomically via tmp file + os.replace
+  - Persist path format unchanged: /media/user_img/<user_id>.jpg
