@@ -1,4 +1,5 @@
 import re
+from typing import Optional
 
 from fastapi_users import schemas
 from pydantic import (
@@ -16,7 +17,9 @@ class UserUsername(BaseModel):  # structures for working with names
         ..., min_length=1, max_length=64, pattern="^[A-Za-zА-Яа-яёЁ0-9_-]+$"
     )
     last_name: str | None = Field(
-        None, max_length=64, pattern="^[A-Za-zА-Яа-яёЁ0-9_-]+$"
+        None,
+        max_length=64,
+        pattern="^[A-Za-zА-Яа-яёЁ0-9_-]+$",
     )
     middle_name: str | None = Field(
         None, max_length=64, pattern="^[A-Za-zА-Яа-яёЁ0-9_-]+$"
@@ -63,8 +66,27 @@ class UserCreate(schemas.BaseUserCreate):
         return v
 
 
+# schemas.BaseUserUpdate
 class UserUpdate(schemas.BaseUserUpdate):
+    password: Optional[str] = None
     username: UserUsername | None = None
+
+    @field_validator("password")
+    @classmethod
+    def validate_password(cls, v: str) -> str:
+        if not re.search(r"\d", v):
+            raise ValueError("Пароль должен содержать хотя бы одну цифру")
+
+        if not re.search(r"[a-zA-Zа-яА-ЯёЁ]", v):
+            raise ValueError("Пароль должен содержать буквы")
+
+        if not re.search(r"[A-ZА-Я]", v):
+            raise ValueError("Пароль должен содержать заглавную букву")
+
+        if not re.search(r"[\W_]", v):
+            raise ValueError("Пароль должен содержать спецсимвол (например, ! @ # $)")
+
+        return v
 
 
 class UserRegisteredNotification(BaseModel):

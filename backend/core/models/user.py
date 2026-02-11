@@ -18,8 +18,6 @@ if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
 
     from core.models import AccessToken
-    from core.models.block import UserBlockProgress
-    from core.models.certificate import Certificate
 
 
 class SQLAlchemyUserDatabase(SQLAlchemyUserDatabaseGeneric):
@@ -58,9 +56,6 @@ class User(IdUuidPkMixin, Base):
         PgEnum(UserRole),
         default=UserRole.user,
     )
-
-    certificates: Mapped[list["Certificate"]] = relationship(back_populates="user")
-    progress: Mapped[list["UserBlockProgress"]] = relationship(back_populates="user")
 
     @classmethod
     def get_db(cls, session: "AsyncSession"):
