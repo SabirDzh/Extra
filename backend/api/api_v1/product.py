@@ -13,9 +13,8 @@ from crud.product import (
     search_product,
     update_product,
 )
-from fastapi import APIRouter, BackgroundTasks, Depends, Query, status
+from fastapi import APIRouter, Depends, Query, status
 from fastapi_cache import decorator
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from utils.product import current_admin
 
@@ -28,6 +27,7 @@ if TYPE_CHECKING:
     from core.models.product import Product
 
 Session = Annotated[AsyncSession, Depends(db_helper.session_getter)]
+CurrentAdmin = Annotated[User, Depends(current_admin)]
 
 
 @router.get("", response_model=list[ProductRead], status_code=status.HTTP_200_OK)
@@ -67,7 +67,7 @@ async def get_search_product(
 async def product_created(
     product: ProductCreate,
     session: Session,
-    admin: User = Depends(current_admin),
+    admin: CurrentAdmin,
 ):
     return await create_product(session, product)
 
@@ -79,7 +79,7 @@ async def product_update(
     product: ProductUpdate,
     product_id: uuid.UUID,
     session: Session,
-    admin: User = Depends(current_admin),
+    admin: CurrentAdmin,
 ):
     return await update_product(session, product_id, product)
 
@@ -88,7 +88,7 @@ async def product_update(
 async def product_delete(
     product_id: uuid.UUID,
     session: Session,
-    admin: User = Depends(current_admin),
+    admin: CurrentAdmin,
 ):
     await delete_product(session, product_id)
 

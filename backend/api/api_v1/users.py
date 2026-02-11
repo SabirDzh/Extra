@@ -29,6 +29,9 @@ from fastapi_cache.decorator import cache
 from api.dependencies.authentication import get_users_db
 from profile.main import save_user_avatar
 
+UsersDB = Annotated[SQLAlchemyUserDatabase, Depends(get_users_db)]
+CurrentUser = Annotated[User, Depends(current_active_user)]
+
 router = APIRouter(
     prefix=settings.api.v1.users,
     tags=["Users"],
@@ -67,10 +70,7 @@ def users_list_key_builder(
     namespace=settings.cache.namespace.users_list,
 )
 async def get_users_list(
-    users_db: Annotated[
-        "SQLAlchemyUserDatabase",
-        Depends(get_users_db),
-    ],
+    users_db: UsersDB,
     # ) -> list["User"]:
 ) -> list[UserRead]:
     users = await users_db.get_users()
@@ -82,11 +82,8 @@ async def get_users_list(
     response_model=UserRead,
 )
 async def upload_my_avatar(
-    user: Annotated[User, Depends(current_active_user)],
-    users_db: Annotated[
-        "SQLAlchemyUserDatabase",
-        Depends(get_users_db),
-    ],
+    user: CurrentUser,
+    users_db: UsersDB,
     file: UploadFile = File(...),
 ) -> UserRead:
     image_url = save_user_avatar(
