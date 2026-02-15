@@ -124,5 +124,5 @@ async def get_progress(
         )
     ).scalar()
 
-    percent = round((completed_count or 0 / total) * 100, 2)
+    percent = round(((completed_count or 0) / total) * 100, 2)
     return CourseProgress(completed=completed_count, total=total, percent=percent)
