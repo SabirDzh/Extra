@@ -2,6 +2,7 @@ import uuid
 from typing import Annotated
 
 from core.authentication.fastapi_users import current_active_user
+from core.config import settings
 from core.models.block import (
     Block,
     BlockType,
@@ -27,7 +28,7 @@ from sqlalchemy.orm import selectinload
 from utils.product import current_admin
 from utils.role import UserRole
 
-router = APIRouter(prefix="/api/tests", tags=["Tests"])
+router = APIRouter(prefix=settings.api.v1.test, tags=["Tests"])
 
 Session = Annotated[AsyncSession, Depends(db_helper.session_getter)]
 
@@ -41,7 +42,7 @@ async def create_question(
     block_id: uuid.UUID,
     data: QuestionCreate,
     db: Session,
-    admin: User = Depends(current_admin),
+    admin: Annotated[User, Depends(current_admin)],
 ):
     block = await db.get(Block, block_id)
     if not block:
@@ -65,7 +66,7 @@ async def update_question(
     question_id: uuid.UUID,
     data: QuestionUpdate,
     db: Session,
-    admin: User = Depends(current_admin),
+    admin: Annotated[User, Depends(current_admin)],
 ):
     question = await db.get(Question, question_id)
     if not question:
@@ -95,7 +96,9 @@ async def update_question(
 
 @router.delete("/questions/{question_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_question(
-    question_id: uuid.UUID, db: Session, admin: User = Depends(current_admin)
+    question_id: uuid.UUID,
+    db: Session,
+    admin: Annotated[User, Depends(current_admin)],
 ):
     question = await db.get(Question, question_id)
     if not question:
@@ -106,7 +109,9 @@ async def delete_question(
 
 @router.get("/blocks/{block_id}/questions")
 async def list_questions(
-    block_id: uuid.UUID, db: Session, user: User = Depends(current_active_user)
+    block_id: uuid.UUID,
+    db: Session,
+    user: Annotated[User, Depends(current_active_user)],
 ):
     block = await db.get(Block, block_id)
     if not block:
@@ -134,7 +139,7 @@ async def submit_test(
     block_id: uuid.UUID,
     data: TestSubmit,
     db: Session,
-    user: User = Depends(current_active_user),
+    user: Annotated[User, Depends(current_active_user)],
 ):
     block = await db.get(Block, block_id)
     if not block:
@@ -177,7 +182,9 @@ async def submit_test(
 
 @router.get("/submissions/{submission_id}", response_model=TestSubmissionRead)
 async def get_submission(
-    submission_id: uuid.UUID, db: Session, user: User = Depends(current_active_user)
+    submission_id: uuid.UUID,
+    db: Session,
+    user: Annotated[User, Depends(current_active_user)],
 ):
     submission = await _load_submission(db, submission_id)
     if not submission:
@@ -189,7 +196,9 @@ async def get_submission(
 
 @router.get("/blocks/{block_id}/submissions", response_model=list[TestSubmissionRead])
 async def list_submissions(
-    block_id: uuid.UUID, db: Session, admin: User = Depends(current_admin)
+    block_id: uuid.UUID,
+    db: Session,
+    admin: Annotated[User, Depends(current_admin)],
 ):
     result = await db.execute(
         select(TestSubmission)
@@ -204,7 +213,7 @@ async def grade_submission(
     submission_id: uuid.UUID,
     data: GradeSubmission,
     db: Session,
-    admin: User = Depends(current_admin),
+    admin: Annotated[User, Depends(current_admin)],
 ):
     submission = await db.get(TestSubmission, submission_id)
     if not submission:

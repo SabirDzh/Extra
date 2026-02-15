@@ -1,5 +1,5 @@
 import re
-from typing import Optional
+from typing import Annotated, Optional
 
 from fastapi_users import schemas
 from pydantic import (
@@ -13,17 +13,14 @@ from core.types.user_id import UuIDMixin
 
 
 class UserUsername(BaseModel):  # structures for working with names
-    first_name: str = Field(
-        ..., min_length=1, max_length=64, pattern="^[A-Za-zА-Яа-яёЁ0-9_-]+$"
-    )
-    last_name: str | None = Field(
-        None,
-        max_length=64,
-        pattern="^[A-Za-zА-Яа-яёЁ0-9_-]+$",
-    )
-    middle_name: str | None = Field(
-        None, max_length=64, pattern="^[A-Za-zА-Яа-яёЁ0-9_-]+$"
-    )
+    first_name: Annotated[str, Field(min_length=1, max_length=64)]
+    last_name: Annotated[
+        Optional[str],
+        Field(
+            max_length=64,
+        ),
+    ] = ""
+    middle_name: Annotated[Optional[str], Field(max_length=64)] = ""
 
 
 class UserRead(schemas.BaseUser[UuIDMixin]):
@@ -32,11 +29,13 @@ class UserRead(schemas.BaseUser[UuIDMixin]):
 
 
 class UserCreate(schemas.BaseUserCreate):
-    password: str = Field(
-        ...,
-        min_length=12,
-        max_length=128,
-    )
+    password: Annotated[
+        str,
+        Field(
+            min_length=12,
+            max_length=128,
+        ),
+    ]
     role: UserRole
     username: UserUsername  # registration
     # password_confirm: str | None = None
@@ -69,7 +68,7 @@ class UserCreate(schemas.BaseUserCreate):
 # schemas.BaseUserUpdate
 class UserUpdate(schemas.BaseUserUpdate):
     password: Optional[str] = None
-    username: UserUsername | None = None
+    username: Optional[UserUsername] = None
 
     @field_validator("password")
     @classmethod

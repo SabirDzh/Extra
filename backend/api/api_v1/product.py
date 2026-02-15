@@ -1,13 +1,22 @@
 import uuid
-from typing import TYPE_CHECKING, Annotated
+from typing import TYPE_CHECKING, Annotated, Optional
 
 from core.config import settings
 from core.models.db_helper import db_helper
 from core.models.user import User
-from core.schemas.product import ProductCreate, ProductRead, ProductUpdate
+from core.schemas.product import (
+    ProductCreate,
+    ProductFilter,
+    ProductFilterCountItemResponse,
+    ProductFilterResponse,
+    ProductRead,
+    ProductUpdate,
+)
 from crud.product import (
     create_product,
     delete_product,
+    get_count_product_filter,
+    get_limits,
     get_product,
     get_products,
     search_product,
@@ -17,6 +26,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, Query, status
 from fastapi_cache import decorator
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from utils.filter import get_filtered
 from utils.product import current_admin
 
 router = APIRouter(
@@ -32,7 +42,11 @@ Session = Annotated[AsyncSession, Depends(db_helper.session_getter)]
 
 @router.get("", response_model=list[ProductRead], status_code=status.HTTP_200_OK)
 @decorator.cache(60)
-async def get_list_products(session: Session, offset: int = 0, limit: int = 10):
+async def get_list_products(
+    session: Session,
+    limit: Annotated[int, Query(ge=0, gt=0)] = 10,
+    offset: Annotated[int, Query(ge=0)] = 0,
+):
     return await get_products(session, offset, limit)
 
 
@@ -48,26 +62,42 @@ async def get_product_by_id(
     return await get_product(session, product_id)
 
 
+# добавить параметр offset
 @router.get(
     "/search/",
     response_model=list[ProductRead],
     status_code=status.HTTP_200_OK,
 )
-@decorator.cache(60)
+# @decorator.cache(60)
 async def get_search_product(
     session: Session,
-    search_query: str | None = Query(None, description="Search request", min_length=1),
-    limit: int = 10,
-    offset: int = 0,
+    search_query: Annotated[
+        Optional[str], Query(description="Search request", min_length=1)
+    ] = None,
+    limit: Annotated[int, Query(ge=0, gt=0)] = 10,
+    offset: Annotated[int, Query(ge=0)] = 0,
 ):
-    return await search_product(session, search_query, limit)
+    return await search_product(
+        session,
+        search_query,
+        limit=limit,
+        offset=offset,
+    )
+
+
+@router.post("/filter", response_model=list[ProductRead])
+async def get_filter(
+    session: Session,
+    filters: ProductFilter,
+):
+    return await get_filtered(session, filters)
 
 
 @router.post("", status_code=status.HTTP_201_CREATED)
 async def product_created(
     product: ProductCreate,
     session: Session,
-    admin: User = Depends(current_admin),
+    admin: Annotated[User, Depends(current_admin)],
 ):
     return await create_product(session, product)
 
@@ -79,7 +109,7 @@ async def product_update(
     product: ProductUpdate,
     product_id: uuid.UUID,
     session: Session,
-    admin: User = Depends(current_admin),
+    admin: Annotated[User, Depends(current_admin)],
 ):
     return await update_product(session, product_id, product)
 
@@ -88,9 +118,27 @@ async def product_update(
 async def product_delete(
     product_id: uuid.UUID,
     session: Session,
-    admin: User = Depends(current_admin),
+    admin: Annotated[User, Depends(current_admin)],
 ):
     await delete_product(session, product_id)
+
+
+@router.get(
+    "/filter/limits",
+    status_code=status.HTTP_200_OK,
+    response_model=ProductFilterResponse,
+)
+async def get_filter_limits(session: Session):
+    return await get_limits(session)
+
+
+@router.get(
+    "/filter/count",
+    status_code=status.HTTP_200_OK,
+    response_model=ProductFilterCountItemResponse,
+)
+async def get_filter_count_item(session: Session):
+    return await get_count_product_filter(session)
 
 
 # @router.get(

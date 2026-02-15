@@ -1,15 +1,24 @@
 import uuid
-from typing import Sequence
+from typing import Annotated, Optional, Sequence
 
 from core.models.product import Product
-from core.schemas.product import ProductCreate, ProductUpdate
-from fastapi import HTTPException, status
-from sqlalchemy import desc, func, or_, select
+from core.schemas.product import (
+    ProductCreate,
+    ProductFilter,
+    ProductFilterCountItemResponse,
+    ProductFilterResponse,
+    ProductUpdate,
+)
+from fastapi import HTTPException, Query, status
+from sqlalchemy import Float, cast, desc, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from utils.filter import get_filtered
 
 
 async def get_products(
-    session: AsyncSession, offset: int = 0, limit: int = 10
+    session: AsyncSession,
+    offset: Annotated[int, Query(ge=0, gt=100)] = 0,
+    limit: Annotated[int, Query(ge=0, gt=100)] = 10,
 ) -> Sequence[Product]:
     stmt = select(Product).limit(limit).offset(offset)
     product = await session.scalars(stmt)
@@ -53,12 +62,15 @@ async def create_product(
 
 async def search_product(
     session: AsyncSession,
-    search: str | None = None,
-    limit: int = 10,
+    search: Optional[str] = None,
+    *,
+    limit: Annotated[int, Query(ge=0, gt=0)] = 10,
+    offset: Annotated[int, Query(ge=0, gt=0)] = 0,
+    filters: Optional[ProductFilter] = None,
     similarity_threshold: float = 0.3,
 ) -> Sequence[Product]:
     if not search:
-        return await get_products(session, limit=limit)
+        return await get_products(session, limit=limit, offset=offset)
 
     similarity_score = func.similarity(Product.title, search)
 
@@ -81,7 +93,10 @@ async def search_product(
         ),
     )
 
-    stmt = stmt.limit(limit)
+    # if filters:
+    #     stmt = get_filtered(stmt, filters)
+
+    stmt = stmt.limit(limit).offset(offset)
 
     result = await session.execute(stmt)
     product = result.scalars().all()
@@ -118,3 +133,47 @@ async def delete_product(
     product = await get_product(session, product_id)
     await session.delete(product)
     await session.commit()
+
+
+async def get_limits(session: AsyncSession) -> ProductFilterResponse:
+    stmt = select(
+        func.min(cast(Product.attributes["accuracy"].astext, Float)),
+        func.max(cast(Product.attributes["accuracy"].astext, Float)),
+        func.min(cast(Product.attributes["temp"].astext, Float)),
+        func.max(cast(Product.attributes["temp"].astext, Float)),
+    )
+    result = await session.execute(stmt)
+    min_acc, max_acc, min_tmp, max_tmp = result.one()
+    return ProductFilterResponse(
+        min_accuracy=min_acc or 0,
+        max_accuracy=max_acc or 0,
+        min_temp=min_tmp or 0,
+        max_temp=max_tmp or 0,
+    )
+
+
+async def get_count_product_filter(
+    session: AsyncSession,
+) -> ProductFilterCountItemResponse:
+    stmt = select(
+        func.count(Product.attributes["accuracy"]),
+        func.count(Product.attributes["temp"]),
+        func.count(Product.attributes["equirement_type"]),
+        func.count(Product.attributes["purpose"]),
+        func.count(Product.attributes["industry"]),
+        func.count(Product.attributes["signal_type"]),
+        func.count(Product.attributes["ip_rating"]),
+        func.count(Product.attributes["mounting"]),
+    )
+    result = await session.execute(stmt)
+    acc, tmp, eq_type, pur, ind, sig_type, ip, moun = result.one()
+    return ProductFilterCountItemResponse(
+        accuracy=acc or 0,
+        temp=tmp or 0,
+        equipment_type=eq_type or 0,
+        purpose=pur or 0,
+        industry=ind or 0,
+        signal_type=sig_type or 0,
+        ip_rating=ip or 0,
+        mounting=moun or 0,
+    )

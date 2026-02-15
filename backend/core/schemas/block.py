@@ -1,5 +1,6 @@
 import uuid
 from datetime import datetime
+from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, model_validator
 
@@ -10,8 +11,8 @@ class BlockCreate(BaseModel):
     title: str
     block_type: BlockType
     order_index: int = 0
-    text_content: str | None = None
-    video_url: str | None = None
+    text_content: Optional[str] = None
+    video_url: Optional[str] = None
 
     @model_validator(mode="after")
     def check_content(self):
@@ -25,10 +26,10 @@ class BlockCreate(BaseModel):
 
 
 class BlockUpdate(BaseModel):
-    title: str | None = None
-    order_index: int | None = None
-    text_content: str | None = None
-    video_url: str | None = None
+    title: Optional[str] = None
+    order_index: Optional[int] = None
+    text_content: Optional[str] = None
+    video_url: Optional[str] = None
 
 
 class BlockRead(BaseModel):
@@ -37,8 +38,8 @@ class BlockRead(BaseModel):
     order_index: int
     title: str
     block_type: BlockType
-    text_content: str | None
-    video_url: str | None
+    text_content: Optional[str]
+    video_url: Optional[str]
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)

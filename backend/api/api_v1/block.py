@@ -16,7 +16,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from utils.product import current_admin
 
-router = APIRouter(prefix="/api/courses/{course_id}/blocks", tags=["Blocks"])
+router = APIRouter(prefix="/courses/{course_id}/blocks", tags=["Blocks"])
 
 Session = Annotated[AsyncSession, Depends(db_helper.session_getter)]
 
@@ -24,18 +24,22 @@ Session = Annotated[AsyncSession, Depends(db_helper.session_getter)]
 async def _get_course_or_404(db, course_id: uuid.UUID) -> Course:
     course = await db.get(Course, course_id)
     if not course:
-        raise HTTPException(status_code=404, detail="Course not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Course not found"
+        )
     return course
 
 
 async def _get_block_or_404(db, block_id: uuid.UUID, course_id: uuid.UUID) -> Block:
     block = await db.get(Block, block_id)
     if not block or block.course_id != course_id:
-        raise HTTPException(status_code=404, detail="Block not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Block not found"
+        )
     return block
 
 
-@router.get("/", response_model=list[BlockRead])
+@router.get("/", status_code=status.HTTP_200_OK, response_model=list[BlockRead])
 async def list_blocks(course_id: uuid.UUID, db: Session):
     await _get_course_or_404(db, course_id)
     result = await db.execute(
@@ -49,7 +53,7 @@ async def create_block(
     course_id: uuid.UUID,
     data: BlockCreate,
     db: Session,
-    admin: User = Depends(current_admin),
+    admin: Annotated[User, Depends(current_admin)],
 ):
     await _get_course_or_404(db, course_id)
     block = Block(**data.model_dump(), course_id=course_id)
@@ -59,7 +63,7 @@ async def create_block(
     return block
 
 
-@router.get("/{block_id}", response_model=BlockRead)
+@router.get("/{block_id}", status_code=status.HTTP_200_OK, response_model=BlockRead)
 async def get_block(course_id: uuid.UUID, block_id: uuid.UUID, db: Session):
     return await _get_block_or_404(db, block_id, course_id)
 
@@ -70,7 +74,7 @@ async def update_block(
     block_id: uuid.UUID,
     data: BlockUpdate,
     db: Session,
-    admin: User = Depends(current_admin),
+    admin: Annotated[User, Depends(current_admin)],
 ):
     block = await _get_block_or_404(db, block_id, course_id)
     for field, value in data.model_dump(exclude_unset=True).items():
@@ -85,20 +89,24 @@ async def delete_block(
     course_id: uuid.UUID,
     block_id: uuid.UUID,
     db: Session,
-    admin: User = Depends(current_admin),
+    admin: Annotated[User, Depends(current_admin)],
 ):
     block = await _get_block_or_404(db, block_id, course_id)
     await db.delete(block)
     await db.commit()
 
 
-@router.post("/{block_id}/upload-video", response_model=BlockRead)
+@router.post(
+    "/{block_id}/upload-video",
+    status_code=status.HTTP_201_CREATED,
+    response_model=BlockRead,
+)
 async def upload_video(
     course_id: uuid.UUID,
     block_id: uuid.UUID,
     file: UploadFile,
     db: Session,
-    admin: User = Depends(current_admin),
+    admin: Annotated[User, Depends(current_admin)],
 ):
     block = await _get_block_or_404(db, block_id, course_id)
     os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
@@ -114,12 +122,15 @@ async def upload_video(
     return block
 
 
-@router.post("/{block_id}/complete")
+@router.post(
+    "/{block_id}/complete",
+    status_code=status.HTTP_201_CREATED,
+)
 async def mark_complete(
     course_id: uuid.UUID,
     block_id: uuid.UUID,
     db: Session,
-    user: User = Depends(current_active_user),
+    user: Annotated[User, Depends(current_active_user)],
 ):
     block = await _get_block_or_404(db, block_id, course_id)
 

@@ -1,3 +1,4 @@
+import uuid
 from datetime import datetime, timezone
 
 from sqlalchemy import select
@@ -9,7 +10,7 @@ from core.models.block import (
     BlockType,
 )
 from core.models.progress import UserBlockProgress
-from core.models.test import AnswerOption, Question, TestAnswer, TestSubmission
+from core.models.test import Question, TestAnswer, TestSubmission
 
 
 async def auto_grade_submission(
@@ -69,7 +70,9 @@ async def auto_grade_submission(
     return submission
 
 
-async def _mark_block_completed(db: AsyncSession, user_id: int, block_id: int) -> None:
+async def _mark_block_completed(
+    db: AsyncSession, user_id: uuid.UUID, block_id: uuid.UUID
+) -> None:
     existing = (
         await db.execute(
             select(UserBlockProgress).where(

@@ -1,15 +1,13 @@
 from typing import Annotated
 
-from fastapi import APIRouter
-from fastapi import Depends
-
 from core.authentication.fastapi_users import (
-    current_active_user,
     current_active_superuser,
+    current_active_user,
 )
 from core.config import settings
 from core.models import User
 from core.schemas.user import UserRead
+from fastapi import APIRouter, Depends, status
 
 router = APIRouter(
     prefix=settings.api.v1.messages,
@@ -17,7 +15,7 @@ router = APIRouter(
 )
 
 
-@router.get("/error")
+@router.get("/error", status_code=status.HTTP_200_OK)
 def view_may_raise_error(
     raise_error: bool = False,
 ):
@@ -27,7 +25,7 @@ def view_may_raise_error(
     return {"ok": True}
 
 
-@router.get("")
+@router.get("", status_code=status.HTTP_200_OK)
 def get_user_messages(
     user: Annotated[
         User,
@@ -40,7 +38,7 @@ def get_user_messages(
     }
 
 
-@router.get("/secrets")
+@router.get("/secrets", status_code=status.HTTP_200_OK)
 def get_superuser_messages(
     user: Annotated[
         User,

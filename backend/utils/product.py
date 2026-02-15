@@ -12,7 +12,7 @@ Session = Annotated[AsyncSession, Depends(db_helper.session_getter)]
 
 
 async def current_admin(
-    current_user: User = Depends(current_active_user),
+    current_user: Annotated[User, Depends(current_active_user)],
 ):
     if current_user.role != UserRole.admin:
         raise HTTPException(

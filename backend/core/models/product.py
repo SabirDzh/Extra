@@ -16,14 +16,14 @@ class Product(IdUuidPkMixin, Base):
     image_url: Mapped[list[dict]] = mapped_column(
         JSONB,
         default=list,
-    )  # рассмотреть это поле еще раз, указал JSONB для больше чем одной фотки, по дизайну видно что фоток будет много
+    )
 
     schema_connect: Mapped[str] = mapped_column(
         String,
         nullable=True,
     )  # рассмотреть другое название и формат хранения, на данный этап оставлю так, для тестов
     documentation: Mapped[str] = mapped_column(
-        String,
+        Text,
         nullable=True,
     )  # рассмотреть возможность переноса в JSONB атрибутов
 

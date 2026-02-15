@@ -1,5 +1,5 @@
-from fastapi import APIRouter
 from core.config import settings
+from fastapi import APIRouter, status
 from middlewares.requests_count_middleware import requests_count_middleware_dispatch
 
 router = APIRouter(
@@ -8,7 +8,7 @@ router = APIRouter(
 )
 
 
-@router.get("/stats")
+@router.get("/stats", status_code=status.HTTP_200_OK)
 def get_paths_stats():
     return {
         path: {

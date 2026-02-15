@@ -1,3 +1,4 @@
+import uuid
 from datetime import datetime
 
 from sqlalchemy import DateTime, ForeignKey, String, Text, func
@@ -9,10 +10,10 @@ from .mixins.id_int_pk import IdUuidPkMixin
 
 
 class Course(IdUuidPkMixin, Base):
-    title: Mapped[str] = mapped_column(String(256), unique=True)
+    title: Mapped[str] = mapped_column(String(256))
     description: Mapped[str] = mapped_column(Text, default="")
     is_published: Mapped[bool] = mapped_column(default=False)
-    created_by: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    created_by: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
@@ -36,8 +37,8 @@ class Course(IdUuidPkMixin, Base):
 
 
 class CourseEnrollment(IdUuidPkMixin, Base):
-    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
-    course_id: Mapped[int] = mapped_column(ForeignKey("courses.id"))
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"))
+    course_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("courses.id"))
     enrolled_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )

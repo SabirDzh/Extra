@@ -3,6 +3,7 @@ from typing import Annotated
 
 from core.authentication.fastapi_users import current_active_user
 from core.certificate_pdf import generate_certificate_pdf
+from core.config import settings
 from core.models.block import Block
 from core.models.certificates import Certificate
 from core.models.course import Course
@@ -16,7 +17,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-router = APIRouter(prefix="/api/certificates", tags=["Certificates"])
+router = APIRouter(prefix=settings.api.v1.certificates, tags=["Certificates"])
 
 Session = Annotated[AsyncSession, Depends(db_helper.session_getter)]
 
@@ -27,11 +28,15 @@ Session = Annotated[AsyncSession, Depends(db_helper.session_getter)]
     status_code=status.HTTP_201_CREATED,
 )
 async def generate_certificate(
-    course_id: uuid.UUID, db: Session, user: User = Depends(current_active_user)
+    course_id: uuid.UUID,
+    db: Session,
+    user: Annotated[User, Depends(current_active_user)],
 ):
     course = await db.get(Course, course_id, options=[selectinload(Course.blocks)])
     if not course:
-        raise HTTPException(status_code=404, detail="Course not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Course not found"
+        )
 
     # check existing
     existing = (
@@ -48,7 +53,9 @@ async def generate_certificate(
     # check 100% progress
     total = len(course.blocks)
     if total == 0:
-        raise HTTPException(status_code=400, detail="Course has no blocks")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Course has no blocks"
+        )
 
     block_ids = [b.id for b in course.blocks]
     completed = (
@@ -56,14 +63,15 @@ async def generate_certificate(
             select(func.count(UserBlockProgress.id)).where(
                 UserBlockProgress.user_id == user.id,
                 UserBlockProgress.block_id.in_(block_ids),
-                UserBlockProgress.is_completed == True,
+                UserBlockProgress.is_completed,
             )
         )
     ).scalar()
 
     if completed < total:
         raise HTTPException(
-            status_code=400, detail=f"Course not fully completed ({completed}/{total})"
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Course not fully completed ({completed}/{total})",
         )
 
     cert = Certificate(user_id=user.id, course_id=course_id)
@@ -73,9 +81,15 @@ async def generate_certificate(
     return cert
 
 
-@router.get("/courses/{course_id}/certificate", response_model=CertificateRead)
+@router.get(
+    "/courses/{course_id}/certificate",
+    status_code=status.HTTP_200_OK,
+    response_model=CertificateRead,
+)
 async def get_certificate(
-    course_id: uuid.UUID, db: Session, user: User = Depends(current_active_user)
+    course_id: uuid.UUID,
+    db: Session,
+    user: Annotated[User, Depends(current_active_user)],
 ):
     cert = (
         await db.execute(
@@ -86,11 +100,13 @@ async def get_certificate(
         )
     ).scalar_one_or_none()
     if not cert:
-        raise HTTPException(status_code=404, detail="Certificate not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Certificate not found"
+        )
     return cert
 
 
-@router.get("/{certificate_number}/download")
+@router.get("/{certificate_number}/download", status_code=status.HTTP_200_OK)
 async def download_certificate(certificate_number: str, db: Session):
     cert = (
         await db.execute(
@@ -103,7 +119,9 @@ async def download_certificate(certificate_number: str, db: Session):
         )
     ).scalar_one_or_none()
     if not cert:
-        raise HTTPException(status_code=404, detail="Certificate not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Certificate not found"
+        )
 
     pdf_bytes = generate_certificate_pdf(
         full_name=cert.user.full_name,

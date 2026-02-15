@@ -55,6 +55,7 @@ class ApiV1Prefix(BaseModel):
     certificates: str = "/certificates"
     admin: str = "/admin"
     product: str = "/product"
+    test: str = "/test"
 
 
 class ApiPrefix(BaseModel):
@@ -87,7 +88,7 @@ class DatabaseConfig(BaseModel):
 
 
 class AccessToken(BaseModel):
-    lifetime_seconds: int = 600
+    lifetime_seconds: int = 6000
     reset_password_token_secret: str
     verification_token_secret: str
 

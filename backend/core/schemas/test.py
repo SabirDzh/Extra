@@ -1,5 +1,6 @@
 import uuid
 from datetime import datetime
+from typing import Annotated, Optional
 
 from pydantic import BaseModel
 
@@ -32,10 +33,10 @@ class QuestionCreate(BaseModel):
 
 
 class QuestionUpdate(BaseModel):
-    text: str | None = None
-    question_type: QuestionType | None = None
-    order_index: int | None = None
-    options: list[AnswerOptionCreate] | None = None
+    text: Optional[str] = None
+    question_type: Optional[QuestionType] = None
+    order_index: Optional[int] = None
+    options: Optional[list[AnswerOptionCreate]] = None
 
 
 class QuestionRead(BaseModel):
@@ -62,8 +63,8 @@ class QuestionReadAdmin(BaseModel):
 
 class TestAnswerSubmit(BaseModel):
     question_id: uuid.UUID
-    selected_answer_id: int | None = None
-    text_answer: str | None = None
+    selected_answer_id: Optional[uuid.UUID] = None
+    text_answer: Optional[str] = None
 
 
 class TestSubmit(BaseModel):
@@ -73,8 +74,8 @@ class TestSubmit(BaseModel):
 class TestAnswerRead(BaseModel):
     id: uuid.UUID
     question_id: uuid.UUID
-    selected_answer_id: int | None
-    text_answer: str | None
+    selected_answer_id: Optional[uuid.UUID]
+    text_answer: Optional[str]
 
     model_config = {"from_attributes": True}
 
@@ -84,11 +85,11 @@ class TestSubmissionRead(BaseModel):
     user_id: uuid.UUID
     block_id: uuid.UUID
     submitted_at: datetime
-    score: int | None
+    score: Optional[int]
     max_score: int
     is_graded: bool
-    graded_by: int | None
-    admin_comment: str | None
+    graded_by: Optional[uuid.UUID]
+    admin_comment: Optional[str]
     answers: list[TestAnswerRead]
 
     model_config = {"from_attributes": True}
@@ -96,4 +97,4 @@ class TestSubmissionRead(BaseModel):
 
 class GradeSubmission(BaseModel):
     score: int
-    admin_comment: str | None = None
+    admin_comment: Optional[str] = None

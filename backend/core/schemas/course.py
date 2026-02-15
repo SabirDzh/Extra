@@ -1,19 +1,20 @@
 import uuid
 from datetime import datetime
+from typing import Annotated, Optional
 
 from pydantic import BaseModel, Field
 
 
 class CourseCreate(BaseModel):
-    title: str = Field(..., max_length=256)
-    description: str = Field("", max_length=1024)
+    title: Annotated[str, Field(max_length=256)]
+    description: Annotated[str, Field(max_length=1024)] = ""
     is_published: bool = True
 
 
 class CourseUpdate(BaseModel):
-    title: str | None = Field(None, max_length=256)
-    description: str | None = Field(None, max_length=1024)
-    is_published: bool | None = None
+    title: Annotated[str | None, Field(max_length=256)] = None
+    description: Annotated[str | None, Field(max_length=1024)] = None
+    is_published: Optional[bool] = None
 
 
 class CourseRead(BaseModel):
@@ -29,6 +30,6 @@ class CourseRead(BaseModel):
 
 
 class CourseProgress(BaseModel):
-    completed: int | None
+    completed: Optional[int]
     total: int
     percent: float
