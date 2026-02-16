@@ -4,7 +4,6 @@ from typing import Annotated
 from core.authentication.fastapi_users import current_active_user
 from core.certificate_pdf import generate_certificate_pdf
 from core.config import settings
-from core.models.block import Block
 from core.models.certificates import Certificate
 from core.models.course import Course
 from core.models.db_helper import db_helper
@@ -31,6 +30,7 @@ async def generate_certificate(
     course_id: uuid.UUID,
     db: Session,
     user: Annotated[User, Depends(current_active_user)],
+    response: Response,
 ):
     course = await db.get(Course, course_id, options=[selectinload(Course.blocks)])
     if not course:
@@ -38,7 +38,6 @@ async def generate_certificate(
             status_code=status.HTTP_404_NOT_FOUND, detail="Course not found"
         )
 
-    # check existing
     existing = (
         await db.execute(
             select(Certificate).where(
@@ -48,9 +47,9 @@ async def generate_certificate(
         )
     ).scalar_one_or_none()
     if existing:
+        response.status_code = status.HTTP_200_OK
         return existing
 
-    # check 100% progress
     total = len(course.blocks)
     if total == 0:
         raise HTTPException(

@@ -64,7 +64,9 @@ class User(IdUuidPkMixin, Base):
         "TestSubmission", back_populates="user", foreign_keys="TestSubmission.user_id"
     )
     block_progress = relationship("UserBlockProgress", back_populates="user")
-    certificates = relationship("Certificate", back_populates="user")
+    certificates = relationship(
+        "Certificate", back_populates="user", cascade="all, delete-orphan"
+    )
 
     @property
     def full_name(self) -> str:

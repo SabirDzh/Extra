@@ -2,13 +2,13 @@ import uuid
 from datetime import datetime
 from typing import Annotated, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from core.models.test import QuestionType
 
 
 class AnswerOptionCreate(BaseModel):
-    text: str
+    text: str = Field(max_length=1000)
     is_correct: bool = False
     order_index: int = 0
 
