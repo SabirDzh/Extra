@@ -130,3 +130,16 @@ async def assign_course(
     await session.commit()
 
     return {"detail": "Course assigned successfully"}
+
+
+@router.get("/users/admins")
+async def get_all_admins():
+    pass
+
+
+@router.get("/users/admins/statistics")
+async def get_admins_statistics():
+    pass
+
+
+# TODO: пересмотреть url путь

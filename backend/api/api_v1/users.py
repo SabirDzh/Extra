@@ -85,9 +85,7 @@ async def get_user_courses(
     user: Annotated[User, Depends(current_active_user)],
 ):
     stmt = (
-        select(Course)
-        .join(CourseEnrollment)
-        .where(CourseEnrollment.user_id == user_id)
+        select(Course).join(CourseEnrollment).where(CourseEnrollment.user_id == user_id)
     )
     result = await session.execute(stmt)
     return result.scalars().all()

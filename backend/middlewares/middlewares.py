@@ -1,6 +1,6 @@
 import logging
 import time
-from typing import Callable, Awaitable
+from typing import Awaitable, Callable
 
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
@@ -15,8 +15,8 @@ ALLOW_ORIGINS = [
     "http://localhost",
     "http://localhost:8000",
     "http://localhost:8080",
+    "https://extra-rho-six.vercel.app",
 ]
-
 
 type CallNext = Callable[[Request], Awaitable[Response]]
 

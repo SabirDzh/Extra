@@ -37,8 +37,6 @@ class User(IdUuidPkMixin, Base):
     is_superuser: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     is_verified: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
-    # stores first_name, last_name, and middle_name
-    # TODO заменить на JSONB, используется JSON для тестирования
     username: Mapped[dict[str, str | None]] = mapped_column(
         JSONB,
         nullable=False,
