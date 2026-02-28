@@ -56,6 +56,7 @@ class ApiV1Prefix(BaseModel):
     admin: str = "/admin"
     product: str = "/product"
     test: str = "/test"
+    search: str = "/search"
 
 
 class ApiPrefix(BaseModel):

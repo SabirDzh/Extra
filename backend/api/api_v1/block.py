@@ -12,9 +12,10 @@ from core.models.progress import UserBlockProgress
 from core.models.user import User
 from core.schemas.block import BlockCreate, BlockRead, BlockUpdate
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from utils.product import current_admin
+from utils.role import UserRole
 
 router = APIRouter(prefix="/courses/{course_id}/blocks", tags=["Blocks"])
 
@@ -37,6 +38,41 @@ async def _get_block_or_404(db, block_id: uuid.UUID, course_id: uuid.UUID) -> Bl
             status_code=status.HTTP_404_NOT_FOUND, detail="Block not found"
         )
     return block
+
+
+async def check_previous_blocks_completed(
+    db: AsyncSession, user: User, block: Block
+) -> bool:
+    if user.role == UserRole.admin:
+        return True
+
+    previous_blocks = (
+        (
+            await db.execute(
+                select(Block.id).where(
+                    Block.course_id == block.course_id,
+                    Block.order_index < block.order_index,
+                )
+            )
+        )
+        .scalars()
+        .all()
+    )
+
+    if not previous_blocks:
+        return True
+
+    completed_count = (
+        await db.execute(
+            select(func.count(UserBlockProgress.id)).where(
+                UserBlockProgress.user_id == user.id,
+                UserBlockProgress.block_id.in_(previous_blocks),
+                UserBlockProgress.is_completed,
+            )
+        )
+    ).scalar()
+
+    return completed_count == len(previous_blocks)
 
 
 @router.get("/", status_code=status.HTTP_200_OK, response_model=list[BlockRead])
@@ -64,8 +100,21 @@ async def create_block(
 
 
 @router.get("/{block_id}", status_code=status.HTTP_200_OK, response_model=BlockRead)
-async def get_block(course_id: uuid.UUID, block_id: uuid.UUID, db: Session):
-    return await _get_block_or_404(db, block_id, course_id)
+async def get_block(
+    course_id: uuid.UUID,
+    block_id: uuid.UUID,
+    db: Session,
+    user: Annotated[User, Depends(current_active_user)],
+):
+    block = await _get_block_or_404(db, block_id, course_id)
+
+    if not await check_previous_blocks_completed(db, user, block):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Previous blocks must be completed first",
+        )
+
+    return block
 
 
 @router.put("/{block_id}", response_model=BlockRead)
@@ -133,6 +182,12 @@ async def mark_complete(
     user: Annotated[User, Depends(current_active_user)],
 ):
     block = await _get_block_or_404(db, block_id, course_id)
+
+    if not await check_previous_blocks_completed(db, user, block):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Previous blocks must be completed first before completing this one",
+        )
 
     existing = (
         await db.execute(

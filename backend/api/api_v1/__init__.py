@@ -13,6 +13,7 @@ from .course import router as course_router
 from .email import router as email_router
 from .messages import router as messages_router
 from .product import router as product_router
+from .search import router as search_router
 from .service import router as service_router
 from .tests import router as tests_router
 from .users import router as users_router
@@ -34,3 +35,4 @@ router.include_router(tests_router)
 router.include_router(certificates_router)
 router.include_router(email_router)
 router.include_router(admin_router)
+router.include_router(search_router)

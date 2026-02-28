@@ -22,7 +22,7 @@ from crud.product import (
     search_product,
     update_product,
 )
-from fastapi import APIRouter, BackgroundTasks, Cookie, Depends, Header, Query, status
+from fastapi import APIRouter, Cookie, Depends, Header, Query, status
 from fastapi_cache import decorator
 from sqlalchemy.ext.asyncio import AsyncSession
 from utils.filter import get_filtered
@@ -166,15 +166,3 @@ async def get_filter_count_item(session: Session):
 
 
 # создать возможность сортировки ()
-
-from typing import Annotated
-
-
-@router.get("/cookie")
-async def get_cookie(test: Annotated[str | None, Cookie()] = None):
-    return test
-
-
-@router.get("/header")
-async def get_header(user_agent: str = Header()):
-    return {"User-Agent": user_agent}

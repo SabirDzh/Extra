@@ -1,4 +1,5 @@
 import uuid
+from collections import defaultdict
 from datetime import datetime, timezone
 
 from sqlalchemy import select
@@ -10,7 +11,7 @@ from core.models.block import (
     BlockType,
 )
 from core.models.progress import UserBlockProgress
-from core.models.test import Question, TestAnswer, TestSubmission
+from core.models.test import Question, QuestionType, TestAnswer, TestSubmission
 
 
 async def auto_grade_submission(
@@ -35,6 +36,8 @@ async def auto_grade_submission(
     max_score = len(questions)
     score = 0
 
+    has_free_text = any(q.question_type == QuestionType.free_text for q in questions)
+
     answers = (
         (
             await db.execute(
@@ -45,26 +48,38 @@ async def auto_grade_submission(
         .all()
     )
 
-    answer_map = {a.question_id: a for a in answers}
+    user_answers = defaultdict(set)
+    for a in answers:
+        if a.selected_answer_id:
+            user_answers[a.question_id].add(a.selected_answer_id)
 
     for question in questions:
-        answer = answer_map.get(question.id)
-        if not answer:
-            continue
-
+        selected_option_ids = user_answers.get(question.id, set())
         correct_option_ids = {o.id for o in question.options if o.is_correct}
 
-        if (
-            answer.selected_answer_id
-            and answer.selected_answer_id in correct_option_ids
-        ):
-            score += 1
+        if question.question_type == QuestionType.single_choice:
+            if (
+                selected_option_ids
+                and list(selected_option_ids)[0] in correct_option_ids
+            ):
+                score += 1
+
+        elif question.question_type == QuestionType.multiple_choice:
+            if (
+                selected_option_ids == correct_option_ids
+                and len(correct_option_ids) > 0
+            ):
+                score += 1
+
+        elif question.question_type == QuestionType.free_text:
+            pass
 
     submission.score = score
     submission.max_score = max_score
-    submission.is_graded = True
 
-    if score == max_score:
+    submission.is_graded = not has_free_text
+
+    if score == max_score and not has_free_text:
         await _mark_block_completed(db, submission.user_id, submission.block_id)
 
     return submission

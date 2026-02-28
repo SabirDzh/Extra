@@ -8,7 +8,6 @@ from core.models.block import (
     BlockType,
 )
 from core.models.db_helper import db_helper
-from core.models.progress import UserBlockProgress
 from core.models.test import AnswerOption, Question, TestAnswer, TestSubmission
 from core.models.user import User
 from core.schemas.test import (
@@ -27,6 +26,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from utils.product import current_admin
 from utils.role import UserRole
+
+from api.api_v1.block import check_previous_blocks_completed
 
 router = APIRouter(prefix=settings.api.v1.test, tags=["Tests"])
 
@@ -116,6 +117,13 @@ async def list_questions(
     block = await db.get(Block, block_id)
     if not block:
         raise HTTPException(status_code=404, detail="Block not found")
+
+    if not await check_previous_blocks_completed(db, user, block):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Previous blocks must be completed first",
+        )
+
     questions = (
         (
             await db.execute(
@@ -146,6 +154,12 @@ async def submit_test(
         raise HTTPException(status_code=404, detail="Block not found")
     if block.block_type not in (BlockType.auto_test, BlockType.manual_test):
         raise HTTPException(status_code=400, detail="Block is not a test")
+
+    if not await check_previous_blocks_completed(db, user, block):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Previous blocks must be completed first",
+        )
 
     questions = (
         (await db.execute(select(Question).where(Question.block_id == block_id)))

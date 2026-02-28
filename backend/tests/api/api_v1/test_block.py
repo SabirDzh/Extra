@@ -3,13 +3,10 @@ import uuid
 import pytest
 from core.models.block import Block, BlockType
 from core.models.course import Course
-from core.models.progress import UserBlockProgress
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
 pytestmark = pytest.mark.anyio
-
-# --- Helpers ---
 
 
 async def create_course_db(session, user_id, title="Test Course"):
@@ -268,6 +265,11 @@ async def test_get_block_success(
     c = await create_course_db(session, user.id)
     b = await create_block_db(session, c.id)
 
+    await client.post(
+        "/api/v1/auth/login",
+        data={"username": "admin@get.com", "password": "Password12345!"},
+    )
+
     response = await client.get(f"/api/v1/courses/{c.id}/blocks/{b.id}")
     assert response.status_code == 200
     assert response.json()["title"] == "B1"
@@ -278,6 +280,11 @@ async def test_get_block_not_found(
 ):
     user = await create_user("admin@gnf.com", is_superuser=True, role="administrator")
     c = await create_course_db(session, user.id)
+
+    await client.post(
+        "/api/v1/auth/login",
+        data={"username": "admin@gnf.com", "password": "Password12345!"},
+    )
 
     response = await client.get(f"/api/v1/courses/{c.id}/blocks/{uuid.uuid4()}")
     assert response.status_code == 404
@@ -290,6 +297,11 @@ async def test_get_block_course_mismatch(
     c1 = await create_course_db(session, user.id, "C1")
     c2 = await create_course_db(session, user.id, "C2")
     b = await create_block_db(session, c1.id)
+
+    await client.post(
+        "/api/v1/auth/login",
+        data={"username": "admin@mis.com", "password": "Password12345!"},
+    )
 
     # Try accessing block b (which is in C1) via C2 URL
     response = await client.get(f"/api/v1/courses/{c2.id}/blocks/{b.id}")
