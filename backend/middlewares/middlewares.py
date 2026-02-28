@@ -1,6 +1,6 @@
 import logging
 import time
-from typing import Callable, Awaitable
+from typing import Awaitable, Callable
 
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
@@ -15,8 +15,7 @@ ALLOW_ORIGINS = [
     "http://localhost",
     "http://localhost:8000",
     "http://localhost:8080",
-    "http://127.0.0.1",
-    "http://127.0.0.1:8000",
+    "https://extra-rho-six.vercel.app",
 ]
 
 
