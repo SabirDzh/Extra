@@ -39,7 +39,7 @@ async def test_auth_sql_truncation_attack(client: AsyncClient, padding):
     """
     payload = {
         "email": f"truncate_{{padding[:50]}}@example.com", # Shorten email to pass basic format validation
-        "password": "password12345",
+        "password": "Password12345!",
         "role": "user",
         "username": {"first_name": padding} # Inject padding into name
     }
@@ -62,7 +62,7 @@ async def test_auth_template_injection_username(client: AsyncClient):
     """
     payload = {
         "email": "ssti@example.com",
-        "password": "password12345",
+        "password": "Password12345!",
         "role": "user",
         "username": {"first_name": "{{7*7}}"} 
     }
@@ -80,7 +80,7 @@ async def test_auth_crlf_injection_email(client: AsyncClient):
     """
     payload = {
         "email": "victim@example.com\r\nBcc: hacker@example.com",
-        "password": "password12345",
+        "password": "Password12345!",
         "role": "user",
         "username": {"first_name": "Hacker"}
     }
@@ -96,7 +96,7 @@ async def test_auth_homoglyph_collision(client: AsyncClient):
     """
     payload = {
         "email": HOMOGLYPH_EMAIL,
-        "password": "password12345",
+        "password": "Password12345!",
         "role": "user",
         "username": {"first_name": "CyrillicUser"}
     }
@@ -128,7 +128,7 @@ async def test_auth_prototype_pollution_fields(client: AsyncClient):
     """
     payload = {
         "email": "proto@example.com",
-        "password": "password12345",
+        "password": "Password12345!",
         "role": "user",
         "username": {"first_name": "Test"},
         "__proto__": {"isAdmin": True},
@@ -152,7 +152,7 @@ async def test_auth_email_parameter_pollution(client: AsyncClient):
     """
     payload = {
         "email": ["user@example.com", "admin@example.com"],
-        "password": "password12345",
+        "password": "Password12345!",
         "role": "user",
         "username": {"first_name": "Test"}
     }
@@ -168,15 +168,15 @@ async def test_auth_password_unicode_normalization(client: AsyncClient, create_u
     Usually hashing is strictly byte-based, so they should NOT match.
     """
     email = "unicode_pass@example.com"
-    # Full-width 'password12345' (ｕｎｉｃｏｄｅ)
+    # Full-width 'Password12345!' (ｕｎｉｃｏｄｅ)
     # Let's use a simpler check: 'Ａ' vs 'A'
-    # Register with standard 'password12345A'
-    std_pass = "password12345A"
+    # Register with standard 'Password12345!A'
+    std_pass = "Password12345!A"
     
     await create_user(email, std_pass)
     
-    # Try login with full-width 'Ａ' -> 'password12345Ａ'
-    full_width_pass = "password12345Ａ" 
+    # Try login with full-width 'Ａ' -> 'Password12345!Ａ'
+    full_width_pass = "Password12345!Ａ" 
     
     response = await client.post("/api/v1/auth/login", data={"username": email, "password": full_width_pass})
     

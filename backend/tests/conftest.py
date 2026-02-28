@@ -9,11 +9,23 @@ from fastapi_cache.backends.inmemory import InMemoryBackend
 from fastapi_users.password import PasswordHelper
 from httpx import ASGITransport, AsyncClient
 from main import main_app
+from sqlalchemy.dialects.postgresql import JSONB, TSVECTOR
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.ext.compiler import compiles
 from sqlalchemy.pool import StaticPool
 
 # Use in-memory SQLite for tests
 DATABASE_URL = "sqlite+aiosqlite:///:memory:"
+
+
+@compiles(JSONB, "sqlite")
+def compile_jsonb(type_, compiler, **kw):
+    return compiler.visit_JSON(type_, **kw)
+
+
+@compiles(TSVECTOR, "sqlite")
+def compile_tsvector(type_, compiler, **kw):
+    return "TEXT"
 
 
 @pytest.fixture(scope="session")
@@ -28,7 +40,26 @@ async def async_db_engine():
         DATABASE_URL,
         connect_args={"check_same_thread": False},
         poolclass=StaticPool,
+        execution_options={"use_insertmanyvalues": False},
     )
+
+    from sqlalchemy import event
+
+    @event.listens_for(engine.sync_engine, "connect")
+    def register_custom_functions(dbapi_connection, connection_record):
+        dbapi_connection.create_function(
+            "to_tsvector", 2, lambda config, text: "mock_vector", deterministic=True
+        )
+        dbapi_connection.create_function(
+            "websearch_to_tsquery", 2, lambda config, query: "mock_query", deterministic=True
+        )
+        dbapi_connection.create_function(
+            "ts_rank", 2, lambda vector, query: 0.0, deterministic=True
+        )
+        dbapi_connection.create_function(
+            "similarity", 2, lambda text1, text2: 1.0, deterministic=True
+        )
+
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     yield engine
@@ -40,7 +71,10 @@ async def async_db_engine():
 @pytest.fixture(scope="function")
 async def session(async_db_engine) -> AsyncGenerator[AsyncSession, None]:
     TestingSessionLocal = async_sessionmaker(
-        autocommit=False, autoflush=False, bind=async_db_engine
+        autocommit=False,
+        autoflush=False,
+        bind=async_db_engine,
+        expire_on_commit=False,
     )
     async with TestingSessionLocal() as session:
         yield session
@@ -71,7 +105,7 @@ async def client(session) -> AsyncGenerator[AsyncClient, None]:
 async def create_user(session):
     async def _create_user(
         email: str,
-        password: str = "password12345",
+        password: str = "Password12345!",
         is_superuser: bool = False,
         role: str = "user",
     ):
@@ -97,7 +131,7 @@ async def create_user(session):
 @pytest.fixture
 async def normal_user_token_headers(client, create_user):
     email = "normal@example.com"
-    password = "password12345"
+    password = "Password12345!"
     await create_user(email, password)
 
     resp = await client.post(
@@ -106,23 +140,13 @@ async def normal_user_token_headers(client, create_user):
     if resp.status_code not in (200, 204):
         raise Exception(f"Failed to login in fixture: {resp.text}")
 
-    # Cookie based auth puts token in cookie jar, which httpx client handles automatically.
-    # But if we need explicit headers (which we assume in tests), we might need to extract it.
-    # However, since we return 'Authorization' header dict, we need to decide.
-    # If the app uses ONLY cookies, then headers might not work unless we manually set cookie header.
-    # But `client` persists cookies.
-    # Let's return empty headers if cookies are managed by client, OR check if we need to return specific headers.
-
-    # Since the tests use `headers=normal_user_token_headers`, passing empty dict or None might be fine
-    # IF the client retained the cookies.
-    # Let's return None or empty dict and rely on client cookies.
     return {}
 
 
 @pytest.fixture
 async def superuser_token_headers(client, create_user):
     email = "super@example.com"
-    password = "password12345"
+    password = "Password12345!"
     await create_user(email, password, is_superuser=True, role="administrator")
 
     resp = await client.post(
