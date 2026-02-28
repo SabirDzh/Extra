@@ -1,8 +1,8 @@
 """initial
 
-Revision ID: 46929a229193
+Revision ID: 8ebed10bb056
 Revises:
-Create Date: 2026-02-11 20:23:05.680741
+Create Date: 2026-03-01 00:22:18.728360
 
 """
 
@@ -14,7 +14,7 @@ from fastapi_users_db_sqlalchemy.generics import TIMESTAMPAware
 from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
-revision: str = "46929a229193"
+revision: str = "8ebed10bb056"
 down_revision: Union[str, None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -80,6 +80,12 @@ def upgrade() -> None:
         sa.Column("is_superuser", sa.Boolean(), nullable=False),
         sa.Column("is_verified", sa.Boolean(), nullable=False),
         sa.Column("username", postgresql.JSONB(astext_type=sa.Text()), nullable=False),
+        sa.Column(
+            "role",
+            postgresql.ENUM("user", "admin", "manager", "client", name="userrole"),
+            nullable=False,
+        ),
+        sa.Column("image_url", sa.String(), nullable=True),
         sa.Column("id", sa.UUID(), nullable=False),
         sa.PrimaryKeyConstraint("id", name=op.f("pk_users")),
     )
@@ -109,7 +115,7 @@ def upgrade() -> None:
     )
     op.create_table(
         "courses",
-        sa.Column("title", sa.String(length=500), nullable=False),
+        sa.Column("title", sa.String(length=256), nullable=False),
         sa.Column("description", sa.Text(), nullable=False),
         sa.Column("is_published", sa.Boolean(), nullable=False),
         sa.Column("created_by", sa.UUID(), nullable=False),
@@ -132,6 +138,7 @@ def upgrade() -> None:
             name=op.f("fk_courses_created_by_users"),
         ),
         sa.PrimaryKeyConstraint("id", name=op.f("pk_courses")),
+        sa.UniqueConstraint("title", name=op.f("uq_courses_title")),
     )
     op.create_table(
         "blocks",
