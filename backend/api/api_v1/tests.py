@@ -7,7 +7,6 @@ from core.models.block import (
     BlockType,
 )
 from core.models.db_helper import db_helper
-from core.models.progress import UserBlockProgress
 from core.models.test import AnswerOption, Question, TestAnswer, TestSubmission
 from core.models.user import User
 from core.schemas.test import (
@@ -27,7 +26,7 @@ from sqlalchemy.orm import selectinload
 from utils.product import current_admin
 from utils.role import UserRole
 
-router = APIRouter(prefix="/api/tests", tags=["tests"])
+router = APIRouter(prefix="/api/tests", tags=["Tests"])
 
 Session = Annotated[AsyncSession, Depends(db_helper.session_getter)]
 

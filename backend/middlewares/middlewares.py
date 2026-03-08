@@ -67,14 +67,6 @@ def register_middlewares(app: FastAPI) -> None:
     app.middleware("http")(add_process_time_to_requests)
 
     app.add_middleware(
-        CORSMiddleware,
-        allow_origins=ALLOW_ORIGINS,
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
-
-    app.add_middleware(
         ProcessTimeHeaderMiddleware,
         process_time_header_name="X-Process-Time-New-Again",
     )
@@ -82,4 +74,12 @@ def register_middlewares(app: FastAPI) -> None:
     app.add_middleware(
         BaseHTTPMiddleware,
         dispatch=requests_count_middleware_dispatch,
+    )
+
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=ALLOW_ORIGINS,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
     )

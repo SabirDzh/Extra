@@ -9,7 +9,7 @@ from core.models.block import (
     BlockType,
 )
 from core.models.progress import UserBlockProgress
-from core.models.test import AnswerOption, Question, TestAnswer, TestSubmission
+from core.models.test import Question, TestAnswer, TestSubmission
 
 
 async def auto_grade_submission(

@@ -15,7 +15,7 @@ async def test_security_privilege_escalation_attempt(client: AsyncClient):
         "email": "hacker_admin@example.com",
         "password": "Password12345!",
         "role": "user",
-        "username": {"first_name": "Hacker"},
+        "fullname": "Hacker",
         # Attempt to inject flags
         "is_superuser": True,
         "is_verified": True,
@@ -45,7 +45,7 @@ async def test_security_role_escalation(client: AsyncClient):
         "email": "hacker_role@example.com",
         "password": "Password12345!",
         "role": "administrator", # Try to grab admin role
-        "username": {"first_name": "Hacker"}
+        "fullname": "Hacker"
     }
     response = await client.post("/api/v1/auth/register", json=payload)
     
@@ -74,7 +74,7 @@ async def test_security_type_confusion_email(client: AsyncClient):
         "email": {"$ne": "something"}, # Mongo-style injection attempt
         "password": "Password12345!",
         "role": "user",
-        "username": {"first_name": "Hacker"}
+        "fullname": "Hacker"
     }
     response = await client.post("/api/v1/auth/register", json=payload)
     assert response.status_code == 422
@@ -90,7 +90,7 @@ async def test_security_type_confusion_password(client: AsyncClient):
         "email": "type_conf_pass@example.com",
         "password": [1, 2, 3], # Array instead of string
         "role": "user",
-        "username": {"first_name": "Hacker"}
+        "fullname": "Hacker"
     }
     response = await client.post("/api/v1/auth/register", json=payload)
     assert response.status_code == 422
@@ -114,7 +114,7 @@ async def test_security_os_command_injection(client: AsyncClient):
             "email": "cmd_inject@example.com",
             "password": "Password12345!",
             "role": "user",
-            "username": {"first_name": cmd}
+            "fullname": cmd
         }
         # We reuse email, so subsequent requests might fail with 400 (duplicate), which is fine.
         # We assume 201 (saved literally) or 422/400.
@@ -138,13 +138,13 @@ async def test_security_path_traversal(client: AsyncClient):
             "email": "path@example.com",
             "password": "Password12345!",
             "role": "user",
-            "username": {"first_name": path}
+            "fullname": path
         }
         response = await client.post("/api/v1/auth/register", json=payload)
         assert response.status_code in [201, 400, 422]
         if response.status_code == 201:
             # Ensure it was saved literally and not interpreted
-            assert response.json()["username"]["first_name"] == path
+            assert response.json()["fullname"] == path
 
 
 @pytest.mark.anyio
@@ -188,7 +188,7 @@ async def test_security_unknown_fields_stripping(client: AsyncClient):
         "email": "strip_fields@example.com",
         "password": "Password12345!",
         "role": "user",
-        "username": {"first_name": "Test"},
+        "fullname": "Test",
         
         "hashed_password": "fake_hash_injection",
         "id": "00000000-0000-0000-0000-000000000000",
@@ -233,7 +233,7 @@ async def test_security_huge_json_dos(client: AsyncClient):
         "email": "dos@example.com",
         "password": "Password12345!",
         "role": "user",
-        "username": {"first_name": "Test", "middle_name": str(massive_list)}
+        "fullname": str(massive_list)
     }
     response = await client.post("/api/v1/auth/register", json=payload)
     # 422 Validation Error (str expected, got list) or 400.

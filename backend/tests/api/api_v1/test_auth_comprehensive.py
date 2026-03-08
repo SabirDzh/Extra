@@ -25,13 +25,10 @@ COMPLEX_EMAILS = [
     ("Joe Smith <email@example.com>", "email@example.com"),
 ]
 
-# 3. Username scenarios
-INVALID_USERNAMES = [
-    {}, # Missing first_name
-    {"first_name": ""}, # Empty
-    {"first_name": None}, # None
-    {"last_name": "Doe"}, # Missing first_name
-    {"middle_name": "J"}, # Missing first_name
+# 3. Fullname scenarios
+INVALID_FULLNAMES = [
+    "", # Empty
+    None, # None
 ]
 
 # --- AUTH REGISTER & LOGIN TESTS ---
@@ -41,9 +38,10 @@ INVALID_USERNAMES = [
 async def test_register_invalid_emails_strict(client: AsyncClient, email):
     """Attempt to register with strictly invalid email addresses."""
     payload = {
+        "email": email,
         "password": "Password12345!",
         "role": "user",
-        "username": {"first_name": "Test"},
+        "fullname": "Test",
         "is_active": True,
         "is_verified": False
     }
@@ -58,7 +56,7 @@ async def test_register_complex_emails(client: AsyncClient, input_email, expecte
         "email": input_email,
         "password": "Password12345!",
         "role": "user",
-        "username": {"first_name": "Test"},
+        "fullname": "Test",
         "is_active": True,
         "is_verified": False
     }
@@ -74,14 +72,14 @@ async def test_register_complex_emails(client: AsyncClient, input_email, expecte
         pytest.fail(f"Unexpected status code {response.status_code} for email '{input_email}'")
 
 @pytest.mark.anyio
-@pytest.mark.parametrize("username_payload", INVALID_USERNAMES)
-async def test_register_invalid_username_structure(client: AsyncClient, username_payload):
-    """Attempt to register with malformed username dictionary."""
+@pytest.mark.parametrize("fullname_value", INVALID_FULLNAMES)
+async def test_register_invalid_fullname(client: AsyncClient, fullname_value):
+    """Attempt to register with malformed fullname."""
     payload = {
         "email": "valid@example.com",
         "password": "Password12345!",
         "role": "user",
-        "username": username_payload,
+        "fullname": fullname_value,
         "is_active": True,
         "is_verified": False
     }
@@ -95,7 +93,7 @@ async def test_register_duplicate_email(client: AsyncClient):
         "email": "duplicate@example.com",
         "password": "Password12345!",
         "role": "user",
-        "username": {"first_name": "First"}
+        "fullname": "First"
     }
     await client.post("/api/v1/auth/register", json=payload)
     resp2 = await client.post("/api/v1/auth/register", json=payload)
@@ -109,9 +107,9 @@ async def test_register_missing_fields(client: AsyncClient):
         "email": "missing@example.com",
         "password": "Password12345!",
         "role": "user",
-        "username": {"first_name": "Test"}
+        "fullname": "Test"
     }
-    fields_to_remove = ["email", "password", "username", "role"]
+    fields_to_remove = ["email", "password", "fullname", "role"]
     for field in fields_to_remove:
         bad_payload = base_payload.copy()
         del bad_payload[field]
@@ -152,7 +150,7 @@ async def test_register_case_insensitivity(client: AsyncClient):
         "email": "CASE@example.com",
         "password": "Password12345!",
         "role": "user",
-        "username": {"first_name": "Test"}
+        "fullname": "Test"
     }
     resp1 = await client.post("/api/v1/auth/register", json=payload1)
     assert resp1.status_code == 201
@@ -170,7 +168,7 @@ async def test_register_valid_roles(client: AsyncClient, role_value):
         "email": f"role_{role_value}@example.com",
         "password": "Password12345!",
         "role": role_value,
-        "username": {"first_name": "Test"}
+        "fullname": "Test"
     }
     response = await client.post("/api/v1/auth/register", json=payload)
     assert response.status_code == 201
@@ -295,15 +293,14 @@ async def test_update_me(client: AsyncClient, create_user):
     await client.post("/api/v1/auth/login", data={"username": email, "password": password})
     
     # Update Payload
-    # Schema UserUpdate allows updating username
-    new_name = {"first_name": "UpdatedName", "last_name": "NewLast"}
-    payload = {"username": new_name}
+    # Schema UserUpdate allows updating fullname
+    new_fullname = "Updated Name"
+    payload = {"fullname": new_fullname}
     
     response = await client.patch("/api/v1/users/me", json=payload)
     assert response.status_code == 200
     data = response.json()
-    assert data["username"]["first_name"] == "UpdatedName"
-    assert data["username"]["last_name"] == "NewLast"
+    assert data["fullname"] == new_fullname
 
 # --- MESSAGES CONTROLLER TESTS ---
 

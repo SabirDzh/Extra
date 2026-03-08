@@ -49,7 +49,7 @@ async def test_register_extreme_usernames(client: AsyncClient, desc, name_value)
         "email": f"extreme_{desc.replace(' ', '_')}@example.com",
         "password": "Password12345!",
         "role": "user",
-        "username": {"first_name": name_value},
+        "fullname": name_value,
         "is_active": True,
         "is_verified": False
     }
@@ -63,7 +63,7 @@ async def test_register_extreme_usernames(client: AsyncClient, desc, name_value)
     if response.status_code == 201:
         data = response.json()
         # Verify encoding is preserved (round-trip)
-        assert data["username"]["first_name"] == name_value
+        assert data["fullname"] == name_value
 
 
 @pytest.mark.anyio
@@ -79,7 +79,7 @@ async def test_register_extreme_passwords(client: AsyncClient, password):
         "email": email,
         "password": password,
         "role": "user",
-        "username": {"first_name": "Test User"},
+        "fullname": "Test User",
         "is_active": True,
         "is_verified": False
     }
@@ -103,7 +103,7 @@ async def test_register_weird_emails(client: AsyncClient, email):
         "email": email,
         "password": "Password12345!",
         "role": "user",
-        "username": {"first_name": "Test"},
+        "fullname": "Test",
         "is_active": True,
         "is_verified": False
     }
@@ -124,7 +124,7 @@ async def test_null_byte_attack(client: AsyncClient):
         "email": "nullbyte@example.com",
         "password": "Password12345!",
         "role": "user",
-        "username": {"first_name": "User\u0000Name"},
+        "fullname": "User\u0000Name",
         "is_active": True,
         "is_verified": False
     }
@@ -138,3 +138,4 @@ async def test_null_byte_attack(client: AsyncClient):
         pytest.fail("Server crashed on NULL byte input!")
     
     assert response.status_code in [201, 400, 422]
+

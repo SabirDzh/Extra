@@ -13,6 +13,7 @@ __all__ = (
     "Question",
     "TestAnswer",
     "TestSubmission",
+    "Term",
 )
 
 from .access_token import AccessToken
@@ -23,5 +24,6 @@ from .course import Course, CourseEnrollment
 from .db_helper import db_helper
 from .product import Product
 from .progress import UserBlockProgress
+from .term import Term
 from .test import AnswerOption, Question, TestAnswer, TestSubmission
 from .user import User

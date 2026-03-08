@@ -28,18 +28,17 @@ class UserUsername(BaseModel):  # structures for working with names
 
 class UserRead(schemas.BaseUser[UuIDMixin]):
     role: UserRole
-    username: UserUsername  # response
+    fullname: str  # response
     image_url: str | None = None
 
 
 class UserCreate(schemas.BaseUserCreate):
     password: str = Field(
-        ...,
-        min_length=12,
-        max_length=128,
+        min_length=4,
+        max_length=64,
     )
     role: UserRole
-    username: UserUsername  # registration
+    fullname: str = Field(min_length=1, max_length=128)  # registration
     image_url: str | None = None
     # password_confirm: str | None = None
 
@@ -71,8 +70,8 @@ class UserCreate(schemas.BaseUserCreate):
 
 # schemas.BaseUserUpdate
 class UserUpdate(schemas.BaseUserUpdate):
-    password: Optional[str] = None
-    username: UserUsername | None = None
+    password: str | None = None
+    fullname: str | None = None
     image_url: str | None = None
 
     @field_validator("password")

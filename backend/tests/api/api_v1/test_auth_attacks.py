@@ -38,10 +38,10 @@ async def test_auth_sql_truncation_attack(client: AsyncClient, padding):
     If truncation happens silently, "admin...x" becomes "admin".
     """
     payload = {
-        "email": f"truncate_{{padding[:50]}}@example.com", # Shorten email to pass basic format validation
+        "email": f"truncate_{padding[:50]}@example.com", # Shorten email to pass basic format validation
         "password": "Password12345!",
         "role": "user",
-        "username": {"first_name": padding} # Inject padding into name
+        "fullname": padding # Inject padding into name
     }
     response = await client.post("/api/v1/auth/register", json=payload)
     
@@ -64,13 +64,13 @@ async def test_auth_template_injection_username(client: AsyncClient):
         "email": "ssti@example.com",
         "password": "Password12345!",
         "role": "user",
-        "username": {"first_name": "{{7*7}}"} 
+        "fullname": "{{7*7}}" 
     }
     response = await client.post("/api/v1/auth/register", json=payload)
     
-    # API should just save it as string (201) OR reject due to strict regex (422).
-    # Since schema has pattern="^[A-Za-z-_]+$", we expect 422.
-    assert response.status_code == 422
+    # API should just save it as string (201) if no strict regex is enforced.
+    assert response.status_code == 201
+    assert response.json()["fullname"] == "{{7*7}}"
 
 @pytest.mark.anyio
 async def test_auth_crlf_injection_email(client: AsyncClient):
@@ -82,7 +82,7 @@ async def test_auth_crlf_injection_email(client: AsyncClient):
         "email": "victim@example.com\r\nBcc: hacker@example.com",
         "password": "Password12345!",
         "role": "user",
-        "username": {"first_name": "Hacker"}
+        "fullname": "Hacker"
     }
     response = await client.post("/api/v1/auth/register", json=payload)
     # MUST be rejected (422)
@@ -98,7 +98,7 @@ async def test_auth_homoglyph_collision(client: AsyncClient):
         "email": HOMOGLYPH_EMAIL,
         "password": "Password12345!",
         "role": "user",
-        "username": {"first_name": "CyrillicUser"}
+        "fullname": "CyrillicUser"
     }
     response = await client.post("/api/v1/auth/register", json=payload)
     # 201 means system supports UTF-8 emails/IDN (good).
@@ -114,7 +114,7 @@ async def test_auth_null_password_attack(client: AsyncClient):
         "email": "nullpass@example.com",
         "password": None,
         "role": "user",
-        "username": {"first_name": "Test"}
+        "fullname": "Test"
     }
     response = await client.post("/api/v1/auth/register", json=payload)
     # Pydantic should catch type mismatch (expecting str, got NoneType)
@@ -130,7 +130,7 @@ async def test_auth_prototype_pollution_fields(client: AsyncClient):
         "email": "proto@example.com",
         "password": "Password12345!",
         "role": "user",
-        "username": {"first_name": "Test"},
+        "fullname": "Test",
         "__proto__": {"isAdmin": True},
         "constructor": {"prototype": {"isAdmin": True}}
     }
@@ -154,7 +154,7 @@ async def test_auth_email_parameter_pollution(client: AsyncClient):
         "email": ["user@example.com", "admin@example.com"],
         "password": "Password12345!",
         "role": "user",
-        "username": {"first_name": "Test"}
+        "fullname": "Test"
     }
     response = await client.post("/api/v1/auth/register", json=payload)
     # Should be 422 (Type mismatch)

@@ -117,7 +117,7 @@ async def create_user(session):
             "is_superuser": is_superuser,
             "is_verified": True,
             "role": role,
-            "username": {"first_name": "Test", "last_name": "User"},
+            "fullname": "Test User",
         }
         user = User(**user_dict)
         session.add(user)

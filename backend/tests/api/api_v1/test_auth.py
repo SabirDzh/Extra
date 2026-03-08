@@ -7,9 +7,7 @@ async def test_register_user(client: AsyncClient):
         "email": "test@example.com",
         "password": "Password12345!",
         "role": "user",
-        "username": {
-            "first_name": "TestUser"
-        },
+        "fullname": "TestUser",
         "is_active": True,
         "is_superuser": False,
         "is_verified": False
@@ -18,6 +16,7 @@ async def test_register_user(client: AsyncClient):
     assert response.status_code == 201, response.text
     data = response.json()
     assert data["email"] == payload["email"]
+    assert data["fullname"] == payload["fullname"]
     assert "id" in data
 
 @pytest.mark.anyio
@@ -27,9 +26,7 @@ async def test_login_user(client: AsyncClient):
         "email": "login@example.com",
         "password": "Password12345!",
         "role": "user",
-        "username": {
-            "first_name": "LoginUser"
-        },
+        "fullname": "LoginUser",
         "is_active": True,
         "is_verified": True # Assuming verification is needed or mocked?
     }

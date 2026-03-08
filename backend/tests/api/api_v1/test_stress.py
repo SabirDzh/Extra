@@ -10,11 +10,7 @@ async def test_register_user_with_emojis(client: AsyncClient):
         "email": "emoji_user@example.com",
         "password": "Password12345!",
         "role": "user",
-        "username": {
-            "first_name": "😊User🚀",
-            "last_name": "Tεst",
-            "middle_name": "🤷‍♂️"
-        },
+        "fullname": "😊User🚀",
         "is_active": True,
         "is_superuser": False,
         "is_verified": False
@@ -28,7 +24,7 @@ async def test_register_user_with_emojis(client: AsyncClient):
     
     if response.status_code == 201:
         data = response.json()
-        assert data["username"]["first_name"] == "😊User🚀"
+        assert data["fullname"] == "😊User🚀"
 
 @pytest.mark.anyio
 async def test_register_user_with_huge_input(client: AsyncClient):
@@ -38,9 +34,7 @@ async def test_register_user_with_huge_input(client: AsyncClient):
         "email": "huge_input@example.com",
         "password": "Password12345!",
         "role": "user",
-        "username": {
-            "first_name": huge_string
-        },
+        "fullname": huge_string,
         "is_active": True,
         "is_superuser": False,
         "is_verified": False
@@ -60,9 +54,7 @@ async def test_register_user_sql_injection_payload(client: AsyncClient):
         "email": "sql_inject@example.com",
         "password": "Password12345!",
         "role": "user",
-        "username": {
-            "first_name": "Robert'); DROP TABLE users; --"
-        },
+        "fullname": "Robert'); DROP TABLE users; --",
         "is_active": True,
         "is_superuser": False,
         "is_verified": False
@@ -76,7 +68,7 @@ async def test_register_user_sql_injection_payload(client: AsyncClient):
     
     if response.status_code == 201:
         data = response.json()
-        assert data["username"]["first_name"] == "Robert'); DROP TABLE users; --"
+        assert data["fullname"] == "Robert'); DROP TABLE users; --"
 
 @pytest.mark.anyio
 async def test_register_user_xss_payload(client: AsyncClient):
@@ -85,9 +77,7 @@ async def test_register_user_xss_payload(client: AsyncClient):
         "email": "xss@example.com",
         "password": "Password12345!",
         "role": "user",
-        "username": {
-            "first_name": "<script>alert('XSS')</script>"
-        },
+        "fullname": "<script>alert('XSS')</script>",
         "is_active": True,
         "is_superuser": False,
         "is_verified": False
@@ -98,7 +88,7 @@ async def test_register_user_xss_payload(client: AsyncClient):
     assert response.status_code in [201, 422]
     if response.status_code == 201:
         data = response.json()
-        assert data["username"]["first_name"] == "<script>alert('XSS')</script>"
+        assert data["fullname"] == "<script>alert('XSS')</script>"
 
 @pytest.mark.anyio
 async def test_register_invalid_email_format(client: AsyncClient):
@@ -107,9 +97,7 @@ async def test_register_invalid_email_format(client: AsyncClient):
         "email": "not-an-email",
         "password": "Password12345!",
         "role": "user",
-        "username": {
-            "first_name": "User"
-        },
+        "fullname": "User",
         "is_active": True,
         "is_superuser": False,
         "is_verified": False
@@ -128,9 +116,7 @@ async def test_register_invalid_role(client: AsyncClient):
         "email": "bad_role@example.com",
         "password": "Password12345!",
         "role": "god_emperor",
-        "username": {
-            "first_name": "User"
-        },
+        "fullname": "User",
         "is_active": True,
         "is_superuser": False,
         "is_verified": False
@@ -150,9 +136,7 @@ async def test_register_empty_first_name(client: AsyncClient):
         "email": "empty_name@example.com",
         "password": "Password12345!",
         "role": "user",
-        "username": {
-            "first_name": ""
-        },
+        "fullname": "",
         "is_active": True,
         "is_superuser": False,
         "is_verified": False
