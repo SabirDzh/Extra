@@ -1,6 +1,11 @@
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 
+from admin import register_admin_views
+from api.webhooks import webhooks_router
+from core.config import BASE_DIR, settings
+from core.models import db_helper
+from errors_handlers import register_errors_handlers
 from fastapi import FastAPI
 from fastapi.openapi.docs import (
     get_redoc_html,
@@ -10,17 +15,11 @@ from fastapi.openapi.docs import (
 from fastapi.responses import ORJSONResponse
 from fastapi_cache import FastAPICache
 from fastapi_cache.backends.redis import RedisBackend
+from middlewares import register_middlewares
+from redis.asyncio import Redis
 from sqladmin import Admin
 from starlette.responses import HTMLResponse
 from starlette.staticfiles import StaticFiles
-from redis.asyncio import Redis
-
-from admin import register_admin_views
-from api.webhooks import webhooks_router
-from core.config import BASE_DIR, settings
-from core.models import db_helper
-from errors_handlers import register_errors_handlers
-from middlewares import register_middlewares
 
 
 @asynccontextmanager

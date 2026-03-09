@@ -48,13 +48,13 @@ async def create_faq(
     return await faq_crud.create_faq(db, data)
 
 
-@router.post("/upload", status_code=status.HTTP_201_CREATED)
-async def upload_faqs_json(
+@router.post("/import", status_code=status.HTTP_201_CREATED)
+async def import_faqs(
     db: Session,
     admin: AdminUser,
     file: UploadFile = File(),
 ):
-    return await faq_crud.import_faqs_from_json(db, file)
+    return await faq_crud.import_faqs(db, file)
 
 
 @router.get("/{faq_id}", response_model=FAQRead)
