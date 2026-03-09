@@ -12,7 +12,7 @@ from core.schemas.product import (
     ProductUpdate,
 )
 from crud import product as product_crud
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from utils.product import current_admin
 
@@ -104,9 +104,16 @@ async def delete_products(
 
 
 @router.get("/summary/", response_model=list[ProductSummaryInfo])
-async def get_product_summary(
-    db: Session, pagination: PaginationParams = Depends()
-):
+async def get_product_summary(db: Session, pagination: PaginationParams = Depends()):
     return await product_crud.get_product_summary(
         db, pagination.limit, pagination.offset
     )
+
+
+@router.post("/import", status_code=status.HTTP_201_CREATED)
+async def import_products(
+    db: Session,
+    admin: AdminUser,
+    file: UploadFile = File(),
+):
+    return await product_crud.import_products(db, file)
