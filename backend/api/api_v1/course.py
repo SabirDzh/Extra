@@ -2,51 +2,63 @@ import uuid
 from typing import Annotated
 
 from core.authentication.fastapi_users import current_active_user
-from core.models.block import Block
-from core.models.course import Course, CourseEnrollment
+from core.config import settings
 from core.models.db_helper import db_helper
-from core.models.progress import UserBlockProgress
 from core.models.user import User
+from core.schemas.base import PaginationParams
 from core.schemas.course import CourseCreate, CourseProgress, CourseRead, CourseUpdate
+from crud import course as course_crud
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
 from utils.product import current_admin
 
-router = APIRouter(prefix="/api/courses", tags=["Courses"])
+router = APIRouter(
+    prefix=settings.api.v1.courses,
+    tags=["Courses"],
+)
 
 Session = Annotated[AsyncSession, Depends(db_helper.session_getter)]
+AdminUser = Annotated[User, Depends(current_admin)]
+IsUser = Annotated[User, Depends(current_active_user)]
 
 
 @router.get("/", response_model=list[CourseRead])
 async def list_courses(
     db: Session,
-    offset: int = Query(0, ge=0),
-    limit: int = Query(20, ge=1, le=100),
+    pagination: Annotated[PaginationParams, Query()],
 ):
-    result = await db.execute(
-        select(Course).where(Course.is_published == True).offset(offset).limit(limit)
+    return await course_crud.get_courses(
+        db, offset=pagination.offset, limit=pagination.limit
     )
-    return result.scalars().all()
+
+
+@router.get("/search", response_model=list[CourseRead])
+async def search_courses(
+    db: Session,
+    pagination: Annotated[PaginationParams, Query()],
+    q: str | None = Query(None, description="Search query"),
+):
+    return await course_crud.search_courses(
+        db, q=q, offset=pagination.offset, limit=pagination.limit
+    )
 
 
 @router.post("/", response_model=CourseRead, status_code=status.HTTP_201_CREATED)
 async def create_course(
-    data: CourseCreate, db: Session, admin: User = Depends(current_admin)
+    data: CourseCreate,
+    db: Session,
+    admin: AdminUser,
 ):
-    course = Course(**data.model_dump(), created_by=admin.id)
-    db.add(course)
-    await db.commit()
-    await db.refresh(course)
-    return course
+    return await course_crud.create_course(db, data, admin.id)
 
 
 @router.get("/{course_id}", response_model=CourseRead)
 async def get_course(course_id: uuid.UUID, db: Session):
-    course = await db.get(Course, course_id)
+    course = await course_crud.get_course(db, course_id)
     if not course:
-        raise HTTPException(status_code=404, detail="Course not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Course not found"
+        )
     return course
 
 
@@ -55,74 +67,77 @@ async def update_course(
     course_id: uuid.UUID,
     data: CourseUpdate,
     db: Session,
-    admin: User = Depends(current_admin),
+    admin: AdminUser,
 ):
-    course = await db.get(Course, course_id)
+    course = await course_crud.get_course(db, course_id)
     if not course:
-        raise HTTPException(status_code=404, detail="Course not found")
-    for field, value in data.model_dump(exclude_unset=True).items():
-        setattr(course, field, value)
-    await db.commit()
-    await db.refresh(course)
-    return course
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Course not found"
+        )
+    return await course_crud.update_course(db, course, data)
 
 
 @router.delete("/{course_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_course(
-    course_id: uuid.UUID, db: Session, admin: User = Depends(current_admin)
+    course_id: uuid.UUID,
+    db: Session,
+    admin: AdminUser,
 ):
-    course = await db.get(Course, course_id)
+    course = await course_crud.get_course(db, course_id)
     if not course:
-        raise HTTPException(status_code=404, detail="Course not found")
-    await db.delete(course)
-    await db.commit()
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Course not found"
+        )
+    await course_crud.delete_course(db, course)
 
 
 @router.post("/{course_id}/enroll", status_code=status.HTTP_201_CREATED)
 async def enroll(
-    course_id: uuid.UUID, db: Session, user: User = Depends(current_active_user)
+    course_id: uuid.UUID,
+    db: Session,
+    user: IsUser,
 ):
-    course = await db.get(Course, course_id)
+    course = await course_crud.get_course(db, course_id)
     if not course:
-        raise HTTPException(status_code=404, detail="Course not found")
-    existing = (
-        await db.execute(
-            select(CourseEnrollment).where(
-                CourseEnrollment.user_id == user.id,
-                CourseEnrollment.course_id == course_id,
-            )
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Course not found"
         )
-    ).scalar_one_or_none()
+
+    existing = await course_crud.get_enrollment(db, user.id, course_id)
     if existing:
-        raise HTTPException(status_code=400, detail="Already enrolled")
-    enrollment = CourseEnrollment(user_id=user.id, course_id=course_id)
-    db.add(enrollment)
-    await db.commit()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Already enrolled"
+        )
+
+    await course_crud.create_enrollment(db, user.id, course_id)
     return {"detail": "Enrolled successfully"}
 
 
 @router.get("/{course_id}/progress", response_model=CourseProgress)
 async def get_progress(
-    course_id: uuid.UUID, db: Session, user: User = Depends(current_active_user)
+    course_id: uuid.UUID,
+    db: Session,
+    user: IsUser,
 ):
-    course = await db.get(Course, course_id, options=[selectinload(Course.blocks)])
+    course = await course_crud.get_course(db, course_id, load_blocks=True)
     if not course:
-        raise HTTPException(status_code=404, detail="Course not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Course not found"
+        )
 
     total = len(course.blocks)
     if total == 0:
         return CourseProgress(completed=0, total=0, percent=0.0)
 
     block_ids = [b.id for b in course.blocks]
-    completed_count = (
-        await db.execute(
-            select(func.count(UserBlockProgress.id)).where(
-                UserBlockProgress.user_id == user.id,
-                UserBlockProgress.block_id.in_(block_ids),
-                UserBlockProgress.is_completed == True,
-            )
-        )
-    ).scalar()
+    completed_count = await course_crud.get_completed_blocks_count(
+        db, user.id, block_ids
+    )
 
-    percent = round(((completed_count or 0) / total) * 100, 2)
+    percent = round((completed_count / total) * 100, 2)
     return CourseProgress(completed=completed_count, total=total, percent=percent)
+
+
+@router.delete("/", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_courses(db: Session, courses_id: Annotated[list[uuid.UUID], Query()]):
+    await course_crud.delete_courses(db, courses_id)

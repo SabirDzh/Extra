@@ -56,6 +56,8 @@ class ApiV1Prefix(BaseModel):
     admin: str = "/admins"
     product: str = "/products"
     term: str = "/terms"
+    faq: str = "/faq"
+    search: str = "/search"
 
 
 class ApiPrefix(BaseModel):
@@ -88,7 +90,7 @@ class DatabaseConfig(BaseModel):
 
 
 class AccessToken(BaseModel):
-    lifetime_seconds: int = 600
+    lifetime_seconds: int = 10800
     reset_password_token_secret: str
     verification_token_secret: str
 
@@ -113,7 +115,7 @@ class CacheConfig(BaseModel):
 
 
 class CookieConfig(BaseModel):
-    lifetime_seconds: int = 600
+    lifetime_seconds: int = 10800
     secure: bool = False  # TODO set to True when HTTPS is enabled
     name: str = "auth_user"
 

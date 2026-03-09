@@ -14,6 +14,7 @@ __all__ = (
     "TestAnswer",
     "TestSubmission",
     "Term",
+    "FAQ",
 )
 
 from .access_token import AccessToken
@@ -22,6 +23,7 @@ from .block import Block
 from .certificates import Certificate
 from .course import Course, CourseEnrollment
 from .db_helper import db_helper
+from .faq import FAQ
 from .product import Product
 from .progress import UserBlockProgress
 from .term import Term

@@ -5,7 +5,7 @@ import uuid
 import pandas as pd
 from core.models.term import Term
 from core.schemas.base import PaginationParams
-from core.schemas.term import TermRequest, TermResponse
+from core.schemas.term import TermRequest
 from fastapi import HTTPException, UploadFile, status
 from sqlalchemy import delete, func, insert, select, update
 from sqlalchemy.ext.asyncio import AsyncSession

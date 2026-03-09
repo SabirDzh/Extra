@@ -9,9 +9,11 @@ from .auth import router as auth_router
 from .block import router as block_router
 from .certificates import router as certificates_router
 from .course import router as course_router
+from .faq import router as faq_router
 from .messages import router as messages_router
 from .product import router as product_router
 from .profile import router as profile_router
+from .search import router as search_router
 from .service import router as service_router
 from .term import router as term_router
 from .tests import router as tests_router
@@ -29,8 +31,10 @@ router.include_router(messages_router)
 router.include_router(service_router)
 router.include_router(product_router)
 router.include_router(course_router)
+router.include_router(faq_router)
 router.include_router(block_router)
 router.include_router(tests_router)
 router.include_router(certificates_router)
 router.include_router(profile_router)
 router.include_router(term_router)
+router.include_router(search_router)

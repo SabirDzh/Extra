@@ -8,6 +8,8 @@ class TermResponse(BaseModel):
     title: str
     description: str
 
+    model_config = {"from_attributes": True}
+
 
 class TermRequest(BaseModel):
     title: str = Field(min_length=1, max_length=256)

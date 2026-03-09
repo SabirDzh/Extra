@@ -47,4 +47,10 @@ class Product(IdUuidPkMixin, Base):
             postgresql_using="gin",
             postgresql_ops={"title": "gin_trgm_ops"},
         ),
+        Index(
+            "idx_product_description_trgm",
+            "description",
+            postgresql_using="gin",
+            postgresql_ops={"description": "gin_trgm_ops"},
+        ),
     )

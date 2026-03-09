@@ -1,121 +1,98 @@
 import uuid
-from typing import TYPE_CHECKING, Annotated
+from typing import Annotated
 
 from core.config import settings
 from core.models.db_helper import db_helper
 from core.models.user import User
+from core.schemas.base import PaginationParams
 from core.schemas.product import ProductCreate, ProductRead, ProductUpdate
-from crud.product import (
-    create_product,
-    delete_product,
-    get_product,
-    get_products,
-    search_product,
-    update_product,
-)
-from fastapi import APIRouter, Depends, Query, status
-from fastapi_cache import decorator
+from crud import product as product_crud
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from utils.product import current_admin
 
 router = APIRouter(
     prefix=settings.api.v1.product,
-    tags=["Product"],
+    tags=["Products"],
 )
-
-if TYPE_CHECKING:
-    from core.models.product import Product
 
 Session = Annotated[AsyncSession, Depends(db_helper.session_getter)]
-CurrentAdmin = Annotated[User, Depends(current_admin)]
+AdminUser = Annotated[User, Depends(current_admin)]
 
 
-@router.get("", response_model=list[ProductRead], status_code=status.HTTP_200_OK)
-@decorator.cache(60)
-async def get_list_products(session: Session, offset: int = 0, limit: int = 10):
-    return await get_products(session, offset, limit)
+@router.get("/", response_model=list[ProductRead])
+async def list_products(
+    db: Session,
+    pagination: Annotated[PaginationParams, Query()],
+):
+    return await product_crud.get_products(
+        db, offset=pagination.offset, limit=pagination.limit
+    )
 
 
-@router.get("/{product_id}", response_model=ProductRead, status_code=status.HTTP_200_OK)
-@decorator.cache(60)
-async def get_product_by_id(
+@router.get("/search", response_model=list[ProductRead])
+async def search_products(
+    db: Session,
+    pagination: Annotated[PaginationParams, Query()],
+    q: str | None = Query(None, description="Search query"),
+):
+    return await product_crud.search_products(
+        db, q=q, offset=pagination.offset, limit=pagination.limit
+    )
+
+
+@router.post("/", response_model=ProductRead, status_code=status.HTTP_201_CREATED)
+async def create_product(
+    data: ProductCreate,
+    db: Session,
+    admin: AdminUser,
+):
+    return await product_crud.create_product(db, data)
+
+
+@router.get("/{product_id}", response_model=ProductRead)
+async def get_product(product_id: uuid.UUID, db: Session):
+    product = await product_crud.get_product(db, product_id)
+    if not product:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Product not found"
+        )
+    return product
+
+
+@router.patch("/{product_id}", response_model=ProductRead)
+async def update_product(
     product_id: uuid.UUID,
-    session: Session,
-    # background_tasks: BackgroundTasks,
-    # redis: Redis,
+    data: ProductUpdate,
+    db: Session,
+    admin: AdminUser,
 ):
-    # background_tasks.add_task(increment_product_view, redis, product_id)
-    return await get_product(session, product_id)
+    product = await product_crud.get_product(db, product_id)
+    if not product:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Product not found"
+        )
+
+    return await product_crud.update_product(db, product, data)
 
 
-@router.get(
-    "/search/",
-    response_model=list[ProductRead],
-    status_code=status.HTTP_200_OK,
-)
-@decorator.cache(60)
-async def get_search_product(
-    session: Session,
-    search_query: str | None = Query(None, description="Search request", min_length=1),
-    limit: int = 10,
-    offset: int = 0,
-):
-    return await search_product(session, search_query, limit)
-
-
-@router.post("", status_code=status.HTTP_201_CREATED)
-async def product_created(
-    product: ProductCreate,
-    session: Session,
-    admin: CurrentAdmin,
-):
-    return await create_product(session, product)
-
-
-@router.patch(
-    "/{product_id}", response_model=ProductRead, status_code=status.HTTP_200_OK
-)
-async def product_update(
-    product: ProductUpdate,
+@router.delete("/{product_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_product(
     product_id: uuid.UUID,
-    session: Session,
-    admin: CurrentAdmin,
+    db: Session,
+    admin: AdminUser,
 ):
-    return await update_product(session, product_id, product)
+    product = await product_crud.get_product(db, product_id)
+    if not product:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Product not found"
+        )
+
+    await product_crud.delete_product(db, product)
 
 
-@router.delete("/{product_id}", status_code=status.HTTP_200_OK)
-async def product_delete(
-    product_id: uuid.UUID,
-    session: Session,
-    admin: CurrentAdmin,
+@router.delete("/", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_products(
+    products_id: Annotated[list[uuid.UUID], Query()], db: Session, admin: AdminUser
 ):
-    await delete_product(session, product_id)
-
-
-# @router.get(
-#     "/popular",
-#     response_model=list[ProductRead],
-#     status_code=status.HTTP_200_OK,
-# )
-# async def get_popular_product(
-#     session: Session,
-#     redis: Redis,
-# ):
-#     top_product_ids = await redis.zrevrange("product:views:all_time", 0, 4)
-
-#     if not top_product_ids:
-#         return []
-
-#     stmt = select(Product).where(Product.id.in_(top_product_ids))
-#     result = await session.execute(stmt)
-#     products = result.scalars().all()
-
-#     products_map = {str(p.id): p for p in products}
-#     sorted_products = [
-#         products_map[pid] for pid in top_product_ids if pid in products_map
-#     ]
-#     return sorted_products
-
-
-# TODO add sorting support
+    await product_crud.delete_products(db, products_id)
