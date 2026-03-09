@@ -2,7 +2,7 @@ import csv
 import io
 import json
 import uuid
-from typing import Any, List
+from typing import List
 
 import pandas as pd
 from core.models.product import Product
@@ -81,6 +81,21 @@ async def delete_product(
 ) -> None:
     await session.delete(product)
     await session.commit()
+
+
+async def get_products_by_ids(
+    session: AsyncSession,
+    product_ids: list[uuid.UUID],
+) -> List[Product]:
+    if not product_ids:
+        return []
+    stmt = select(Product).where(Product.id.in_(product_ids))
+    result = await session.execute(stmt)
+    products = result.scalars().all()
+
+    # Sort products to match the order of product_ids (important for popularity)
+    product_map = {p.id: p for p in products}
+    return [product_map[pid] for pid in product_ids if pid in product_map]
 
 
 async def search_products(

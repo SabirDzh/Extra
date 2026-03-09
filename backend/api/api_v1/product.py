@@ -12,12 +12,27 @@ from core.schemas.product import (
     ProductUpdate,
 )
 from crud import product as product_crud
-from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status, Request
-from sqlalchemy.ext.asyncio import AsyncSession
-from utils.product import current_admin
-from utils.analytics import track_product_view, get_product_views, get_multiple_product_views
-from api.dependencies.redis import get_redis
+from fastapi import (
+    APIRouter,
+    Depends,
+    File,
+    HTTPException,
+    Query,
+    Request,
+    UploadFile,
+    status,
+)
 from redis.asyncio import Redis
+from sqlalchemy.ext.asyncio import AsyncSession
+from utils.analytics import (
+    get_multiple_product_views,
+    get_product_views,
+    get_top_product_ids,
+    track_product_view,
+)
+from utils.product import current_admin
+
+from api.dependencies.redis import get_redis
 
 router = APIRouter(
     prefix=settings.api.v1.product,
@@ -28,12 +43,13 @@ Session = Annotated[AsyncSession, Depends(db_helper.session_getter)]
 AdminUser = Annotated[User, Depends(current_admin)]
 RedisDep = Annotated[Redis, Depends(get_redis)]
 
+
 def _get_client_identifier(request: Request) -> str:
     # Use user ID if authenticated, else IP address
     user = getattr(request.state, "user", None)
     if user and hasattr(user, "id"):
         return str(user.id)
-    
+
     # Try to get real IP from headers if behind proxy, else direct client IP
     forwarded_for = request.headers.get("X-Forwarded-For")
     if forwarded_for:
@@ -50,14 +66,14 @@ async def list_products(
     products = await product_crud.get_products(
         db, offset=pagination.offset, limit=pagination.limit
     )
-    
+
     product_ids = [p.id for p in products]
     views = await get_multiple_product_views(redis, product_ids)
-    
+
     # Attach views to the SQLAlchemy models (they will be converted by Pydantic)
     for product, view_count in zip(products, views):
         product.views = view_count
-        
+
     return products
 
 
@@ -71,13 +87,13 @@ async def search_products(
     products = await product_crud.search_products(
         db, q=q, offset=pagination.offset, limit=pagination.limit
     )
-    
+
     product_ids = [p.id for p in products]
     views = await get_multiple_product_views(redis, product_ids)
-    
+
     for product, view_count in zip(products, views):
         product.views = view_count
-        
+
     return products
 
 
@@ -86,15 +102,18 @@ async def create_product(
     data: ProductCreate,
     db: Session,
     admin: AdminUser,
+    redis: RedisDep,
 ):
     product = await product_crud.create_product(db, data)
     product.views = 0
+    # Инициализируем товар в рейтинге с 0 просмотров, чтобы он сразу появлялся в /popular
+    await redis.zadd("products:popularity", {str(product.id): 0})
     return product
 
 
 @router.get("/{product_id}", response_model=ProductRead)
 async def get_product(
-    product_id: uuid.UUID, 
+    product_id: uuid.UUID,
     db: Session,
     redis: RedisDep,
     request: Request,
@@ -104,15 +123,15 @@ async def get_product(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Product not found"
         )
-        
+
     # Track unique view
     identifier = _get_client_identifier(request)
     await track_product_view(redis, product_id, identifier)
-    
+
     # Get total views
     views = await get_product_views(redis, product_id)
     product.views = views
-    
+
     return product
 
 
@@ -152,14 +171,15 @@ async def delete_product(
     # Safely delete from redis
     try:
         await redis.delete(f"product:{product_id}:unique_views")
+        await redis.zrem("products:popularity", str(product_id))
     except Exception:
         pass
 
 
 @router.delete("/", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_products(
-    products_id: Annotated[list[uuid.UUID], Query()], 
-    db: Session, 
+    products_id: Annotated[list[uuid.UUID], Query()],
+    db: Session,
     admin: AdminUser,
     redis: RedisDep,
 ):
@@ -168,6 +188,7 @@ async def delete_products(
         keys = [f"product:{pid}:unique_views" for pid in products_id]
         try:
             await redis.delete(*keys)
+            await redis.zrem("products:popularity", *[str(pid) for pid in products_id])
         except Exception:
             pass
 
@@ -186,3 +207,37 @@ async def import_products(
     file: UploadFile = File(),
 ):
     return await product_crud.import_products(db, file)
+
+
+@router.get("/popular/", response_model=list[ProductRead])
+async def get_popular_product(
+    db: Session,
+    redis: RedisDep,
+    pagination: PaginationParams = Depends(),
+):
+    """
+    Returns products sorted by unique views (popularity).
+    Uses Redis Sorted Set for efficient ranking.
+    """
+    # 1. Get top product IDs from Redis leaderboard
+    top_ids_str = await get_top_product_ids(
+        redis, limit=pagination.limit, offset=pagination.offset
+    )
+
+    if not top_ids_str:
+        return []
+
+    # 2. Convert string IDs back to UUIDs
+    product_ids = [uuid.UUID(pid) for pid in top_ids_str]
+
+    # 3. Fetch products from DB (maintaining order)
+    products = await product_crud.get_products_by_ids(db, product_ids)
+
+    # 4. Get fresh view counts for these specific products
+    actual_views = await get_multiple_product_views(redis, [p.id for p in products])
+
+    # 5. Attach views to models
+    for product, view_count in zip(products, actual_views):
+        product.views = view_count
+
+    return products
