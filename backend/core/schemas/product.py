@@ -14,6 +14,7 @@ class ProductRead(BaseModel):
     schema_connect: str | None  # TODO revisit this field
     attributes: dict[str, Any]
     image_url: list[str]
+    views: int = 0
 
     model_config = ConfigDict(
         from_attributes=True,

@@ -25,11 +25,9 @@ from starlette.staticfiles import StaticFiles
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # startup
-    redis = Redis(
-        host=settings.redis.host,
-        port=settings.redis.port,
-        db=settings.redis.db.cache,
-    )
+    from api.dependencies.redis import redis_pool
+    redis = Redis(connection_pool=redis_pool)
+    
     FastAPICache.init(
         RedisBackend(redis),
         prefix=settings.cache.prefix,
@@ -38,6 +36,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     yield
     # shutdown
     await db_helper.dispose()
+    await redis_pool.disconnect()
 
 
 def register_static_docs_routes(app: FastAPI) -> None:
