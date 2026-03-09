@@ -23,9 +23,20 @@ AdminUser = Annotated[User, Depends(current_admin)]
 @router.get("/", response_model=List[FAQRead])
 async def list_faqs(
     db: Session,
-    pagination: Annotated[PaginationParams, Query()],
+    pagination: PaginationParams = Depends(),
 ):
     return await faq_crud.get_faqs(db, offset=pagination.offset, limit=pagination.limit)
+
+
+@router.get("/search", response_model=List[FAQRead])
+async def search_faqs(
+    db: Session,
+    pagination: PaginationParams = Depends(),
+    q: str | None = Query(None, description="Search query"),
+):
+    return await faq_crud.search_faqs(
+        db, q=q, offset=pagination.offset, limit=pagination.limit
+    )
 
 
 @router.post("/", response_model=FAQRead, status_code=status.HTTP_201_CREATED)

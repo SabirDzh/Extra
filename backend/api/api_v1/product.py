@@ -5,7 +5,12 @@ from core.config import settings
 from core.models.db_helper import db_helper
 from core.models.user import User
 from core.schemas.base import PaginationParams
-from core.schemas.product import ProductCreate, ProductRead, ProductUpdate
+from core.schemas.product import (
+    ProductCreate,
+    ProductRead,
+    ProductSummaryInfo,
+    ProductUpdate,
+)
 from crud import product as product_crud
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -23,7 +28,7 @@ AdminUser = Annotated[User, Depends(current_admin)]
 @router.get("/", response_model=list[ProductRead])
 async def list_products(
     db: Session,
-    pagination: Annotated[PaginationParams, Query()],
+    pagination: PaginationParams = Depends(),
 ):
     return await product_crud.get_products(
         db, offset=pagination.offset, limit=pagination.limit
@@ -33,7 +38,7 @@ async def list_products(
 @router.get("/search", response_model=list[ProductRead])
 async def search_products(
     db: Session,
-    pagination: Annotated[PaginationParams, Query()],
+    pagination: PaginationParams = Depends(),
     q: str | None = Query(None, description="Search query"),
 ):
     return await product_crud.search_products(
@@ -96,3 +101,12 @@ async def delete_products(
     products_id: Annotated[list[uuid.UUID], Query()], db: Session, admin: AdminUser
 ):
     await product_crud.delete_products(db, products_id)
+
+
+@router.get("/summary/", response_model=list[ProductSummaryInfo])
+async def get_product_summary(
+    db: Session, pagination: PaginationParams = Depends()
+):
+    return await product_crud.get_product_summary(
+        db, pagination.limit, pagination.offset
+    )

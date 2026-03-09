@@ -27,6 +27,7 @@ httpx = "^0.28.1"
 reportlab = "^4.4.9"
 openpyxl = "^3.1.5"
 pandas = "^3.0.1"
+pytest-benchmark = "^5.2.3"
 
 [tool.poetry.group.dev.dependencies]
 black = "^25.1.0"

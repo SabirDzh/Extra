@@ -3,15 +3,17 @@ from typing import Any, List
 
 from core.models.product import Product
 from core.schemas.product import ProductCreate, ProductUpdate
+from fastapi import HTTPException, status
 from sqlalchemy import delete, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from utils.db import ensure_unique_field
 
 
 async def get_products(
     session: AsyncSession,
     offset: int = 0,
     limit: int = 20,
-) -> List[Product]:
+):
     stmt = select(Product).offset(offset).limit(limit)
     result = await session.execute(stmt)
     return result.scalars().all()
@@ -28,6 +30,15 @@ async def create_product(
     session: AsyncSession,
     product_in: ProductCreate,
 ) -> Product:
+    # Check for duplicate title using utility
+    await ensure_unique_field(
+        session,
+        Product,
+        "title",
+        product_in.title,
+        error_msg=f"Product with title '{product_in.title}' already exists",
+    )
+
     product = Product(**product_in.model_dump())
     session.add(product)
     await session.commit()
@@ -40,8 +51,21 @@ async def update_product(
     product: Product,
     product_update: ProductUpdate,
 ) -> Product:
-    for field, value in product_update.model_dump(exclude_unset=True).items():
+    patch = product_update.model_dump(exclude_unset=True)
+
+    if "title" in patch and patch["title"]:
+        await ensure_unique_field(
+            session,
+            Product,
+            "title",
+            patch["title"],
+            exclude_id=product.id,
+            error_msg=f"Product with title '{patch['title']}' already exists",
+        )
+
+    for field, value in patch.items():
         setattr(product, field, value)
+
     await session.commit()
     await session.refresh(product)
     return product
@@ -60,7 +84,7 @@ async def search_products(
     q: str | None = None,
     offset: int = 0,
     limit: int = 20,
-) -> List[Product]:
+):
     stmt = select(Product)
     if q:
         if len(q) < 3:
@@ -90,3 +114,17 @@ async def delete_products(session: AsyncSession, products_id: list[uuid.UUID]):
     stmt = delete(Product).where(Product.id.in_(products_id))
     await session.execute(stmt)
     await session.commit()
+
+
+async def get_product_summary(
+    session: AsyncSession,
+    limit: int,
+    offset: int,
+):
+    stmt = (
+        select(Product.id, Product.title, Product.description)
+        .limit(limit)
+        .offset(offset)
+        .order_by(Product.created_at)
+    )
+    return (await session.execute(stmt)).mappings().all()

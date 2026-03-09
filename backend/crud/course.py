@@ -14,7 +14,7 @@ async def get_courses(
     offset: int = 0,
     limit: int = 20,
     published_only: bool = True,
-) -> List[Course]:
+):
     stmt = select(Course).offset(offset).limit(limit)
     if published_only:
         stmt = stmt.where(Course.is_published)
@@ -109,7 +109,7 @@ async def search_courses(
     q: str | None = None,
     offset: int = 0,
     limit: int = 20,
-) -> List[Course]:
+):
     query = select(Course).where(Course.is_published)
 
     if q:

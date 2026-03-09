@@ -7,6 +7,7 @@ from core.schemas.faq import FAQCreate, FAQUpdate
 from fastapi import HTTPException, UploadFile, status
 from sqlalchemy import delete, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from utils.db import ensure_unique_field
 
 
 async def get_faqs(
@@ -30,6 +31,15 @@ async def create_faq(
     session: AsyncSession,
     faq_in: FAQCreate,
 ) -> FAQ:
+    # Check for duplicate question using utility
+    await ensure_unique_field(
+        session,
+        FAQ,
+        "question",
+        faq_in.question,
+        error_msg=f"FAQ with question '{faq_in.question}' already exists",
+    )
+
     faq = FAQ(**faq_in.model_dump())
     session.add(faq)
     await session.commit()
@@ -42,7 +52,19 @@ async def update_faq(
     faq: FAQ,
     faq_update: FAQUpdate,
 ) -> FAQ:
-    for field, value in faq_update.model_dump(exclude_unset=True).items():
+    patch = faq_update.model_dump(exclude_unset=True)
+
+    if "question" in patch and patch["question"]:
+        await ensure_unique_field(
+            session,
+            FAQ,
+            "question",
+            patch["question"],
+            exclude_id=faq.id,
+            error_msg=f"FAQ with question '{patch['question']}' already exists",
+        )
+
+    for field, value in patch.items():
         setattr(faq, field, value)
 
     await session.commit()
@@ -56,6 +78,38 @@ async def delete_faq(
 ) -> None:
     await session.delete(faq)
     await session.commit()
+
+
+async def search_faqs(
+    session: AsyncSession,
+    q: str | None = None,
+    offset: int = 0,
+    limit: int = 20,
+) -> List[FAQ]:
+    stmt = select(FAQ)
+    
+    if q:
+        if len(q) < 3:
+            search_pattern = f"%{q}%"
+            stmt = stmt.where(
+                or_(
+                    FAQ.question.ilike(search_pattern),
+                    FAQ.answer.ilike(search_pattern),
+                )
+            ).order_by(FAQ.question.asc())
+        else:
+            stmt = stmt.where(
+                or_(
+                    FAQ.question.bool_op("%")(q),
+                    FAQ.answer.bool_op("%")(q),
+                )
+            ).order_by(
+                func.similarity(FAQ.question, q).desc(),
+                func.similarity(FAQ.answer, q).desc(),
+            )
+            
+    result = await session.execute(stmt.offset(offset).limit(limit))
+    return result.scalars().all()
 
 
 async def bulk_delete_faqs(
@@ -82,23 +136,38 @@ async def import_faqs_from_json(
             raise ValueError("Root element must be a list")
 
         faqs = []
+        imported_count = 0
+        skipped_count = 0
+
         for item in items:
             if "question" not in item or "answer" not in item:
                 continue
+
+            q_text = item["question"]
+            # Check for existing question in DB
+            try:
+                await ensure_unique_field(session, FAQ, "question", q_text)
+            except HTTPException:
+                skipped_count += 1
+                continue
+
             faqs.append(
                 FAQ(
-                    question=item["question"],
+                    question=q_text,
                     answer=item["answer"],
                     order_index=item.get("order_index", 0),
                     is_published=item.get("is_published", True),
                 )
             )
+            imported_count += 1
 
         if faqs:
             session.add_all(faqs)
             await session.commit()
-            return {"detail": f"Successfully imported {len(faqs)} FAQ items"}
-        return {"detail": "No valid FAQ items found in file"}
+            return {
+                "detail": f"Successfully imported {imported_count} FAQ items. Skipped {skipped_count} duplicates."
+            }
+        return {"detail": "No new valid FAQ items found in file"}
 
     except Exception as e:
         await session.rollback()

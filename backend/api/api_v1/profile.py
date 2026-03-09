@@ -13,7 +13,7 @@ from core.schemas.profile import (
     RecentCourseRead,
     TestAttemptRead,
 )
-from profile.service import (
+from user_profile.service import (
     get_certificates,
     get_courses_progress,
     get_recent_courses,

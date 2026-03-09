@@ -56,3 +56,9 @@ class ProductUpdate(BaseModel):
     model_config = ConfigDict(
         from_attributes=True,
     )
+
+
+class ProductSummaryInfo(BaseModel):
+    id: uuid.UUID
+    title: str
+    description: str

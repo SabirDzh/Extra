@@ -27,7 +27,7 @@ from core.schemas.user import (
 from fastapi_cache.decorator import cache
 
 from api.dependencies.authentication import get_users_db
-from profile.main import save_user_avatar
+from user_profile.main import save_user_avatar
 
 UsersDB = Annotated[SQLAlchemyUserDatabase, Depends(get_users_db)]
 CurrentUser = Annotated[User, Depends(current_active_user)]
