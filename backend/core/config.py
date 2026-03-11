@@ -90,7 +90,7 @@ class DatabaseConfig(BaseModel):
 
 
 class AccessToken(BaseModel):
-    lifetime_seconds: int = 10800
+    lifetime_seconds: int = 28800
     reset_password_token_secret: str
     verification_token_secret: str
 
@@ -115,9 +115,10 @@ class CacheConfig(BaseModel):
 
 
 class CookieConfig(BaseModel):
-    lifetime_seconds: int = 10800
+    lifetime_seconds: int = 28800
     secure: bool = False  # TODO set to True when HTTPS is enabled
     name: str = "auth_user"
+    samesite: Literal["none", "lax", "strict"] = "none"
 
 
 class Settings(BaseSettings):

@@ -1,6 +1,7 @@
 import pytest
 from httpx import AsyncClient
 
+
 @pytest.mark.anyio
 async def test_register_user(client: AsyncClient):
     payload = {
@@ -10,7 +11,7 @@ async def test_register_user(client: AsyncClient):
         "fullname": "TestUser",
         "is_active": True,
         "is_superuser": False,
-        "is_verified": False
+        "is_verified": False,
     }
     response = await client.post("/api/v1/auth/register", json=payload)
     assert response.status_code == 201, response.text
@@ -18,6 +19,7 @@ async def test_register_user(client: AsyncClient):
     assert data["email"] == payload["email"]
     assert data["fullname"] == payload["fullname"]
     assert "id" in data
+
 
 @pytest.mark.anyio
 async def test_login_user(client: AsyncClient):
@@ -28,21 +30,18 @@ async def test_login_user(client: AsyncClient):
         "role": "user",
         "fullname": "LoginUser",
         "is_active": True,
-        "is_verified": True # Assuming verification is needed or mocked?
+        "is_verified": True,  # Assuming verification is needed or mocked?
     }
     # Create user directly or via API. API creates inactive/unverified usually depending on config.
     # But fastapi-users usually allows login if verified.
     # Let's check api/api_v1/auth.py logic or core/authentication.
-    
+
     # Just register via API
     resp = await client.post("/api/v1/auth/register", json=payload)
     assert resp.status_code == 201, resp.text
-    
+
     # Login
-    login_data = {
-        "username": "login@example.com",
-        "password": "Password12345!"
-    }
+    login_data = {"username": "login@example.com", "password": "Password12345!"}
     response = await client.post("/api/v1/auth/login", data=login_data)
     # If fails, it might be because user is not active or verified.
     # In a real scenario we'd need to verify the user or force it in DB.

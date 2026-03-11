@@ -70,7 +70,6 @@ async def list_products(
     product_ids = [p.id for p in products]
     views = await get_multiple_product_views(redis, product_ids)
 
-    # Attach views to the SQLAlchemy models (they will be converted by Pydantic)
     for product, view_count in zip(products, views):
         product.views = view_count
 

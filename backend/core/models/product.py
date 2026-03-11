@@ -13,7 +13,7 @@ from .mixins.id_int_pk import IdUuidPkMixin
 class Product(IdUuidPkMixin, Base):
     title: Mapped[str] = mapped_column(String(256), unique=True)
     description: Mapped[str] = mapped_column(String(1024))
-    image_url: Mapped[list[dict]] = mapped_column(
+    image_url: Mapped[list[str]] = mapped_column(
         JSONB,
         default=list,
     )  # TODO revisit: JSONB is used to store multiple images

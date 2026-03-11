@@ -141,7 +141,7 @@ async def get_product_summary(
     offset: int,
 ):
     stmt = (
-        select(Product.id, Product.title, Product.description)
+        select(Product.id, Product.title, Product.description, Product.image_url)
         .limit(limit)
         .offset(offset)
         .order_by(Product.created_at)

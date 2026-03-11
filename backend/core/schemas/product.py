@@ -63,3 +63,8 @@ class ProductSummaryInfo(BaseModel):
     id: uuid.UUID
     title: str
     description: str
+    image_url: list[str]
+
+    model_config = ConfigDict(
+        from_attributes=True,
+    )
