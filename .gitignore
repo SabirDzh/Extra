@@ -3,7 +3,7 @@ fast-application/__pycache__/
 __pycache__/
 *.py[cod]
 *$py.class
-/.DS_Store
+.DS_Store
 
 # C extensions
 *.so

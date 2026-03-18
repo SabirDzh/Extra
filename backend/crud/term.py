@@ -92,6 +92,12 @@ async def delete_terms(session: AsyncSession, terms_id: list[uuid.UUID]):
     await session.commit()
 
 
+async def delete_all_terms(session: AsyncSession):
+    stmt = delete(Term)
+    await session.execute(stmt)
+    await session.commit()
+
+
 def check_format(filename: str) -> str:
     filename = filename.lower()
     if not filename.endswith((".csv", ".xlsx", ".xls")):

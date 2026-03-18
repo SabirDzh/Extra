@@ -83,6 +83,14 @@ async def update_faq(
     return await faq_crud.update_faq(db, faq, data)
 
 
+@router.delete("/clear", status_code=status.HTTP_204_NO_CONTENT)
+async def clear_faqs(
+    db: Session,
+    admin: AdminUser,
+):
+    await faq_crud.delete_all_faqs(db)
+
+
 @router.delete("/{faq_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_faq(
     faq_id: uuid.UUID,

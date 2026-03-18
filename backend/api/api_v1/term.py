@@ -83,6 +83,14 @@ async def update_term(
     return data
 
 
+@router.delete("/clear", status_code=status.HTTP_204_NO_CONTENT)
+async def clear_terms(
+    session: Session,
+    admin: AdminUser,
+):
+    await term_crud.delete_all_terms(session)
+
+
 @router.delete("/{term_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_term(
     session: Session,

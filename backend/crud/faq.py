@@ -124,6 +124,12 @@ async def bulk_delete_faqs(
     await session.commit()
 
 
+async def delete_all_faqs(session: AsyncSession) -> None:
+    stmt = delete(FAQ)
+    await session.execute(stmt)
+    await session.commit()
+
+
 def check_format(filename: str) -> str:
     filename = filename.lower()
     if not filename.endswith((".csv", ".xlsx", ".xls", ".json")):
