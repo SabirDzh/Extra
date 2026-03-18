@@ -58,6 +58,7 @@ class ApiV1Prefix(BaseModel):
     term: str = "/terms"
     faq: str = "/faq"
     search: str = "/search"
+    error: str = "/error"
 
 
 class ApiPrefix(BaseModel):
