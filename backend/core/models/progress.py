@@ -1,3 +1,4 @@
+import uuid
 from datetime import datetime
 
 from sqlalchemy import DateTime, ForeignKey, UniqueConstraint, func
@@ -11,8 +12,8 @@ from .mixins.id_int_pk import IdUuidPkMixin
 class UserBlockProgress(IdUuidPkMixin, Base):
     __table_args__ = (UniqueConstraint("user_id", "block_id", name="uq_user_block"),)
 
-    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
-    block_id: Mapped[int] = mapped_column(ForeignKey("blocks.id"))
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    block_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("blocks.id", ondelete="CASCADE"))
     is_completed: Mapped[bool] = mapped_column(default=False)
     completed_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True

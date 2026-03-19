@@ -62,7 +62,7 @@ class QuestionReadAdmin(BaseModel):
 
 class TestAnswerSubmit(BaseModel):
     question_id: uuid.UUID
-    selected_answer_id: int | None = None
+    selected_answer_id: uuid.UUID | None = None
     text_answer: str | None = None
 
 
@@ -73,7 +73,7 @@ class TestSubmit(BaseModel):
 class TestAnswerRead(BaseModel):
     id: uuid.UUID
     question_id: uuid.UUID
-    selected_answer_id: int | None
+    selected_answer_id: uuid.UUID | None
     text_answer: str | None
 
     model_config = {"from_attributes": True}
@@ -87,7 +87,7 @@ class TestSubmissionRead(BaseModel):
     score: int | None
     max_score: int
     is_graded: bool
-    graded_by: int | None
+    graded_by: uuid.UUID | None
     admin_comment: str | None
     answers: list[TestAnswerRead]
 

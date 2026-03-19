@@ -1,12 +1,14 @@
 import uuid
-from typing import List
+from datetime import datetime, timedelta, timezone
+from typing import List, Literal
 
-from core.models.course import Course, CourseEnrollment
+from core.models.course import Course, CourseEnrollment, CourseLevel
 from core.models.progress import UserBlockProgress
 from core.schemas.course import CourseCreate, CourseUpdate
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
+from utils.db import ensure_unique_field
 
 
 async def get_courses(
@@ -38,6 +40,13 @@ async def create_course(
     course_in: CourseCreate,
     creator_id: uuid.UUID,
 ) -> Course:
+    await ensure_unique_field(
+        session,
+        Course,
+        "title",
+        course_in.title,
+        error_msg=f"Course with title '{course_in.title}' already exists",
+    )
     course = Course(**course_in.model_dump(), created_by=creator_id)
     session.add(course)
     await session.commit()
@@ -50,7 +59,17 @@ async def update_course(
     course: Course,
     course_update: CourseUpdate,
 ) -> Course:
-    for field, value in course_update.model_dump(exclude_unset=True).items():
+    patch = course_update.model_dump(exclude_unset=True)
+    if "title" in patch and patch["title"]:
+        await ensure_unique_field(
+            session,
+            Course,
+            "title",
+            patch["title"],
+            exclude_id=course.id,
+            error_msg=f"Course with title '{patch['title']}' already exists",
+        )
+    for field, value in patch.items():
         setattr(course, field, value)
     await session.commit()
     await session.refresh(course)
@@ -109,23 +128,75 @@ async def search_courses(
     q: str | None = None,
     offset: int = 0,
     limit: int = 20,
+    user_id: uuid.UUID | None = None,
+    filter_type: (
+        Literal["in_progress", "completed", "new", "popular", "beginner"] | None
+    ) = None,
 ):
     query = select(Course).where(Course.is_published)
 
+    # 1. Text Search
     if q:
         if len(q) < 3:
             search_pattern = f"%{q}%"
             query = query.where(
                 (Course.title.ilike(search_pattern))
                 | (Course.description.ilike(search_pattern))
-            ).order_by(Course.title.asc())
+            )
         else:
             query = query.where(
                 (Course.title.bool_op("%")(q)) | (Course.description.bool_op("%")(q))
-            ).order_by(
+            )
+
+    # 2. Specific Filters
+    if filter_type == "beginner":
+        query = query.where(Course.level == CourseLevel.beginner)
+
+    elif filter_type == "new":
+        # Added less than 24 hours ago
+        day_ago = datetime.now(timezone.utc) - timedelta(days=1)
+        query = query.where(Course.created_at >= day_ago)
+
+    elif filter_type == "popular":
+        # Sort by number of enrollments
+        # We need a subquery or join to count enrollments
+        enrollment_count = (
+            select(
+                CourseEnrollment.course_id,
+                func.count(CourseEnrollment.id).label("count"),
+            )
+            .group_by(CourseEnrollment.course_id)
+            .subquery()
+        )
+        query = query.outerjoin(
+            enrollment_count, Course.id == enrollment_count.c.course_id
+        )
+        query = query.order_by(func.coalesce(enrollment_count.c.count, 0).desc())
+
+    elif filter_type == "in_progress" and user_id:
+        # Enrolled but not completed
+        query = query.join(CourseEnrollment, Course.id == CourseEnrollment.course_id)
+        query = query.where(
+            CourseEnrollment.user_id == user_id, CourseEnrollment.completed_at.is_(None)
+        )
+
+    elif filter_type == "completed" and user_id:
+        # Enrolled and completed
+        query = query.join(CourseEnrollment, Course.id == CourseEnrollment.course_id)
+        query = query.where(
+            CourseEnrollment.user_id == user_id,
+            CourseEnrollment.completed_at.is_not(None),
+        )
+
+    # Default ordering if not popular
+    if filter_type != "popular":
+        if q and len(q) >= 3:
+            query = query.order_by(
                 func.similarity(Course.title, q).desc(),
                 func.similarity(Course.description, q).desc(),
             )
+        else:
+            query = query.order_by(Course.title.asc())
 
     query = query.offset(offset).limit(limit)
     result = await session.execute(query)

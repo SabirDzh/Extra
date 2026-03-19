@@ -1,12 +1,20 @@
+import enum
 import uuid
 from datetime import datetime
 
 from sqlalchemy import DateTime, ForeignKey, Index, String, Text, func
+from sqlalchemy import Enum as SaEnum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from core.models.base import Base
 
 from .mixins.id_int_pk import IdUuidPkMixin
+
+
+class CourseLevel(str, enum.Enum):
+    beginner = "beginner"
+    intermediate = "intermediate"
+    advanced = "advanced"
 
 
 class Course(IdUuidPkMixin, Base):
@@ -27,6 +35,11 @@ class Course(IdUuidPkMixin, Base):
 
     title: Mapped[str] = mapped_column(String(256), unique=True)
     description: Mapped[str] = mapped_column(Text, default="")
+    level: Mapped[CourseLevel] = mapped_column(
+        SaEnum(CourseLevel),
+        default=CourseLevel.beginner,
+        nullable=False,
+    )
     is_published: Mapped[bool] = mapped_column(default=False)
     created_by: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"))
     created_at: Mapped[datetime] = mapped_column(
@@ -52,8 +65,12 @@ class Course(IdUuidPkMixin, Base):
 
 
 class CourseEnrollment(IdUuidPkMixin, Base):
-    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
-    course_id: Mapped[int] = mapped_column(ForeignKey("courses.id"))
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE")
+    )
+    course_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("courses.id", ondelete="CASCADE")
+    )
     enrolled_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )

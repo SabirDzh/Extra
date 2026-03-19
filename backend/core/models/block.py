@@ -1,3 +1,4 @@
+import uuid
 import enum
 from datetime import datetime
 
@@ -16,7 +17,7 @@ class BlockType(str, enum.Enum):
 
 
 class Block(IdUuidPkMixin, Base):
-    course_id: Mapped[int] = mapped_column(ForeignKey("courses.id"))
+    course_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("courses.id", ondelete="CASCADE"))
     order_index: Mapped[int] = mapped_column(Integer, default=0)
     title: Mapped[str] = mapped_column(String(500))
     block_type: Mapped[BlockType] = mapped_column(Enum(BlockType))

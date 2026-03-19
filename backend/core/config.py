@@ -119,7 +119,7 @@ class CookieConfig(BaseModel):
     lifetime_seconds: int = 28800
     secure: bool = False  # TODO set to True when HTTPS is enabled
     name: str = "auth_user"
-    samesite: Literal["none", "lax", "strict"] = "none"
+    samesite: Literal["none", "lax", "strict"] = "lax"  # TODO set to "none" when Server
 
 
 class Settings(BaseSettings):

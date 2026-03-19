@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import Computed, Index, String, func
+from sqlalchemy import Computed, Index, String, Text, func
 from sqlalchemy.dialects.postgresql import JSONB, TSVECTOR
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -12,18 +12,18 @@ from .mixins.id_int_pk import IdUuidPkMixin
 
 class Product(IdUuidPkMixin, Base):
     title: Mapped[str] = mapped_column(String(256), unique=True)
-    description: Mapped[str] = mapped_column(String(1024))
+    description: Mapped[str] = mapped_column(Text)
     image_url: Mapped[list[str]] = mapped_column(
         JSONB,
         default=list,
     )  # TODO revisit: JSONB is used to store multiple images
 
     schema_connect: Mapped[str] = mapped_column(
-        String,
+        Text,
         nullable=True,
     )  # TODO revisit naming/storage format; kept as-is for tests
     documentation: Mapped[str] = mapped_column(
-        String,
+        Text,
         nullable=True,
     )  # TODO consider moving attributes into JSONB
 

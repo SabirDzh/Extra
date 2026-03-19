@@ -10,9 +10,6 @@ from typing import (
     Union,
 )
 
-from fastapi import APIRouter, Depends, File, Request, Response, UploadFile
-from fastapi_cache import FastAPICache
-
 from core.authentication.fastapi_users import (
     current_active_user,
     fastapi_users,
@@ -24,13 +21,18 @@ from core.schemas.user import (
     UserRead,
     UserUpdate,
 )
+from fastapi import APIRouter, Depends, File, Request, Response, UploadFile
+from fastapi_cache import FastAPICache
 from fastapi_cache.decorator import cache
+from user_profile.main import save_user_avatar
+from utils.product import current_admin
 
 from api.dependencies.authentication import get_users_db
-from user_profile.main import save_user_avatar
 
 UsersDB = Annotated[SQLAlchemyUserDatabase, Depends(get_users_db)]
 CurrentUser = Annotated[User, Depends(current_active_user)]
+AdminUser = Annotated[User, Depends(current_admin)]
+
 
 router = APIRouter(
     prefix=settings.api.v1.users,
@@ -71,6 +73,7 @@ def users_list_key_builder(
 )
 async def get_users_list(
     users_db: UsersDB,
+    admin: AdminUser,
     # ) -> list["User"]:
 ) -> list[UserRead]:
     users = await users_db.get_users()

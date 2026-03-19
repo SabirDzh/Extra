@@ -1,5 +1,5 @@
 import uuid
-from typing import Annotated
+from typing import Annotated, Literal
 
 from core.config import settings
 from core.models.db_helper import db_helper
@@ -62,9 +62,19 @@ async def list_products(
     db: Session,
     redis: RedisDep,
     pagination: PaginationParams = Depends(),
+    sort_by: Literal["title", "created_at", "article"] = Query("title"),
+    order: Literal["asc", "desc"] = Query("asc"),
+    features: list[str] | None = Query(
+        None, description="Filter by product attributes (e.g. 'Модуль Wi-Fi')"
+    ),
 ):
     products = await product_crud.get_products(
-        db, offset=pagination.offset, limit=pagination.limit
+        db,
+        offset=pagination.offset,
+        limit=pagination.limit,
+        sort_by=sort_by,
+        order=order,
+        features=features,
     )
 
     product_ids = [p.id for p in products]
@@ -82,9 +92,20 @@ async def search_products(
     redis: RedisDep,
     pagination: PaginationParams = Depends(),
     q: str | None = Query(None, description="Search query"),
+    sort_by: Literal["title", "created_at", "article"] = Query("title"),
+    order: Literal["asc", "desc"] = Query("asc"),
+    features: list[str] | None = Query(
+        None, description="Filter by product attributes"
+    ),
 ):
     products = await product_crud.search_products(
-        db, q=q, offset=pagination.offset, limit=pagination.limit
+        db,
+        q=q,
+        offset=pagination.offset,
+        limit=pagination.limit,
+        sort_by=sort_by,
+        order=order,
+        features=features,
     )
 
     product_ids = [p.id for p in products]
@@ -108,6 +129,29 @@ async def create_product(
     # Инициализируем товар в рейтинге с 0 просмотров, чтобы он сразу появлялся в /popular
     await redis.zadd("products:popularity", {str(product.id): 0})
     return product
+
+
+@router.delete("/all/clear", status_code=status.HTTP_200_OK)
+async def clear_all_products(
+    db: Session,
+    admin: AdminUser,
+    redis: RedisDep,
+):
+    """Очищает всю таблицу товаров и сбрасывает рейтинги в Redis."""
+    count = await product_crud.delete_all_products(db)
+
+    try:
+        keys = await redis.keys("product:*:unique_views")
+        if keys:
+            await redis.delete(*keys)
+        await redis.delete("products:popularity")
+    except Exception:
+        pass
+
+    return {
+        "msg": f"Успешно удалено товаров: {count}. Данные в Redis сброшены.",
+        "status": "OK",
+    }
 
 
 @router.get("/{product_id}", response_model=ProductRead)
@@ -197,6 +241,11 @@ async def get_product_summary(db: Session, pagination: PaginationParams = Depend
     return await product_crud.get_product_summary(
         db, pagination.limit, pagination.offset
     )
+
+
+@router.get("/filters/", response_model=list[str])
+async def get_product_filters(db: Session):
+    return await product_crud.get_product_attributes_list(db)
 
 
 @router.post("/import", status_code=status.HTTP_201_CREATED)

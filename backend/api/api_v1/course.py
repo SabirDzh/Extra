@@ -1,7 +1,7 @@
 import uuid
-from typing import Annotated
+from typing import Annotated, Literal
 
-from core.authentication.fastapi_users import current_active_user
+from core.authentication.fastapi_users import current_active_user, current_optional_user
 from core.config import settings
 from core.models.db_helper import db_helper
 from core.models.user import User
@@ -20,12 +20,13 @@ router = APIRouter(
 Session = Annotated[AsyncSession, Depends(db_helper.session_getter)]
 AdminUser = Annotated[User, Depends(current_admin)]
 IsUser = Annotated[User, Depends(current_active_user)]
+OptionalUser = Annotated[User | None, Depends(current_optional_user)]
 
 
 @router.get("/", response_model=list[CourseRead])
 async def list_courses(
     db: Session,
-    pagination: Annotated[PaginationParams, Query()],
+    pagination: Annotated[PaginationParams, Depends()],
 ):
     return await course_crud.get_courses(
         db, offset=pagination.offset, limit=pagination.limit
@@ -35,11 +36,27 @@ async def list_courses(
 @router.get("/search", response_model=list[CourseRead])
 async def search_courses(
     db: Session,
-    pagination: Annotated[PaginationParams, Query()],
+    pagination: Annotated[PaginationParams, Depends()],
+    user: OptionalUser,
     q: str | None = Query(None, description="Search query"),
+    filter_type: (
+        Literal["in_progress", "completed", "new", "popular", "beginner"] | None
+    ) = Query(None, description="Filter type for courses"),
 ):
+    # If user wants personal filters but is not logged in, raise error
+    if filter_type in ["in_progress", "completed"] and not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="You must be logged in to use this filter",
+        )
+
     return await course_crud.search_courses(
-        db, q=q, offset=pagination.offset, limit=pagination.limit
+        db,
+        q=q,
+        offset=pagination.offset,
+        limit=pagination.limit,
+        user_id=user.id if user else None,
+        filter_type=filter_type,
     )
 
 
@@ -139,5 +156,7 @@ async def get_progress(
 
 
 @router.delete("/", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_courses(db: Session, courses_id: Annotated[list[uuid.UUID], Query()]):
+async def delete_courses(
+    db: Session, courses_id: Annotated[list[uuid.UUID], Query()], admin: AdminUser
+):
     await course_crud.delete_courses(db, courses_id)
