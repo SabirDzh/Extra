@@ -8,7 +8,16 @@ from core.models.db_helper import db_helper
 from core.models.user import User
 from core.schemas.base import ListParams
 from core.schemas.error import ErrorCreate, ErrorRead, ErrorReadAdmin, ErrorUpdate
-from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
+from fastapi import (
+    APIRouter,
+    Body,
+    Depends,
+    File,
+    HTTPException,
+    Query,
+    UploadFile,
+    status,
+)
 from sqlalchemy.ext.asyncio import AsyncSession
 from utils.product import current_admin
 
@@ -27,11 +36,19 @@ async def get_errors(db: Session, query: ListParams = Depends()):
     return await error_crud.get_errors(db, query.limit, query.offset, query.sorted)
 
 
+@router.get("/search", response_model=List[ErrorRead])
+async def search_errors(
+    db: Session,
+    query: ListParams = Depends(),
+    q: str | None = Query(None, description="Search query"),
+):
+    return await error_crud.search_errors(db, q=q, limit=query.limit, offset=query.offset)
+
+
 @router.get("/{error_id}", response_model=ErrorRead)
 async def get_error(
     db: Session,
     error_id: uuid.UUID,
-    user: IsUser,
 ):
     error = await error_crud.get_error(db, error_id)
     if not error:
@@ -86,6 +103,14 @@ async def update_error(
             status_code=status.HTTP_404_NOT_FOUND, detail="Error not found"
         )
     return await error_crud.update_error(db, error, data)
+
+
+@router.delete("/clear", status_code=status.HTTP_204_NO_CONTENT)
+async def clear_errors(
+    db: Session,
+    admin: AdminUser,
+):
+    await error_crud.delete_all_errors(db)
 
 
 @router.delete("/{error_id}", status_code=status.HTTP_204_NO_CONTENT)

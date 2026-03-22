@@ -27,10 +27,26 @@ OptionalUser = Annotated[User | None, Depends(current_optional_user)]
 async def list_courses(
     db: Session,
     pagination: Annotated[PaginationParams, Depends()],
+    user: OptionalUser,
+    filter_type: (
+        Literal["in_progress", "completed", "not_started", "new", "popular", "beginner"] | None
+    ) = Query(None, description="Filter type for courses"),
 ):
-    return await course_crud.get_courses(
-        db, offset=pagination.offset, limit=pagination.limit
+    if filter_type in ["in_progress", "completed", "not_started"] and not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="You must be logged in to use this filter",
+        )
+
+    courses = await course_crud.search_courses(
+        db,
+        offset=pagination.offset,
+        limit=pagination.limit,
+        user_id=user.id if user else None,
+        filter_type=filter_type,
     )
+    await course_crud.attach_course_progress(db, courses, user.id if user else None)
+    return courses
 
 
 @router.get("/search", response_model=list[CourseRead])
@@ -40,17 +56,17 @@ async def search_courses(
     user: OptionalUser,
     q: str | None = Query(None, description="Search query"),
     filter_type: (
-        Literal["in_progress", "completed", "new", "popular", "beginner"] | None
+        Literal["in_progress", "completed", "not_started", "new", "popular", "beginner"] | None
     ) = Query(None, description="Filter type for courses"),
 ):
     # If user wants personal filters but is not logged in, raise error
-    if filter_type in ["in_progress", "completed"] and not user:
+    if filter_type in ["in_progress", "completed", "not_started"] and not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="You must be logged in to use this filter",
         )
 
-    return await course_crud.search_courses(
+    courses = await course_crud.search_courses(
         db,
         q=q,
         offset=pagination.offset,
@@ -58,6 +74,8 @@ async def search_courses(
         user_id=user.id if user else None,
         filter_type=filter_type,
     )
+    await course_crud.attach_course_progress(db, courses, user.id if user else None)
+    return courses
 
 
 @router.post("/", response_model=CourseRead, status_code=status.HTTP_201_CREATED)
@@ -70,12 +88,37 @@ async def create_course(
 
 
 @router.get("/{course_id}", response_model=CourseRead)
-async def get_course(course_id: uuid.UUID, db: Session):
+async def get_course(
+    course_id: uuid.UUID,
+    db: Session,
+    user: OptionalUser,
+    filter_type: (
+        Literal["in_progress", "completed", "not_started", "new", "popular", "beginner"] | None
+    ) = Query(None, description="Filter type for courses"),
+):
+    if filter_type in ["in_progress", "completed", "not_started"] and not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="You must be logged in to use this filter",
+        )
+
     course = await course_crud.get_course(db, course_id)
     if not course:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Course not found"
         )
+        
+    # Apply personal filters manually for the single course if requested
+    if user and filter_type in ["in_progress", "completed", "not_started"]:
+        enrollment = await course_crud.get_enrollment(db, user.id, course_id)
+        if filter_type == "not_started" and enrollment:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found")
+        elif filter_type == "in_progress" and (not enrollment or enrollment.completed_at):
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found")
+        elif filter_type == "completed" and (not enrollment or not enrollment.completed_at):
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found")
+
+    await course_crud.attach_course_progress(db, [course], user.id if user else None)
     return course
 
 

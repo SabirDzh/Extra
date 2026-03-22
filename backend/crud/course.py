@@ -2,6 +2,7 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from typing import List, Literal
 
+from core.models.block import Block
 from core.models.course import Course, CourseEnrollment, CourseLevel
 from core.models.progress import UserBlockProgress
 from core.schemas.course import CourseCreate, CourseUpdate
@@ -130,7 +131,7 @@ async def search_courses(
     limit: int = 20,
     user_id: uuid.UUID | None = None,
     filter_type: (
-        Literal["in_progress", "completed", "new", "popular", "beginner"] | None
+        Literal["in_progress", "completed", "not_started", "new", "popular", "beginner"] | None
     ) = None,
 ):
     query = select(Course).where(Course.is_published)
@@ -173,6 +174,11 @@ async def search_courses(
         )
         query = query.order_by(func.coalesce(enrollment_count.c.count, 0).desc())
 
+    elif filter_type == "not_started" and user_id:
+        # Not enrolled
+        subq = select(CourseEnrollment.course_id).where(CourseEnrollment.user_id == user_id)
+        query = query.where(Course.id.not_in(subq))
+
     elif filter_type == "in_progress" and user_id:
         # Enrolled but not completed
         query = query.join(CourseEnrollment, Course.id == CourseEnrollment.course_id)
@@ -207,3 +213,59 @@ async def delete_courses(session: AsyncSession, courses_id: list[uuid.UUID]):
     stmt = delete(Course).where(Course.id.in_(courses_id))
     await session.execute(stmt)
     await session.commit()
+
+
+async def attach_course_progress(
+    session: AsyncSession,
+    courses: list[Course],
+    user_id: uuid.UUID | None,
+) -> None:
+    if not courses:
+        return
+
+    course_ids = [c.id for c in courses]
+
+    # 1. Total blocks per course
+    stmt_total = (
+        select(Block.course_id, func.count(Block.id).label("total"))
+        .where(Block.course_id.in_(course_ids))
+        .group_by(Block.course_id)
+    )
+    result_total = await session.execute(stmt_total)
+    total_blocks_map = {row.course_id: row.total for row in result_total}
+
+    # 2. Completed blocks per course (if user is logged in)
+    completed_blocks_map = {}
+    enrolled_courses = set()
+    if user_id:
+        stmt_completed = (
+            select(Block.course_id, func.count(UserBlockProgress.id).label("completed"))
+            .join(UserBlockProgress, Block.id == UserBlockProgress.block_id)
+            .where(
+                Block.course_id.in_(course_ids),
+                UserBlockProgress.user_id == user_id,
+                UserBlockProgress.is_completed == True,
+            )
+            .group_by(Block.course_id)
+        )
+        result_completed = await session.execute(stmt_completed)
+        completed_blocks_map = {row.course_id: row.completed for row in result_completed}
+
+        stmt_enroll = select(CourseEnrollment.course_id).where(
+            CourseEnrollment.course_id.in_(course_ids),
+            CourseEnrollment.user_id == user_id,
+        )
+        result_enroll = await session.execute(stmt_enroll)
+        enrolled_courses = {row[0] for row in result_enroll}
+
+    from core.schemas.course import CourseProgress
+
+    for c in courses:
+        if user_id and c.id in enrolled_courses:
+            total = total_blocks_map.get(c.id, 0)
+            completed = completed_blocks_map.get(c.id, 0)
+            percent = round((completed / total) * 100, 2) if total > 0 else 0.0
+            c.progress = CourseProgress(completed=completed, total=total, percent=percent)
+        else:
+            c.progress = None
+

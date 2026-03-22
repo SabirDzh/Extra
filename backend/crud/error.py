@@ -8,7 +8,7 @@ import pandas as pd
 from core.models.error import Error
 from core.schemas.error import ErrorCreate, ErrorUpdate
 from fastapi import HTTPException, UploadFile, status
-from sqlalchemy import delete, insert, select
+from sqlalchemy import delete, insert, select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from utils.db import ensure_unique_field
 
@@ -31,6 +31,38 @@ async def get_error(
     error_id: uuid.UUID,
 ) -> Error | None:
     return await session.get(Error, error_id)
+
+
+async def search_errors(
+    session: AsyncSession,
+    q: str | None = None,
+    limit: int = 20,
+    offset: int = 0,
+) -> List[Error]:
+    query = select(Error)
+    
+    if q:
+        if len(q) < 3:
+            search_pattern = f"%{q}%"
+            query = query.where(
+                (Error.title.ilike(search_pattern))
+                | (Error.description.ilike(search_pattern))
+            )
+            query = query.order_by(Error.order_index.asc())
+        else:
+            query = query.where(
+                (Error.title.bool_op("%")(q)) | (Error.description.bool_op("%")(q))
+            )
+            query = query.order_by(
+                func.similarity(Error.title, q).desc(),
+                func.similarity(Error.description, q).desc(),
+            )
+    else:
+        query = query.order_by(Error.order_index.asc())
+
+    query = query.offset(offset).limit(limit)
+    result = await session.execute(query)
+    return result.scalars().all()
 
 
 async def create_error(
@@ -95,6 +127,12 @@ async def delete_errors(
     await session.commit()
 
 
+async def delete_all_errors(session: AsyncSession) -> None:
+    stmt = delete(Error)
+    await session.execute(stmt)
+    await session.commit()
+
+
 def check_format(filename: str) -> str:
     filename = filename.lower()
     if not filename.endswith((".csv", ".xlsx", ".xls", ".json")):
@@ -155,34 +193,85 @@ def parse_error_csv_file(contents: bytes) -> list[dict]:
 def parse_error_excel_file(contents: bytes) -> list[dict]:
     df = pd.read_excel(io.BytesIO(contents))
 
-    if "title" not in df.columns or "description" not in df.columns:
+    # Support for both English and Russian column names
+    title_col = None
+    if "title" in df.columns:
+        title_col = "title"
+    elif "название" in df.columns:
+        title_col = "название"
+
+    desc_col = None
+    if "description" in df.columns:
+        desc_col = "description"
+    elif "описание" in df.columns:
+        desc_col = "описание"
+
+    if not title_col or not desc_col:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="В файле Excel отсутствуют обязательные колонки 'title' и/или 'description'",
+            detail="В файле Excel отсутствуют обязательные колонки 'title'/'название' и/или 'description'/'описание'",
         )
 
     df = df.fillna("")
+    
+    try:
+        from openpyxl import load_workbook
+        from openpyxl_image_loader import SheetImageLoader
+        wb = load_workbook(io.BytesIO(contents), data_only=True)
+        sheet = wb.active
+        image_loader = SheetImageLoader(sheet)
+        has_images = True
+    except Exception:
+        has_images = False
+        image_loader = None
+
     errors_data = []
 
     for index, row in df.iterrows():
-        title = str(row.get("title", "")).strip()
-        description = str(row.get("description", "")).strip()
+        title = str(row.get(title_col, "")).strip()
+        description = str(row.get(desc_col, "")).strip()
 
         if title and description:
+            is_published = True
+            published_col = None
+            for col in ["is_published", "опубликовано", "опубликован"]:
+                if col in df.columns:
+                    published_col = col
+                    break
+
+            if published_col:
+                val = str(row.get(published_col, "")).strip().lower()
+                if val in ["false", "0", "no", "ложь", "нет"]:
+                    is_published = False
+
             order_index = 0
-            if "order_index" in df.columns:
-                val = row.get("order_index", "")
+            order_col = None
+            for col in ["order_index", "порядок"]:
+                if col in df.columns:
+                    order_col = col
+                    break
+
+            if order_col:
+                val = row.get(order_col, "")
                 if str(val).isdigit() or isinstance(val, (int, float)):
                     try:
                         order_index = int(val)
                     except ValueError:
                         pass
 
-            is_published = True
-            if "is_published" in df.columns:
-                val = str(row.get("is_published", "")).strip().lower()
-                if val in ["false", "0", "no"]:
-                    is_published = False
+            img_obj = None
+            if has_images:
+                excel_row = index + 2
+                for col_idx in range(1, len(df.columns) + 1):
+                    from openpyxl.utils import get_column_letter
+                    col_letter = get_column_letter(col_idx)
+                    cell_coord = f"{col_letter}{excel_row}"
+                    if image_loader and image_loader.image_in(cell_coord):
+                        try:
+                            img_obj = image_loader.get(cell_coord)
+                            break
+                        except Exception:
+                            pass
 
             errors_data.append(
                 {
@@ -190,6 +279,7 @@ def parse_error_excel_file(contents: bytes) -> list[dict]:
                     "description": description,
                     "order_index": order_index,
                     "is_published": is_published,
+                    "image": img_obj,
                 }
             )
 
@@ -233,19 +323,39 @@ async def import_errors(
         existing_result = await session.execute(stmt)
         existing_titles = {t.lower() for t in existing_result.scalars().all()}
 
+        import os
+        import uuid
+        media_dir = "media/error_img"
+        os.makedirs(media_dir, exist_ok=True)
+        
         new_errors = []
+        
         for item in valid_items:
             if item["title"].lower() not in existing_titles:
-                new_errors.append(
-                    {
-                        "title": item["title"],
-                        "description": item["description"],
-                        "order_index": item.get("order_index", 0),
-                        "is_published": item.get("is_published", True),
-                        "created_by": user_id,
-                    }
-                )
+                new_error_data = {
+                    "title": item["title"],
+                    "description": item["description"],
+                    "order_index": item.get("order_index", 0),
+                    "is_published": item.get("is_published", True),
+                    "created_by": user_id,
+                    "image": None,
+                }
                 existing_titles.add(item["title"].lower())
+                
+                img_obj = item.get("image")
+                if img_obj:
+                    try:
+                        filename_webp = f"{uuid.uuid4()}.webp"
+                        filepath = os.path.join(media_dir, filename_webp)
+                        if img_obj.mode not in ('RGB', 'RGBA'):
+                            img_obj = img_obj.convert('RGBA')
+                        img_obj.save(filepath, "WEBP")
+                        
+                        new_error_data["image"] = f"/{media_dir}/{filename_webp}"
+                    except Exception as e:
+                        print(f"Error saving image for {item['title']}: {e}")
+                
+                new_errors.append(new_error_data)
 
         if not new_errors:
             return {

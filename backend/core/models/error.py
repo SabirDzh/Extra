@@ -10,8 +10,9 @@ from .mixins.id_int_pk import IdUuidPkMixin
 
 
 class Error(IdUuidPkMixin, Base):
-    title: Mapped[str] = mapped_column(String(52), unique=True)
+    title: Mapped[str] = mapped_column(String(512), unique=True)
     description: Mapped[str] = mapped_column(String(2048))
+    image: Mapped[str | None] = mapped_column(String, nullable=True)
     is_published: Mapped[bool] = mapped_column(Boolean, default=True)
     order_index: Mapped[int] = mapped_column(default=0)
     created_at: Mapped[datetime.datetime] = mapped_column(server_default=func.now())

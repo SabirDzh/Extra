@@ -6,6 +6,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from core.models.course import Course
 from core.models.product import Product
 from core.models.term import Term
+from core.models.error import Error
+from core.models.faq import FAQ
 
 
 async def global_search_entities(
@@ -21,7 +23,10 @@ async def global_search_entities(
         if hasattr(model, "is_published"):
             stmt = stmt.where(model.is_published == True)
 
-        if not q:
+        title_field = getattr(model, "title", getattr(model, "question", None))
+        desc_field = getattr(model, "description", getattr(model, "answer", None))
+
+        if not q or not title_field or not desc_field:
             result = await session.execute(stmt.limit(limit_per_category))
             return result.scalars().all()
 
@@ -29,19 +34,19 @@ async def global_search_entities(
             search_pattern = f"%{q}%"
             stmt = stmt.where(
                 or_(
-                    model.title.ilike(search_pattern),
-                    model.description.ilike(search_pattern),
+                    title_field.ilike(search_pattern),
+                    desc_field.ilike(search_pattern),
                 )
-            ).order_by(model.title.asc())
+            ).order_by(title_field.asc())
         else:
             stmt = stmt.where(
                 or_(
-                    model.title.bool_op("%")(q),
-                    model.description.bool_op("%")(q),
+                    title_field.bool_op("%")(q),
+                    desc_field.bool_op("%")(q),
                 )
             ).order_by(
-                func.similarity(model.title, q).desc(),
-                func.similarity(model.description, q).desc(),
+                func.similarity(title_field, q).desc(),
+                func.similarity(desc_field, q).desc(),
             )
 
         result = await session.execute(stmt.limit(limit_per_category))
@@ -50,9 +55,13 @@ async def global_search_entities(
     courses = await search_single_model(Course)
     products = await search_single_model(Product)
     terms = await search_single_model(Term)
+    errors = await search_single_model(Error)
+    faqs = await search_single_model(FAQ)
 
     return {
         "courses": courses,
         "products": products,
         "terms": terms,
+        "errors": errors,
+        "faqs": faqs,
     }

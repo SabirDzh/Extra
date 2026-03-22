@@ -36,6 +36,15 @@ async def get_terms(session: Session, pagination: Annotated[PaginationParams, Qu
     return await term_crud.get_terms(session, pagination)
 
 
+@router.get("/search", response_model=list[TermResponse])
+async def search_terms(
+    session: Session,
+    pagination: Annotated[PaginationParams, Query()],
+    q: str | None = Query(None, description="Search query"),
+):
+    return await term_crud.search_terms(session, q, pagination)
+
+
 @router.get("/{term_id}", response_model=TermResponse)
 async def get_term(
     session: Session, term_id: Annotated[uuid.UUID, Path()], user: IsUser

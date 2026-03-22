@@ -36,6 +36,36 @@ async def get_term_by_title(
     return result.first()
 
 
+async def search_terms(
+    session: AsyncSession,
+    q: str | None,
+    pagination: PaginationParams,
+):
+    query = select(Term)
+    if q:
+        if len(q) < 3:
+            search_pattern = f"%{q}%"
+            query = query.where(
+                (Term.title.ilike(search_pattern))
+                | (Term.description.ilike(search_pattern))
+            )
+            query = query.order_by(Term.title.asc())
+        else:
+            query = query.where(
+                (Term.title.bool_op("%")(q)) | (Term.description.bool_op("%")(q))
+            )
+            query = query.order_by(
+                func.similarity(Term.title, q).desc(),
+                func.similarity(Term.description, q).desc(),
+            )
+    else:
+        query = query.order_by(Term.title.asc())
+
+    query = query.offset(pagination.offset).limit(pagination.limit)
+    result = await session.execute(query)
+    return result.scalars().all()
+
+
 async def create_term(
     session: AsyncSession,
     term: TermRequest,

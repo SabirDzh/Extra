@@ -45,12 +45,10 @@ RedisDep = Annotated[Redis, Depends(get_redis)]
 
 
 def _get_client_identifier(request: Request) -> str:
-    # Use user ID if authenticated, else IP address
     user = getattr(request.state, "user", None)
     if user and hasattr(user, "id"):
         return str(user.id)
 
-    # Try to get real IP from headers if behind proxy, else direct client IP
     forwarded_for = request.headers.get("X-Forwarded-For")
     if forwarded_for:
         return forwarded_for.split(",")[0].strip()
@@ -126,7 +124,6 @@ async def create_product(
 ):
     product = await product_crud.create_product(db, data)
     product.views = 0
-    # Инициализируем товар в рейтинге с 0 просмотров, чтобы он сразу появлялся в /popular
     await redis.zadd("products:popularity", {str(product.id): 0})
     return product
 
@@ -267,7 +264,6 @@ async def get_popular_product(
     Returns products sorted by unique views (popularity).
     Uses Redis Sorted Set for efficient ranking.
     """
-    # 1. Get top product IDs from Redis leaderboard
     top_ids_str = await get_top_product_ids(
         redis, limit=pagination.limit, offset=pagination.offset
     )
@@ -275,16 +271,12 @@ async def get_popular_product(
     if not top_ids_str:
         return []
 
-    # 2. Convert string IDs back to UUIDs
     product_ids = [uuid.UUID(pid) for pid in top_ids_str]
 
-    # 3. Fetch products from DB (maintaining order)
     products = await product_crud.get_products_by_ids(db, product_ids)
 
-    # 4. Get fresh view counts for these specific products
     actual_views = await get_multiple_product_views(redis, [p.id for p in products])
 
-    # 5. Attach views to models
     for product, view_count in zip(products, actual_views):
         product.views = view_count
 

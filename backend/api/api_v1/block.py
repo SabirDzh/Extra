@@ -19,6 +19,8 @@ from utils.product import current_admin
 router = APIRouter(prefix="/api/courses/{course_id}/blocks", tags=["Blocks"])
 
 Session = Annotated[AsyncSession, Depends(db_helper.session_getter)]
+IsAdmin = Annotated[User, Depends(current_admin)]
+isUser = Annotated[User, Depends(current_active_user)]
 
 
 async def _get_course_or_404(db, course_id: uuid.UUID) -> Course:
