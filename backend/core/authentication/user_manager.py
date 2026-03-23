@@ -58,8 +58,8 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
         # )
         await send_new_user_notification(user)
 
-        if request is not None:
-            await self.request_verify(user, request)
+        # if request is not None:
+        #     await self.request_verify(user, request)
 
     async def on_after_forgot_password(
         self,
