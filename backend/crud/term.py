@@ -43,7 +43,7 @@ async def search_terms(
 ):
     query = select(Term)
     if q:
-        if len(q) < 3:
+        if len(q) < 2:
             search_pattern = f"%{q}%"
             query = query.where(
                 (Term.title.ilike(search_pattern))
@@ -51,13 +51,18 @@ async def search_terms(
             )
             query = query.order_by(Term.title.asc())
         else:
+            relevance = (
+                func.similarity(Term.title, q) * 2
+                + func.similarity(Term.description, q) * 0.5
+            )
+            search_pattern = f"%{q}%"
             query = query.where(
-                (Term.title.bool_op("%")(q)) | (Term.description.bool_op("%")(q))
+                (Term.title.bool_op("%")(q))
+                | (Term.description.bool_op("%")(q))
+                | (Term.title.ilike(search_pattern))
+                | (Term.description.ilike(search_pattern))
             )
-            query = query.order_by(
-                func.similarity(Term.title, q).desc(),
-                func.similarity(Term.description, q).desc(),
-            )
+            query = query.order_by(relevance.desc())
     else:
         query = query.order_by(Term.title.asc())
 

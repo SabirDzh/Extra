@@ -1,7 +1,7 @@
 import datetime
 import uuid
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class ErrorBase(BaseModel):
@@ -10,6 +10,8 @@ class ErrorBase(BaseModel):
     image: str | None = None
     is_published: bool = True
     order_index: int = Field(ge=0)
+
+    model_config = ConfigDict(from_attributes=True)
 
 
 class ErrorRead(ErrorBase):

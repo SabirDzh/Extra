@@ -30,7 +30,7 @@ async def global_search_entities(
             result = await session.execute(stmt.limit(limit_per_category))
             return result.scalars().all()
 
-        if len(q) < 3:
+        if len(q) < 2:
             search_pattern = f"%{q}%"
             stmt = stmt.where(
                 or_(
@@ -39,15 +39,19 @@ async def global_search_entities(
                 )
             ).order_by(title_field.asc())
         else:
+            relevance = (
+                func.similarity(title_field, q) * 2
+                + func.similarity(desc_field, q) * 0.5
+            )
+            search_pattern = f"%{q}%"
             stmt = stmt.where(
                 or_(
                     title_field.bool_op("%")(q),
                     desc_field.bool_op("%")(q),
+                    title_field.ilike(search_pattern),
+                    desc_field.ilike(search_pattern),
                 )
-            ).order_by(
-                func.similarity(title_field, q).desc(),
-                func.similarity(desc_field, q).desc(),
-            )
+            ).order_by(relevance.desc())
 
         result = await session.execute(stmt.limit(limit_per_category))
         return result.scalars().all()

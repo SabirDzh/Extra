@@ -39,7 +39,7 @@ async def get_terms(session: Session, pagination: Annotated[PaginationParams, Qu
 @router.get("/search", response_model=list[TermResponse])
 async def search_terms(
     session: Session,
-    pagination: Annotated[PaginationParams, Query()],
+    pagination: Annotated[PaginationParams, Depends()],
     q: str | None = Query(None, description="Search query"),
 ):
     return await term_crud.search_terms(session, q, pagination)

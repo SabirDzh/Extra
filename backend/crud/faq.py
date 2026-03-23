@@ -92,7 +92,7 @@ async def search_faqs(
     stmt = select(FAQ)
 
     if q:
-        if len(q) < 3:
+        if len(q) < 2:
             search_pattern = f"%{q}%"
             stmt = stmt.where(
                 or_(
@@ -101,15 +101,19 @@ async def search_faqs(
                 )
             ).order_by(FAQ.question.asc())
         else:
+            relevance = (
+                func.similarity(FAQ.question, q) * 2
+                + func.similarity(FAQ.answer, q) * 0.5
+            )
+            search_pattern = f"%{q}%"
             stmt = stmt.where(
                 or_(
                     FAQ.question.bool_op("%")(q),
                     FAQ.answer.bool_op("%")(q),
+                    FAQ.question.ilike(search_pattern),
+                    FAQ.answer.ilike(search_pattern),
                 )
-            ).order_by(
-                func.similarity(FAQ.question, q).desc(),
-                func.similarity(FAQ.answer, q).desc(),
-            )
+            ).order_by(relevance.desc())
 
     result = await session.execute(stmt.offset(offset).limit(limit))
     return result.scalars().all()

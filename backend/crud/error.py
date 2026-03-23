@@ -42,7 +42,7 @@ async def search_errors(
     query = select(Error)
     
     if q:
-        if len(q) < 3:
+        if len(q) < 2:
             search_pattern = f"%{q}%"
             query = query.where(
                 (Error.title.ilike(search_pattern))
@@ -50,13 +50,18 @@ async def search_errors(
             )
             query = query.order_by(Error.order_index.asc())
         else:
+            relevance = (
+                func.similarity(Error.title, q) * 2
+                + func.similarity(Error.description, q) * 0.5
+            )
+            search_pattern = f"%{q}%"
             query = query.where(
-                (Error.title.bool_op("%")(q)) | (Error.description.bool_op("%")(q))
+                (Error.title.bool_op("%")(q))
+                | (Error.description.bool_op("%")(q))
+                | (Error.title.ilike(search_pattern))
+                | (Error.description.ilike(search_pattern))
             )
-            query = query.order_by(
-                func.similarity(Error.title, q).desc(),
-                func.similarity(Error.description, q).desc(),
-            )
+            query = query.order_by(relevance.desc())
     else:
         query = query.order_by(Error.order_index.asc())
 

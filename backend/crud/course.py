@@ -138,15 +138,19 @@ async def search_courses(
 
     # 1. Text Search
     if q:
-        if len(q) < 3:
+        if len(q) < 2:
             search_pattern = f"%{q}%"
             query = query.where(
                 (Course.title.ilike(search_pattern))
                 | (Course.description.ilike(search_pattern))
             )
         else:
+            search_pattern = f"%{q}%"
             query = query.where(
-                (Course.title.bool_op("%")(q)) | (Course.description.bool_op("%")(q))
+                (Course.title.bool_op("%")(q))
+                | (Course.description.bool_op("%")(q))
+                | (Course.title.ilike(search_pattern))
+                | (Course.description.ilike(search_pattern))
             )
 
     # 2. Specific Filters
@@ -196,11 +200,12 @@ async def search_courses(
 
     # Default ordering if not popular
     if filter_type != "popular":
-        if q and len(q) >= 3:
-            query = query.order_by(
-                func.similarity(Course.title, q).desc(),
-                func.similarity(Course.description, q).desc(),
+        if q and len(q) >= 2:
+            relevance = (
+                func.similarity(Course.title, q) * 2
+                + func.similarity(Course.description, q) * 0.5
             )
+            query = query.order_by(relevance.desc())
         else:
             query = query.order_by(Course.title.asc())
 
