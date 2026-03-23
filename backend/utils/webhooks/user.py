@@ -21,7 +21,7 @@ try:
         async with aiohttp.ClientSession() as session:
             async with session.post(WEBHOOK_URL, json=wh_data) as response:
                 data = await response.json()
-                log.info("Sent webhook, got response: %s", data)
+                # log.info("Sent webhook, got response: %s", data)
 
 except Exception as e:
     log.exception("Failed to send webhook for new user")

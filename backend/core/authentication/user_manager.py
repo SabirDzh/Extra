@@ -1,5 +1,6 @@
 import logging
 import uuid
+import secrets
 from typing import TYPE_CHECKING, Optional
 
 from fastapi_cache import FastAPICache
@@ -10,6 +11,7 @@ from fastapi_users import (
 from fastapi_users.db import BaseUserDatabase
 from mailing.send_email_confirmed import send_email_confirmed
 from mailing.send_verification_email import send_verification_email
+from mailing.send_password_reset_email import send_password_reset_email
 from utils.webhooks.user import send_new_user_notification
 
 from core.config import settings
@@ -50,10 +52,10 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
             await FastAPICache.clear(
                 namespace=settings.cache.namespace.users_list,
             )
-        log.warning(
-            "User %r has registered.",
-            user.id,
-        )
+        # log.warning(
+        #     "User %r has registered.",
+        #     user.id,
+        # )
         await send_new_user_notification(user)
 
         if request is not None:
@@ -65,10 +67,19 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
         token: str,
         request: Optional["Request"] = None,
     ):
-        log.warning(
-            "User %r has forgot their password. Reset token: %r",
-            user.id,
-            token,
+        # log.warning(
+        #     "User %r has forgot their password. Token: %r. Generating a new password.",
+        #     user.id,
+        #     token,
+        # )
+        new_password = secrets.token_urlsafe(12)
+        hashed_password = self.password_helper.hash(new_password)
+        await self.user_db.update(user, {"hashed_password": hashed_password})
+
+        self.background_tasks.add_task(
+            send_password_reset_email,
+            user=user,
+            new_password=new_password,
         )
 
     async def on_after_request_verify(
@@ -105,3 +116,4 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
             send_email_confirmed,
             user=user,
         )
+
