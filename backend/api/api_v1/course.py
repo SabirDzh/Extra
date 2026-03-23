@@ -29,7 +29,8 @@ async def list_courses(
     pagination: Annotated[PaginationParams, Depends()],
     user: OptionalUser,
     filter_type: (
-        Literal["in_progress", "completed", "not_started", "new", "popular", "beginner"] | None
+        Literal["in_progress", "completed", "not_started", "new", "popular", "beginner"]
+        | None
     ) = Query(None, description="Filter type for courses"),
 ):
     if filter_type in ["in_progress", "completed", "not_started"] and not user:
@@ -56,7 +57,8 @@ async def search_courses(
     user: OptionalUser,
     q: str | None = Query(None, description="Search query"),
     filter_type: (
-        Literal["in_progress", "completed", "not_started", "new", "popular", "beginner"] | None
+        Literal["in_progress", "completed", "not_started", "new", "popular", "beginner"]
+        | None
     ) = Query(None, description="Filter type for courses"),
 ):
     # If user wants personal filters but is not logged in, raise error
@@ -93,7 +95,8 @@ async def get_course(
     db: Session,
     user: OptionalUser,
     filter_type: (
-        Literal["in_progress", "completed", "not_started", "new", "popular", "beginner"] | None
+        Literal["in_progress", "completed", "not_started", "new", "popular", "beginner"]
+        | None
     ) = Query(None, description="Filter type for courses"),
 ):
     if filter_type in ["in_progress", "completed", "not_started"] and not user:
@@ -107,16 +110,26 @@ async def get_course(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Course not found"
         )
-        
+
     # Apply personal filters manually for the single course if requested
     if user and filter_type in ["in_progress", "completed", "not_started"]:
         enrollment = await course_crud.get_enrollment(db, user.id, course_id)
         if filter_type == "not_started" and enrollment:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found")
-        elif filter_type == "in_progress" and (not enrollment or enrollment.completed_at):
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found")
-        elif filter_type == "completed" and (not enrollment or not enrollment.completed_at):
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Course not found"
+            )
+        elif filter_type == "in_progress" and (
+            not enrollment or enrollment.completed_at
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Course not found"
+            )
+        elif filter_type == "completed" and (
+            not enrollment or not enrollment.completed_at
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Course not found"
+            )
 
     await course_crud.attach_course_progress(db, [course], user.id if user else None)
     return course
