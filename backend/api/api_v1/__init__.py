@@ -14,6 +14,7 @@ from .faq import router as faq_router
 from .messages import router as messages_router
 from .product import router as product_router
 from .profile import router as profile_router
+from .recomendation import router as recommendations_router
 from .search import router as search_router
 from .service import router as service_router
 from .term import router as term_router
@@ -40,3 +41,4 @@ router.include_router(profile_router)
 router.include_router(term_router)
 router.include_router(search_router)
 router.include_router(error_router)
+router.include_router(recommendations_router)

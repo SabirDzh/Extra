@@ -1,8 +1,6 @@
-import csv
 import io
 import json
 import uuid
-from pathlib import Path
 from typing import List
 
 import openpyxl
@@ -111,14 +109,14 @@ async def get_product_attributes_list(session: AsyncSession) -> list[str]:
     # Получаем все пары ключ-значение из атрибутов всех товаров
     stmt = select(func.jsonb_each(Product.attributes))
     result = await session.execute(stmt)
-    
+
     boolean_keys = set()
     for row in result:
-        key, value = row[0] # row[0] is a tuple (key, value) from jsonb_each
+        key, value = row[0]  # row[0] is a tuple (key, value) from jsonb_each
         # Проверяем, является ли значение булевым
         if isinstance(value, bool):
             boolean_keys.add(key)
-    
+
     # Исключаем системные или ненужные поля, если они попали в булевы
     filtered_keys = [k for k in boolean_keys if k != "Артикул"]
     return sorted(filtered_keys)

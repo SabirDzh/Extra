@@ -33,16 +33,6 @@ class ProductCreate(BaseModel):
 
     model_config = ConfigDict(
         from_attributes=True,
-        json_schema_extra={
-            "example": {
-                "title": "Test product",
-                "description": "Description...",
-                "documentation": "http://doc...",
-                "schema_connect": "http://schema...",
-                "attributes": {"weight": "500g", "size": "M"},
-                "image_url": ["http://img..."],
-            }
-        },
     )
 
 

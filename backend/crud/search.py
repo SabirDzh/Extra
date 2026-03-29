@@ -1,13 +1,13 @@
 import uuid
-from typing import List, Any
-from sqlalchemy import select, func, or_
-from sqlalchemy.ext.asyncio import AsyncSession
+from typing import Any, List
 
 from core.models.course import Course
-from core.models.product import Product
-from core.models.term import Term
 from core.models.error import Error
 from core.models.faq import FAQ
+from core.models.product import Product
+from core.models.term import Term
+from sqlalchemy import func, or_, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 
 async def global_search_entities(
@@ -15,13 +15,13 @@ async def global_search_entities(
     q: str | None = None,
     limit_per_category: int = 5,
 ) -> dict:
-    
+
     async def search_single_model(model):
         stmt = select(model)
-        
+
         # Apply filters like is_published if available
         if hasattr(model, "is_published"):
-            stmt = stmt.where(model.is_published == True)
+            stmt = stmt.where(model.is_published)
 
         title_field = getattr(model, "title", getattr(model, "question", None))
         desc_field = getattr(model, "description", getattr(model, "answer", None))

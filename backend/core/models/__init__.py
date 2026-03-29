@@ -16,6 +16,7 @@ __all__ = (
     "Term",
     "FAQ",
     "Error",
+    "Recommendation",
 )
 
 from .access_token import AccessToken
@@ -28,6 +29,7 @@ from .error import Error
 from .faq import FAQ
 from .product import Product
 from .progress import UserBlockProgress
+from .recommendation import Recommendation
 from .term import Term
 from .test import AnswerOption, Question, TestAnswer, TestSubmission
 from .user import User
