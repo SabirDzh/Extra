@@ -6,7 +6,7 @@ from core.authentication.fastapi_users import current_active_user, current_optio
 from core.config import settings
 from core.models.db_helper import db_helper
 from core.models.user import User
-from core.schemas.base import ListParams, PaginationParams
+from core.schemas.base import ListParams
 from core.schemas.recommendation import (
     RecommendationCreate,
     RecommendationListRead,
@@ -14,13 +14,13 @@ from core.schemas.recommendation import (
     RecommendationReadAdmin,
     RecommendationUpdate,
 )
-from fastapi import APIRouter, Depends, File, Query, UploadFile, status
+from fastapi import APIRouter, Depends, File, Query, UploadFile, status, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from utils.product import current_admin
 
 router = APIRouter(
-    prefix=settings.api.v1.recomendations,
-    tags=["Recomendation"],
+    prefix=settings.api.v1.recommendations,
+    tags=["Recommendation"],
 )
 
 
@@ -61,14 +61,20 @@ async def search_recomendations(
 async def get_recommendation_admin(
     session: Session, recommendation_id: uuid.UUID, admin: AdminUser
 ):
-    return await recommendation_crud.get_recommendation_admin(
+    result = await recommendation_crud.get_recommendation_admin(
         session, recommendation_id
     )
+    if not result:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Recommendation not found")
+    return result
 
 
 @router.get("/{recommendation_id}", response_model=RecommendationRead)
-async def get_recomendation(session: Session, recommendation_id: uuid.UUID):
-    return await recommendation_crud.get_recommendation(session, recommendation_id)
+async def get_recommendation(session: Session, recommendation_id: uuid.UUID):
+    result = await recommendation_crud.get_recommendation(session, recommendation_id)
+    if not result:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Recommendation not found")
+    return result
 
 
 @router.post("", response_model=RecommendationRead, status_code=status.HTTP_201_CREATED)
@@ -94,9 +100,12 @@ async def update_recomendation(
     recommendation_in: RecommendationUpdate,
     admin: AdminUser,
 ):
-    return await recommendation_crud.update_recommendation(
+    result = await recommendation_crud.update_recommendation(
         session, recommendation_id, recommendation_in
     )
+    if not result:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Recommendation not found")
+    return result
 
 
 @router.delete("", status_code=status.HTTP_204_NO_CONTENT)

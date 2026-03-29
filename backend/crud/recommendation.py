@@ -21,14 +21,9 @@ async def get_recommendation_admin(session: AsyncSession, recommendation_id: uui
 
 
 async def get_recommendation(session: AsyncSession, recommendation_id: uuid.UUID):
-    stmt = select(
-        Recommendation.id,
-        Recommendation.title,
-        Recommendation.description,
-        Recommendation.created_at,
-    ).where(Recommendation.id == recommendation_id)
+    stmt = select(Recommendation).where(Recommendation.id == recommendation_id)
     result = await session.execute(stmt)
-    return result.first()
+    return result.scalars().first()
 
 
 async def get_recommendations(
@@ -213,6 +208,7 @@ def parse_recommendation_csv_file(contents: bytes) -> list[dict]:
 
 def parse_recommendation_excel_file(contents: bytes) -> list[dict]:
     try:
+        # Сначала пробуем прочитать с заголовками
         df = pd.read_excel(io.BytesIO(contents))
     except Exception as e:
         raise HTTPException(
@@ -220,30 +216,61 @@ def parse_recommendation_excel_file(contents: bytes) -> list[dict]:
             detail=f"Ошибка чтения Excel файла: {str(e)}",
         )
 
-    required_cols = {"title", "description"}
-    actual_cols = {str(c).lower().strip() for c in df.columns}
-    if not required_cols.issubset(actual_cols):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="В файле Excel отсутствуют обязательные колонки 'title' и/или 'description'",
-        )
-
     df = df.fillna("")
     recommendations_data = []
 
-    for index, row in df.iterrows():
-        title = str(row.get("title", "")).strip()
-        description = str(row.get("description", "")).strip()
+    actual_cols = {str(c).lower().strip() for c in df.columns}
+    
+    # Возможные названия колонок
+    title_candidates = {"title", "заголовок", "название", "вопрос"}
+    desc_candidates = {"description", "описание", "ответ", "текст"}
 
-        if title and description:
-            recommendations_data.append(
-                {
-                    "title": title,
-                    "description": description,
-                }
-            )
+    title_col = next((c for c in df.columns if str(c).lower().strip() in title_candidates), None)
+    desc_col = next((c for c in df.columns if str(c).lower().strip() in desc_candidates), None)
 
-    return recommendations_data
+    # Если мы нашли нужные колонки по названиям
+    if title_col and desc_col:
+        for index, row in df.iterrows():
+            title = str(row.get(title_col, "")).strip()
+            description = str(row.get(desc_col, "")).strip()
+
+            if title and description:
+                recommendations_data.append(
+                    {
+                        "title": title,
+                        "description": description,
+                    }
+                )
+        return recommendations_data
+
+    # Если колонки не найдены, возможно файл без заголовков (header=None)
+    try:
+        df = pd.read_excel(io.BytesIO(contents), header=None)
+        df = df.fillna("")
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Ошибка чтения Excel файла: {str(e)}",
+        )
+
+    if len(df.columns) >= 2:
+        for index, row in df.iterrows():
+            title = str(row.iloc[0]).strip()
+            description = str(row.iloc[1]).strip()
+
+            if title and description:
+                recommendations_data.append(
+                    {
+                        "title": title,
+                        "description": description,
+                    }
+                )
+        return recommendations_data
+
+    raise HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail="В файле Excel не найдены колонки с названиями ('title', 'заголовок') и ('description', 'описание'), а также не удалось прочитать его как таблицу из двух колонок.",
+    )
 
 
 async def import_recommendations(
@@ -286,8 +313,12 @@ async def import_recommendations(
         existing_titles = {t.lower() for t in existing_result.scalars().all()}
 
         new_recommendations = []
+        seen_in_batch = set()
+        
         for item in valid_items:
-            if item["title"].lower() not in existing_titles:
+            title_lower = item["title"].lower()
+            if title_lower not in existing_titles and title_lower not in seen_in_batch:
+                seen_in_batch.add(title_lower)
                 new_recommendations.append(
                     {
                         "title": item["title"],

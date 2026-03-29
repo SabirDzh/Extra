@@ -59,7 +59,7 @@ class ApiV1Prefix(BaseModel):
     faq: str = "/faq"
     search: str = "/search"
     error: str = "/error"
-    recomendations: str = "/recomendation"
+    recommendations: str = "/recommendation"
 
 
 class ApiPrefix(BaseModel):

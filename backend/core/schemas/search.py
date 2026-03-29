@@ -5,6 +5,7 @@ from core.schemas.product import ProductRead
 from core.schemas.term import TermResponse
 from core.schemas.error import ErrorRead
 from core.schemas.faq import FAQRead
+from core.schemas.recommendation import RecommendationRead
 
 
 class GlobalSearchResponse(BaseModel):
@@ -13,4 +14,5 @@ class GlobalSearchResponse(BaseModel):
     terms: list[TermResponse]
     errors: list[ErrorRead]
     faqs: list[FAQRead]
+    recommendations: list[RecommendationRead]
 

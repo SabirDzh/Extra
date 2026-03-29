@@ -6,6 +6,7 @@ from core.models.error import Error
 from core.models.faq import FAQ
 from core.models.product import Product
 from core.models.term import Term
+from core.models.recommendation import Recommendation
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -61,6 +62,7 @@ async def global_search_entities(
     terms = await search_single_model(Term)
     errors = await search_single_model(Error)
     faqs = await search_single_model(FAQ)
+    recommendations = await search_single_model(Recommendation)
 
     return {
         "courses": courses,
@@ -68,4 +70,5 @@ async def global_search_entities(
         "terms": terms,
         "errors": errors,
         "faqs": faqs,
+        "recommendations": recommendations,
     }
