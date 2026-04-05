@@ -3,7 +3,7 @@ from datetime import datetime, timedelta, timezone
 from typing import List, Literal
 
 from core.models.block import Block
-from core.models.course import Course, CourseEnrollment, CourseLevel
+from core.models.course import Course, CourseAudience, CourseEnrollment, CourseLevel, CourseStatus
 from core.models.progress import UserBlockProgress
 from core.schemas.course import CourseCreate, CourseUpdate
 from sqlalchemy import delete, func, or_, select
@@ -131,8 +131,9 @@ async def search_courses(
     limit: int = 20,
     user_id: uuid.UUID | None = None,
     filter_type: (
-        Literal["in_progress", "completed", "not_started", "new", "popular", "beginner"] | None
+        Literal["in_progress", "completed", "not_started", "new", "popular"] | None
     ) = None,
+    level: CourseLevel | None = None,
 ):
     query = select(Course).where(Course.is_published)
 
@@ -153,11 +154,12 @@ async def search_courses(
                 | (Course.description.ilike(search_pattern))
             )
 
-    # 2. Specific Filters
-    if filter_type == "beginner":
-        query = query.where(Course.level == CourseLevel.beginner)
+    # 2. Level filter
+    if level is not None:
+        query = query.where(Course.level == level)
 
-    elif filter_type == "new":
+    # 3. Specific Filters
+    if filter_type == "new":
         # Added less than 24 hours ago
         day_ago = datetime.now(timezone.utc) - timedelta(days=1)
         query = query.where(Course.created_at >= day_ago)
@@ -220,11 +222,66 @@ async def delete_courses(session: AsyncSession, courses_id: list[uuid.UUID]):
     await session.commit()
 
 
+async def update_course_completion_status(
+    session: AsyncSession,
+    user_id: uuid.UUID,
+    course_id: uuid.UUID,
+) -> None:
+    """
+    Пересчитывает статус прохождения курса для пользователя.
+
+    Правила:
+    - Если пользователь НЕ записан — ничего не делаем.
+    - Если все блоки курса пройдены — ставим enrollment.completed_at.
+    - Если хотя бы один блок пройден, но не все — снимаем completed_at (откат).
+    """
+    enrollment = await get_enrollment(session, user_id, course_id)
+    if not enrollment:
+        return
+
+    # Count total blocks in the course
+    stmt_total = select(func.count(Block.id)).where(Block.course_id == course_id)
+    total: int = (await session.execute(stmt_total)).scalar() or 0
+
+    if total == 0:
+        # No blocks — nothing to complete
+        return
+
+    # Count blocks completed by this user in this course
+    stmt_done = (
+        select(func.count(UserBlockProgress.id))
+        .join(Block, UserBlockProgress.block_id == Block.id)
+        .where(
+            Block.course_id == course_id,
+            UserBlockProgress.user_id == user_id,
+            UserBlockProgress.is_completed == True,
+        )
+    )
+    completed: int = (await session.execute(stmt_done)).scalar() or 0
+
+    if completed >= total:
+        # All blocks done → mark course as completed
+        if enrollment.completed_at is None:
+            enrollment.completed_at = datetime.now(timezone.utc)
+            await session.commit()
+    else:
+        # Not all done → ensure completed_at is cleared (handles block un-completion)
+        if enrollment.completed_at is not None:
+            enrollment.completed_at = None
+            await session.commit()
+
+
 async def attach_course_progress(
     session: AsyncSession,
     courses: list[Course],
     user_id: uuid.UUID | None,
 ) -> None:
+    """
+    Attaches progress information to each course object.
+
+    - Enrolled users: completed/total/percent based on their actual block progress.
+    - Unenrolled or anonymous users: completed=0, total=total blocks, percent=0.0.
+    """
     if not courses:
         return
 
@@ -239,9 +296,10 @@ async def attach_course_progress(
     result_total = await session.execute(stmt_total)
     total_blocks_map = {row.course_id: row.total for row in result_total}
 
-    # 2. Completed blocks per course (if user is logged in)
-    completed_blocks_map = {}
-    enrolled_courses = set()
+    # 2. Completed blocks and enrollments per course (only for authenticated users)
+    completed_blocks_map: dict[uuid.UUID, int] = {}
+    enrolled_courses: set[uuid.UUID] = set()
+
     if user_id:
         stmt_completed = (
             select(Block.course_id, func.count(UserBlockProgress.id).label("completed"))
@@ -266,11 +324,25 @@ async def attach_course_progress(
     from core.schemas.course import CourseProgress
 
     for c in courses:
+        total = total_blocks_map.get(c.id, 0)
+
         if user_id and c.id in enrolled_courses:
-            total = total_blocks_map.get(c.id, 0)
             completed = completed_blocks_map.get(c.id, 0)
             percent = round((completed / total) * 100, 2) if total > 0 else 0.0
-            c.progress = CourseProgress(completed=completed, total=total, percent=percent)
+            # Determine status
+            if completed == 0:
+                status = CourseStatus.not_started
+            elif total > 0 and completed >= total:
+                status = CourseStatus.completed
+            else:
+                status = CourseStatus.in_progress
         else:
-            c.progress = None
+            # Not enrolled or anonymous — default progress (0/total/0%)
+            completed = 0
+            percent = 0.0
+            status = CourseStatus.not_started
+
+        c.progress = CourseProgress(
+            completed=completed, total=total, percent=percent, status=status
+        )
 

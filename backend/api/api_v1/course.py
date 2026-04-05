@@ -3,6 +3,7 @@ from typing import Annotated, Literal
 
 from core.authentication.fastapi_users import current_active_user, current_optional_user
 from core.config import settings
+from core.models.course import CourseLevel
 from core.models.db_helper import db_helper
 from core.models.user import User
 from core.schemas.base import PaginationParams
@@ -29,9 +30,10 @@ async def list_courses(
     pagination: Annotated[PaginationParams, Depends()],
     user: OptionalUser,
     filter_type: (
-        Literal["in_progress", "completed", "not_started", "new", "popular", "beginner"]
+        Literal["in_progress", "completed", "not_started", "new", "popular"]
         | None
     ) = Query(None, description="Filter type for courses"),
+    level: CourseLevel | None = Query(None, description="Filter by course level"),
 ):
     if filter_type in ["in_progress", "completed", "not_started"] and not user:
         raise HTTPException(
@@ -45,6 +47,7 @@ async def list_courses(
         limit=pagination.limit,
         user_id=user.id if user else None,
         filter_type=filter_type,
+        level=level,
     )
     await course_crud.attach_course_progress(db, courses, user.id if user else None)
     return courses
@@ -57,9 +60,10 @@ async def search_courses(
     user: OptionalUser,
     q: str | None = Query(None, description="Search query"),
     filter_type: (
-        Literal["in_progress", "completed", "not_started", "new", "popular", "beginner"]
+        Literal["in_progress", "completed", "not_started", "new", "popular"]
         | None
     ) = Query(None, description="Filter type for courses"),
+    level: CourseLevel | None = Query(None, description="Filter by course level"),
 ):
     # If user wants personal filters but is not logged in, raise error
     if filter_type in ["in_progress", "completed", "not_started"] and not user:
@@ -75,6 +79,7 @@ async def search_courses(
         limit=pagination.limit,
         user_id=user.id if user else None,
         filter_type=filter_type,
+        level=level,
     )
     await course_crud.attach_course_progress(db, courses, user.id if user else None)
     return courses
@@ -95,7 +100,7 @@ async def get_course(
     db: Session,
     user: OptionalUser,
     filter_type: (
-        Literal["in_progress", "completed", "not_started", "new", "popular", "beginner"]
+        Literal["in_progress", "completed", "not_started", "new", "popular"]
         | None
     ) = Query(None, description="Filter type for courses"),
 ):

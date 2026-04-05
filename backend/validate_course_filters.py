@@ -88,10 +88,10 @@ async def validate_filters():
         # 5. Тестирование фильтров
         print("\nПроверка фильтров:")
         
-        # Beginner
-        results = await search_courses(session, filter_type="beginner")
+        # Beginner (теперь используем параметр level вместо filter_type)
+        results = await search_courses(session, level=CourseLevel.beginner)
         titles = [r.title for r in results if r.title.startswith("TEST_FILTER_")]
-        print(f"   [beginner] Ожидаем Beginner_Old: {titles}")
+        print(f"   [level=beginner] Ожидаем Beginner_Old: {titles}")
 
         # New
         results = await search_courses(session, filter_type="new")

@@ -11,6 +11,7 @@ from core.models.db_helper import db_helper
 from core.models.progress import UserBlockProgress
 from core.models.user import User
 from core.schemas.block import BlockCreate, BlockRead, BlockUpdate
+from crud import course as course_crud
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -148,4 +149,8 @@ async def mark_complete(
         )
 
     await db.commit()
+
+    # Automatically recalculate course completion status (business logic in crud)
+    await course_crud.update_course_completion_status(db, user.id, course_id)
+
     return {"detail": "Block marked as completed"}

@@ -17,6 +17,32 @@ class CourseLevel(str, enum.Enum):
     advanced = "advanced"
 
 
+# Human-readable labels for the frontend (e.g., to compose course titles).
+# Keys match enum values; update here if labels change.
+LEVEL_DISPLAY_NAMES: dict[str, str] = {
+    CourseLevel.beginner: "Начинающий",
+    CourseLevel.intermediate: "Продвинутый",
+    CourseLevel.advanced: "Эксперт",
+}
+
+
+class CourseAudience(str, enum.Enum):
+    everyone = "everyone"   # Для всех
+    installer = "installer"  # Монтажник
+
+
+AUDIENCE_DISPLAY_NAMES: dict[str, str] = {
+    CourseAudience.everyone: "Для всех",
+    CourseAudience.installer: "Монтажник",
+}
+
+
+class CourseStatus(str, enum.Enum):
+    not_started = "not_started"   # Не начат
+    in_progress = "in_progress"   # В процессе
+    completed = "completed"       # Пройден
+
+
 class Course(IdUuidPkMixin, Base):
     __table_args__ = (
         Index(
@@ -38,6 +64,11 @@ class Course(IdUuidPkMixin, Base):
     level: Mapped[CourseLevel] = mapped_column(
         SaEnum(CourseLevel),
         default=CourseLevel.beginner,
+        nullable=False,
+    )
+    audience: Mapped[CourseAudience] = mapped_column(
+        SaEnum(CourseAudience),
+        default=CourseAudience.everyone,
         nullable=False,
     )
     is_published: Mapped[bool] = mapped_column(default=False)
