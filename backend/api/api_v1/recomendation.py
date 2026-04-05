@@ -14,7 +14,7 @@ from core.schemas.recommendation import (
     RecommendationReadAdmin,
     RecommendationUpdate,
 )
-from fastapi import APIRouter, Depends, File, Query, UploadFile, status, HTTPException
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from utils.product import current_admin
 
@@ -48,7 +48,6 @@ async def get_recomendations(
 @router.get("/search", response_model=list[RecommendationListRead])
 async def search_recomendations(
     session: Session,
-    user: IsUser,
     query_param: Annotated[ListParams, Depends()],
     q: str | None = None,
 ):
@@ -65,7 +64,9 @@ async def get_recommendation_admin(
         session, recommendation_id
     )
     if not result:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Recommendation not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Recommendation not found"
+        )
     return result
 
 
@@ -73,7 +74,9 @@ async def get_recommendation_admin(
 async def get_recommendation(session: Session, recommendation_id: uuid.UUID):
     result = await recommendation_crud.get_recommendation(session, recommendation_id)
     if not result:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Recommendation not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Recommendation not found"
+        )
     return result
 
 
@@ -104,7 +107,9 @@ async def update_recomendation(
         session, recommendation_id, recommendation_in
     )
     if not result:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Recommendation not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Recommendation not found"
+        )
     return result
 
 
