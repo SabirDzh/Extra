@@ -34,7 +34,7 @@ OptionalUser = Annotated[User | None, Depends(current_optional_user)]
 async def get_recomendations(
     session: Session,
     query_param: Annotated[ListParams, Depends()],
-    sorted_by: Literal["title", "created_at"] = "title",
+    sorted_by: Literal["title", "created_at", "description"] = "title",
 ):
     return await recommendation_crud.get_recommendations(
         session,

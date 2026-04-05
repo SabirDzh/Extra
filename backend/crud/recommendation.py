@@ -31,13 +31,14 @@ async def get_recommendations(
     limit: int,
     offset: int,
     sorted: Literal["asc", "desc"],
-    sorted_by: Literal["title", "created_at"],
+    sorted_by: Literal["title", "created_at", "description"],
 ):
     order_func = desc if sorted == "desc" else asc
     stmt = (
         select(
             Recommendation.id,
             Recommendation.title,
+            Recommendation.description,
             Recommendation.created_at,
         )
         .limit(limit)
@@ -126,6 +127,7 @@ async def search_recommendations(
     stmt = select(
         Recommendation.id,
         Recommendation.title,
+        Recommendation.description,
         Recommendation.created_at,
     )
 
@@ -220,13 +222,17 @@ def parse_recommendation_excel_file(contents: bytes) -> list[dict]:
     recommendations_data = []
 
     actual_cols = {str(c).lower().strip() for c in df.columns}
-    
+
     # Возможные названия колонок
     title_candidates = {"title", "заголовок", "название", "вопрос"}
     desc_candidates = {"description", "описание", "ответ", "текст"}
 
-    title_col = next((c for c in df.columns if str(c).lower().strip() in title_candidates), None)
-    desc_col = next((c for c in df.columns if str(c).lower().strip() in desc_candidates), None)
+    title_col = next(
+        (c for c in df.columns if str(c).lower().strip() in title_candidates), None
+    )
+    desc_col = next(
+        (c for c in df.columns if str(c).lower().strip() in desc_candidates), None
+    )
 
     # Если мы нашли нужные колонки по названиям
     if title_col and desc_col:
@@ -314,7 +320,7 @@ async def import_recommendations(
 
         new_recommendations = []
         seen_in_batch = set()
-        
+
         for item in valid_items:
             title_lower = item["title"].lower()
             if title_lower not in existing_titles and title_lower not in seen_in_batch:

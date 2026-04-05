@@ -6,7 +6,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 class RecommendationBase(BaseModel):
     title: str
-    description: str
+    description: str | None = None
     created_at: datetime.datetime
 
 
@@ -17,6 +17,7 @@ class RecommendationRead(RecommendationBase):
 class RecommendationListRead(BaseModel):
     id: uuid.UUID
     title: str
+    description: str | None = None
     created_at: datetime.datetime
 
 
