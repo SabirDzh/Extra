@@ -4,7 +4,7 @@ from datetime import datetime
 from pydantic import BaseModel, ConfigDict, model_validator
 
 from core.models.block import BlockType, TEST_BLOCK_TYPES
-
+from core.schemas.course import CourseProgress
 
 class BlockCreate(BaseModel):
     title: str
@@ -41,5 +41,13 @@ class BlockRead(BaseModel):
     text_content: str | None
     video_url: str | None
     created_at: datetime
+    
+    audience_label: str
+    level_label: str
+    progress: CourseProgress | None
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class CourseBlocksResponse(BaseModel):
+    blocks: list[BlockRead]

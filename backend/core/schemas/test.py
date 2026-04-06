@@ -1,9 +1,16 @@
 import uuid
 from datetime import datetime
+from enum import Enum
 
 from pydantic import BaseModel
 
 from core.models.test import QuestionType
+
+
+class TestResultStatus(str, Enum):
+    CORRECT = "Верно"
+    INCORRECT = "Неверно"
+    REQUIRES_REVIEW = "Требует проверки"
 
 
 class AnswerOptionCreate(BaseModel):
@@ -97,3 +104,20 @@ class TestSubmissionRead(BaseModel):
 class GradeSubmission(BaseModel):
     score: int
     admin_comment: str | None = None
+
+
+class QuestionResult(BaseModel):
+    question_id: uuid.UUID
+    text: str
+    status: TestResultStatus
+    correct_answer: str | None
+    user_answer: str | None
+    score: int
+
+
+class BlockTestResults(BaseModel):
+    block_id: uuid.UUID
+    submission_id: uuid.UUID | None
+    total_score: int | None
+    max_score: int
+    questions: list[QuestionResult]

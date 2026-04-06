@@ -3,14 +3,14 @@ import uuid
 from datetime import datetime, timezone
 from typing import Annotated
 
-from core.authentication.fastapi_users import current_active_user
+from core.authentication.fastapi_users import current_active_user, current_optional_user
 from core.config import settings
-from core.models.block import Block
-from core.models.course import Course
+from core.models.block import Block, BlockType
+from core.models.course import Course, AUDIENCE_DISPLAY_NAMES, LEVEL_DISPLAY_NAMES
 from core.models.db_helper import db_helper
 from core.models.progress import UserBlockProgress
 from core.models.user import User
-from core.schemas.block import BlockCreate, BlockRead, BlockUpdate
+from core.schemas.block import BlockCreate, BlockRead, BlockUpdate, CourseBlocksResponse
 from crud import course as course_crud
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, status
 from sqlalchemy import select
@@ -22,6 +22,7 @@ router = APIRouter(prefix="/courses/{course_id}/blocks", tags=["Blocks"])
 Session = Annotated[AsyncSession, Depends(db_helper.session_getter)]
 IsAdmin = Annotated[User, Depends(current_admin)]
 isUser = Annotated[User, Depends(current_active_user)]
+OptionalUser = Annotated[User | None, Depends(current_optional_user)]
 
 
 async def _get_course_or_404(db, course_id: uuid.UUID) -> Course:
@@ -38,13 +39,94 @@ async def _get_block_or_404(db, block_id: uuid.UUID, course_id: uuid.UUID) -> Bl
     return block
 
 
-@router.get("/", response_model=list[BlockRead])
-async def list_blocks(course_id: uuid.UUID, db: Session):
-    await _get_course_or_404(db, course_id)
+async def _format_block_read(
+    db: AsyncSession, 
+    block: Block, 
+    course: Course, 
+    user_id: uuid.UUID | None = None
+) -> BlockRead:
+    from core.schemas.course import CourseProgress, CourseStatus
+    
+    aud_label = AUDIENCE_DISPLAY_NAMES.get(course.audience, str(course.audience))
+    lvl_label = LEVEL_DISPLAY_NAMES.get(course.level, str(course.level))
+    
+    is_done = False
+    if user_id:
+        stmt = select(UserBlockProgress.is_completed).where(
+            UserBlockProgress.user_id == user_id,
+            UserBlockProgress.block_id == block.id,
+            UserBlockProgress.is_completed == True,
+        )
+        is_done = (await db.execute(stmt)).scalar() or False
+        
+    block_progress = CourseProgress(
+        completed=1 if is_done else 0,
+        total=1,
+        percent=100.0 if is_done else 0.0,
+        status=CourseStatus.completed if is_done else CourseStatus.not_started,
+    )
+    
+    return BlockRead(
+        id=block.id,
+        course_id=block.course_id,
+        order_index=block.order_index,
+        title=block.title,
+        block_type=block.block_type,
+        text_content=block.text_content,
+        video_url=block.video_url,
+        created_at=block.created_at,
+        audience_label=aud_label,
+        level_label=lvl_label,
+        progress=block_progress,
+    )
+
+
+@router.get("/", response_model=CourseBlocksResponse)
+async def list_blocks(course_id: uuid.UUID, db: Session, user: OptionalUser):
+    from core.schemas.course import CourseProgress, CourseStatus
+    
+    course = await _get_course_or_404(db, course_id)
     result = await db.execute(
         select(Block).where(Block.course_id == course_id).order_by(Block.order_index)
     )
-    return result.scalars().all()
+    blocks = result.scalars().all()
+
+    # Optimized progress fetch for list
+    completed_block_ids = set()
+    if user:
+        stmt_progress = select(UserBlockProgress.block_id).where(
+            UserBlockProgress.user_id == user.id,
+            UserBlockProgress.block_id.in_([b.id for b in blocks]),
+            UserBlockProgress.is_completed == True,
+        )
+        completed_block_ids = set((await db.execute(stmt_progress)).scalars().all())
+
+    aud_label = AUDIENCE_DISPLAY_NAMES.get(course.audience, str(course.audience))
+    lvl_label = LEVEL_DISPLAY_NAMES.get(course.level, str(course.level))
+
+    block_reads = [
+        BlockRead(
+            id=b.id,
+            course_id=b.course_id,
+            order_index=b.order_index,
+            title=b.title,
+            block_type=b.block_type,
+            text_content=b.text_content,
+            video_url=b.video_url,
+            created_at=b.created_at,
+            audience_label=aud_label,
+            level_label=lvl_label,
+            progress=CourseProgress(
+                completed=1 if b.id in completed_block_ids else 0,
+                total=1,
+                percent=100.0 if b.id in completed_block_ids else 0.0,
+                status=CourseStatus.completed if b.id in completed_block_ids else CourseStatus.not_started,
+            ),
+        )
+        for b in blocks
+    ]
+
+    return CourseBlocksResponse(blocks=block_reads)
 
 
 @router.post("/", response_model=BlockRead, status_code=status.HTTP_201_CREATED)
@@ -54,17 +136,24 @@ async def create_block(
     db: Session,
     admin: User = Depends(current_admin),
 ):
-    await _get_course_or_404(db, course_id)
+    course = await _get_course_or_404(db, course_id)
     block = Block(**data.model_dump(), course_id=course_id)
     db.add(block)
     await db.commit()
     await db.refresh(block)
-    return block
+    return await _format_block_read(db, block, course, admin.id)
 
 
 @router.get("/{block_id}", response_model=BlockRead)
-async def get_block(course_id: uuid.UUID, block_id: uuid.UUID, db: Session):
-    return await _get_block_or_404(db, block_id, course_id)
+async def get_block(
+    course_id: uuid.UUID, 
+    block_id: uuid.UUID, 
+    db: Session,
+    user: OptionalUser,
+):
+    course = await _get_course_or_404(db, course_id)
+    block = await _get_block_or_404(db, block_id, course_id)
+    return await _format_block_read(db, block, course, user.id if user else None)
 
 
 @router.put("/{block_id}", response_model=BlockRead)
@@ -75,12 +164,13 @@ async def update_block(
     db: Session,
     admin: User = Depends(current_admin),
 ):
+    course = await _get_course_or_404(db, course_id)
     block = await _get_block_or_404(db, block_id, course_id)
     for field, value in data.model_dump(exclude_unset=True).items():
         setattr(block, field, value)
     await db.commit()
     await db.refresh(block)
-    return block
+    return await _format_block_read(db, block, course, admin.id)
 
 
 @router.delete("/{block_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -154,3 +244,26 @@ async def mark_complete(
     await course_crud.update_course_completion_status(db, user.id, course_id)
 
     return {"detail": "Block marked as completed"}
+
+
+from core.schemas.test import BlockTestResults
+from crud.test_results import get_test_results_for_block
+
+@router.get("/{block_id}/test-results", response_model=BlockTestResults)
+async def get_block_test_results(
+    course_id: uuid.UUID,
+    block_id: uuid.UUID,
+    db: Session,
+    user: User = Depends(current_active_user),
+):
+    block = await _get_block_or_404(db, block_id, course_id)
+    
+    # Needs to handle if it's not a test block
+    if block.block_type not in (BlockType.auto_test, BlockType.manual_test):
+        raise HTTPException(status_code=400, detail="Block is not a test block")
+
+    results = await get_test_results_for_block(db, user.id, block_id)
+    if not results:
+        raise HTTPException(status_code=404, detail="Test results not found or no submissions")
+        
+    return results

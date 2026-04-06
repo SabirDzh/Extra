@@ -133,21 +133,31 @@ async def search_products(
 ):
     stmt = select(Product)
     if q and len(q) >= 2:
-        ts_query = func.websearch_to_tsquery("russian", q)
-        stmt = stmt.where(
-            or_(
-                Product.search_product.bool_op("@@")(ts_query),
-                Product.title.bool_op("%")(q),
-                Product.description.bool_op("%")(q),
+        is_sqlite = session.bind.url.drivername.startswith("sqlite")
+        if is_sqlite:
+            search_pattern = f"%{q}%"
+            stmt = stmt.where(
+                or_(
+                    Product.title.ilike(search_pattern),
+                    Product.description.ilike(search_pattern),
+                )
             )
-        )
-        if sort_by == "title" and order == "asc":
-            relevance = (
-                func.ts_rank(Product.search_product, ts_query)
-                + func.similarity(Product.title, q) * 2
-                + func.similarity(Product.description, q) * 0.5
+        else:
+            ts_query = func.websearch_to_tsquery("russian", q)
+            stmt = stmt.where(
+                or_(
+                    Product.search_product.bool_op("@@")(ts_query),
+                    Product.title.bool_op("%")(q),
+                    Product.description.bool_op("%")(q),
+                )
             )
-            stmt = stmt.order_by(relevance.desc())
+            if sort_by == "title" and order == "asc":
+                relevance = (
+                    func.ts_rank(Product.search_product, ts_query)
+                    + func.similarity(Product.title, q) * 2
+                    + func.similarity(Product.description, q) * 0.5
+                )
+                stmt = stmt.order_by(relevance.desc())
     elif q:
         search_pattern = f"%{q}%"
         stmt = stmt.where(

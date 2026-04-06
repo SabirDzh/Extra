@@ -2,9 +2,9 @@ import pytest
 from httpx import AsyncClient
 
 @pytest.mark.anyio
-async def test_get_users_list(client: AsyncClient, create_user):
+async def test_get_users_list(client: AsyncClient, create_user, superuser_token_headers):
     await create_user("user1@example.com")
-    response = await client.get("/api/v1/users")
+    response = await client.get("/api/v1/users", headers=superuser_token_headers)
     assert response.status_code == 200
     data = response.json()
     assert isinstance(data, list)
