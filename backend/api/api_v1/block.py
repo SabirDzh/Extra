@@ -65,6 +65,27 @@ async def _format_block_read(
     stmt_count = select(func.count(Question.id)).where(Question.block_id == block.id)
     n_questions = (await db.execute(stmt_count)).scalar() or 0
 
+    # Calculate 1-based positional index
+    stmt_pos = select(func.count(Block.id)).where(
+        Block.course_id == block.course_id,
+        Block.order_index <= block.order_index,
+    )
+    pos_index = (await db.execute(stmt_pos)).scalar() or 1
+
+    # Fetch next block ID
+    stmt_next = select(Block.id).where(
+        Block.course_id == block.course_id,
+        Block.order_index > block.order_index,
+    ).order_by(Block.order_index).limit(1)
+    next_id = (await db.execute(stmt_next)).scalar()
+
+    # Total blocks in course
+    stmt_all = select(func.count(Block.id)).where(Block.course_id == block.course_id)
+    all_blocks_count = (await db.execute(stmt_all)).scalar() or 0
+    
+    # Stage calculation (Lesson + Test = 1 stage)
+    pos_stage = (pos_index - 1) // 2 + 1
+
     block_progress = CourseProgress(
         completed=1 if is_done else 0,
         total=n_questions,
@@ -75,7 +96,7 @@ async def _format_block_read(
     return BlockRead(
         id=block.id,
         course_id=block.course_id,
-        order_index=block.order_index,
+        order_index=pos_index,
         title=block.title,
         block_type=block.block_type,
         text_content=block.text_content,
@@ -84,6 +105,9 @@ async def _format_block_read(
         audience_label=aud_label,
         level_label=lvl_label,
         progress=block_progress,
+        next_block_id=next_id,
+        all_blocks=all_blocks_count,
+        stage=pos_stage,
     )
 
 
@@ -119,40 +143,59 @@ async def list_blocks(course_id: uuid.UUID, db: Session, user: OptionalUser):
     aud_label = AUDIENCE_DISPLAY_NAMES.get(course.audience, str(course.audience))
     lvl_label = LEVEL_DISPLAY_NAMES.get(course.level, str(course.level))
 
-    block_reads = [
-        BlockRead(
-            id=b.id,
-            course_id=b.course_id,
-            order_index=b.order_index,
-            title=b.title,
-            block_type=b.block_type,
-            text_content=b.text_content,
-            video_url=b.video_url,
-            created_at=b.created_at,
-            audience_label=aud_label,
-            level_label=lvl_label,
-            progress=CourseProgress(
-                completed=1 if b.id in completed_block_ids else 0,
-                total=question_counts.get(b.id, 0),
-                percent=100.0 if b.id in completed_block_ids else 0.0,
-                status=CourseStatus.completed if b.id in completed_block_ids else CourseStatus.not_started,
-            ),
+    current_block_id = None
+    block_reads = []
+    all_blocks_count = len(blocks)
+    all_stages_count = (all_blocks_count + 1) // 2 # Lesson + Test = 1 stage
+    
+    for i, b in enumerate(blocks):
+        # 1. Positional order_index (1-based)
+        pos_index = i + 1
+        
+        # 2. Next block ID
+        next_id = blocks[i + 1].id if i + 1 < len(blocks) else None
+        
+        # 3. Track first uncompleted block as current
+        if current_block_id is None and b.id not in completed_block_ids:
+            current_block_id = b.id
+            
+        block_reads.append(
+            BlockRead(
+                id=b.id,
+                course_id=b.course_id,
+                order_index=pos_index,
+                title=b.title,
+                block_type=b.block_type,
+                text_content=b.text_content,
+                video_url=b.video_url,
+                created_at=b.created_at,
+                audience_label=aud_label,
+                level_label=lvl_label,
+                next_block_id=next_id,
+                all_blocks=all_blocks_count,
+                stage=(i // 2) + 1,
+                progress=CourseProgress(
+                    completed=1 if b.id in completed_block_ids else 0,
+                    total=question_counts.get(b.id, 0),
+                    percent=100.0 if b.id in completed_block_ids else 0.0,
+                    status=CourseStatus.completed if b.id in completed_block_ids else CourseStatus.not_started,
+                ),
+            )
         )
-        for b in blocks
-    ]
 
     return CourseBlocksResponse(
         blocks=block_reads,
         audience_label=aud_label,
         level_label=lvl_label,
         progress=await _get_course_progress(db, course, user.id if user else None),
+        current_block_id=current_block_id,
+        all_blocks=all_blocks_count,
+        all_stages=all_stages_count,
     )
 
 
 async def _get_course_progress(db: AsyncSession, course: Course, user_id: uuid.UUID | None):
     from crud import course as course_crud
-    if not user_id:
-        return None
     await course_crud.attach_course_progress(db, [course], user_id)
     return course.progress
 

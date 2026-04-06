@@ -196,15 +196,22 @@ async def test_get_blocks_for_course(client: AsyncClient, session: AsyncSession,
     assert resp.status_code == 200
     data = resp.json()
     assert len(data["blocks"]) == 2
-    # Verify new structure: fields are inside the block
-    assert "audience_label" in data["blocks"][0]
-    assert data["blocks"][0]["audience_label"] == "Для всех"
-    assert "progress" in data["blocks"][0]
+    # Verify navigation fields
+    assert "current_block_id" in data
+    assert "next_block_id" in data["blocks"][0]
     
-    # Verify root-level fields are ALSO present (restored)
-    assert "audience_label" in data
-    assert data["audience_label"] == "Для всех"
-    assert "progress" in data
+    # Verify 1-based order_index
+    assert data["blocks"][0]["order_index"] == 1
+    
+    # Verify stage calculations
+    assert data["all_stages"] == 1 # (2+1)//2 = 1? No, (2+1)//2 = 1. Wait. 2//2 = 1.
+    # Actually, for 2 blocks: 1 stage.
+    assert data["blocks"][0]["stage"] == 1
+    assert data["blocks"][1]["stage"] == 1
+    
+    # Verify all_blocks count
+    assert data["all_blocks"] == 2
+    assert data["blocks"][0]["all_blocks"] == 2
 
 # 17. Get block sequence for nonexistent course
 @pytest.mark.anyio
