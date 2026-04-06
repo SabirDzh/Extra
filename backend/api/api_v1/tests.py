@@ -5,6 +5,7 @@ from core.authentication.fastapi_users import current_active_user
 from core.models.block import (
     Block,
     BlockType,
+    TEST_BLOCK_TYPES,
 )
 from core.models.db_helper import db_helper
 from core.models.test import AnswerOption, Question, TestAnswer, TestSubmission
@@ -45,6 +46,8 @@ async def create_question(
     block = await db.get(Block, block_id)
     if not block:
         raise HTTPException(status_code=404, detail="Block not found")
+    if block.block_type not in TEST_BLOCK_TYPES:
+        raise HTTPException(status_code=400, detail="Questions can only be added to test blocks")
     question = Question(
         block_id=block_id,
         text=data.text,

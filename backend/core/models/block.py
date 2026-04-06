@@ -16,6 +16,11 @@ class BlockType(str, enum.Enum):
     manual_test = "manual_test"
 
 
+# Block types that count towards course progress (total / completed).
+# Lesson blocks are informational and do NOT contribute to progress tracking.
+TEST_BLOCK_TYPES = {BlockType.auto_test, BlockType.manual_test}
+
+
 class Block(IdUuidPkMixin, Base):
     course_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("courses.id", ondelete="CASCADE"))
     order_index: Mapped[int] = mapped_column(Integer, default=0)

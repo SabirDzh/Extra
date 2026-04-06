@@ -17,7 +17,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from utils.product import current_admin
 
-router = APIRouter(prefix="/api/courses/{course_id}/blocks", tags=["Blocks"])
+router = APIRouter(prefix="/courses/{course_id}/blocks", tags=["Blocks"])
 
 Session = Annotated[AsyncSession, Depends(db_helper.session_getter)]
 IsAdmin = Annotated[User, Depends(current_admin)]

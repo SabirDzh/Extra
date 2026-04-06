@@ -30,14 +30,20 @@ async def _create_course(session: AsyncSession, title: str = "Test Course") -> C
     return course
 
 
-async def _add_blocks(session: AsyncSession, course_id: uuid.UUID, count: int) -> list[Block]:
+async def _add_blocks(
+    session: AsyncSession,
+    course_id: uuid.UUID,
+    count: int,
+    block_type: BlockType = BlockType.auto_test,
+) -> list[Block]:
+    """Create blocks. Defaults to auto_test since progress counts only test blocks."""
     blocks = []
     for i in range(count):
         block = Block(
             course_id=course_id,
             order_index=i,
             title=f"Block {i}",
-            block_type=BlockType.lesson,
+            block_type=block_type,
         )
         session.add(block)
         await session.flush()
@@ -45,6 +51,7 @@ async def _add_blocks(session: AsyncSession, course_id: uuid.UUID, count: int) -
         blocks.append(block)
     await session.commit()
     return blocks
+
 
 
 async def _enroll(session: AsyncSession, user_id: uuid.UUID, course_id: uuid.UUID) -> None:

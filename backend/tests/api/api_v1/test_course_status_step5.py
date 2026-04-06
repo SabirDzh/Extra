@@ -38,7 +38,7 @@ async def _add_block(session: AsyncSession, course_id: uuid.UUID, title: str = "
         course_id=course_id,
         order_index=0,
         title=title,
-        block_type=BlockType.lesson,
+        block_type=BlockType.auto_test,  # progress counts only test blocks
     )
     session.add(block)
     await session.flush()

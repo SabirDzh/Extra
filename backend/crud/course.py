@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from typing import List, Literal
 
-from core.models.block import Block
+from core.models.block import Block, TEST_BLOCK_TYPES
 from core.models.course import Course, CourseAudience, CourseEnrollment, CourseLevel, CourseStatus
 from core.models.progress import UserBlockProgress
 from core.schemas.course import CourseCreate, CourseUpdate
@@ -134,6 +134,7 @@ async def search_courses(
         Literal["in_progress", "completed", "not_started", "new", "popular"] | None
     ) = None,
     level: CourseLevel | None = None,
+    audience: CourseAudience | None = None,
 ):
     query = select(Course).where(Course.is_published)
 
@@ -157,6 +158,10 @@ async def search_courses(
     # 2. Level filter
     if level is not None:
         query = query.where(Course.level == level)
+
+    # 2b. Audience filter
+    if audience is not None:
+        query = query.where(Course.audience == audience)
 
     # 3. Specific Filters
     if filter_type == "new":
@@ -239,20 +244,24 @@ async def update_course_completion_status(
     if not enrollment:
         return
 
-    # Count total blocks in the course
-    stmt_total = select(func.count(Block.id)).where(Block.course_id == course_id)
+    # Count total TEST blocks in the course (lessons are excluded from progress)
+    stmt_total = select(func.count(Block.id)).where(
+        Block.course_id == course_id,
+        Block.block_type.in_(TEST_BLOCK_TYPES),
+    )
     total: int = (await session.execute(stmt_total)).scalar() or 0
 
     if total == 0:
         # No blocks — nothing to complete
         return
 
-    # Count blocks completed by this user in this course
+    # Count TEST blocks completed by this user in this course
     stmt_done = (
         select(func.count(UserBlockProgress.id))
         .join(Block, UserBlockProgress.block_id == Block.id)
         .where(
             Block.course_id == course_id,
+            Block.block_type.in_(TEST_BLOCK_TYPES),
             UserBlockProgress.user_id == user_id,
             UserBlockProgress.is_completed == True,
         )
@@ -287,10 +296,13 @@ async def attach_course_progress(
 
     course_ids = [c.id for c in courses]
 
-    # 1. Total blocks per course
+    # 1. Total TEST blocks per course (lessons excluded from progress)
     stmt_total = (
         select(Block.course_id, func.count(Block.id).label("total"))
-        .where(Block.course_id.in_(course_ids))
+        .where(
+            Block.course_id.in_(course_ids),
+            Block.block_type.in_(TEST_BLOCK_TYPES),
+        )
         .group_by(Block.course_id)
     )
     result_total = await session.execute(stmt_total)
@@ -306,6 +318,7 @@ async def attach_course_progress(
             .join(UserBlockProgress, Block.id == UserBlockProgress.block_id)
             .where(
                 Block.course_id.in_(course_ids),
+                Block.block_type.in_(TEST_BLOCK_TYPES),
                 UserBlockProgress.user_id == user_id,
                 UserBlockProgress.is_completed == True,
             )

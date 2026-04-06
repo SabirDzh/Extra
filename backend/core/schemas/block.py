@@ -3,7 +3,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, model_validator
 
-from core.models.block import BlockType
+from core.models.block import BlockType, TEST_BLOCK_TYPES
 
 
 class BlockCreate(BaseModel):
@@ -14,13 +14,14 @@ class BlockCreate(BaseModel):
     video_url: str | None = None
 
     @model_validator(mode="after")
-    def check_content(self):
-        if (
-            self.block_type == BlockType.lesson
-            and not self.text_content
-            and not self.video_url
-        ):
-            raise ValueError("Lesson block must have text_content or video_url")
+    def normalize_by_block_type(self):
+        if self.block_type in TEST_BLOCK_TYPES:
+            # Поля урока не применимы к тестовым блокам — молча отсекаем
+            self.text_content = None
+            self.video_url = None
+        elif self.block_type == BlockType.lesson:
+            if not self.text_content and not self.video_url:
+                raise ValueError("Lesson block must have text_content or video_url")
         return self
 
 

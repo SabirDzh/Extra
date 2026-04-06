@@ -3,7 +3,7 @@ from typing import Annotated, Literal
 
 from core.authentication.fastapi_users import current_active_user, current_optional_user
 from core.config import settings
-from core.models.course import CourseLevel
+from core.models.course import CourseAudience, CourseLevel
 from core.models.db_helper import db_helper
 from core.models.user import User
 from core.schemas.base import PaginationParams
@@ -34,6 +34,7 @@ async def list_courses(
         | None
     ) = Query(None, description="Filter type for courses"),
     level: CourseLevel | None = Query(None, description="Filter by course level"),
+    audience: CourseAudience | None = Query(None, description="Filter by audience"),
 ):
     if filter_type in ["in_progress", "completed", "not_started"] and not user:
         raise HTTPException(
@@ -48,6 +49,7 @@ async def list_courses(
         user_id=user.id if user else None,
         filter_type=filter_type,
         level=level,
+        audience=audience,
     )
     await course_crud.attach_course_progress(db, courses, user.id if user else None)
     return courses
@@ -64,8 +66,8 @@ async def search_courses(
         | None
     ) = Query(None, description="Filter type for courses"),
     level: CourseLevel | None = Query(None, description="Filter by course level"),
+    audience: CourseAudience | None = Query(None, description="Filter by audience"),
 ):
-    # If user wants personal filters but is not logged in, raise error
     if filter_type in ["in_progress", "completed", "not_started"] and not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -80,6 +82,7 @@ async def search_courses(
         user_id=user.id if user else None,
         filter_type=filter_type,
         level=level,
+        audience=audience,
     )
     await course_crud.attach_course_progress(db, courses, user.id if user else None)
     return courses
