@@ -17,6 +17,7 @@ ALLOW_ORIGINS = [
     "http://localhost:8080",
     "https://extra-rho-six.vercel.app",
     "http://192.168.60.15:3000",
+    "http://172.19.0.1:3000",
 ]
 
 

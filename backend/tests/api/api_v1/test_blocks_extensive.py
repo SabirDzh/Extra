@@ -211,7 +211,7 @@ async def test_get_blocks_for_course(client: AsyncClient, session: AsyncSession,
     
     # Verify all_blocks count
     assert data["all_blocks"] == 2
-    assert data["blocks"][0]["all_blocks"] == 2
+    assert "all_blocks" not in data["blocks"][0]
 
 # 17. Get block sequence for nonexistent course
 @pytest.mark.anyio

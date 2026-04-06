@@ -46,7 +46,6 @@ class BlockRead(BaseModel):
     level_label: str
     progress: CourseProgress | None
     next_block_id: uuid.UUID | None = None
-    all_blocks: int = 0
     stage: int = 1
 
     model_config = ConfigDict(from_attributes=True)

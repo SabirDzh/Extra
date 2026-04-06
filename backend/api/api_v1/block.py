@@ -106,7 +106,6 @@ async def _format_block_read(
         level_label=lvl_label,
         progress=block_progress,
         next_block_id=next_id,
-        all_blocks=all_blocks_count,
         stage=pos_stage,
     )
 
@@ -144,21 +143,34 @@ async def list_blocks(course_id: uuid.UUID, db: Session, user: OptionalUser):
     lvl_label = LEVEL_DISPLAY_NAMES.get(course.level, str(course.level))
 
     current_block_id = None
+    active_stage = 1
     block_reads = []
     all_blocks_count = len(blocks)
     all_stages_count = (all_blocks_count + 1) // 2 # Lesson + Test = 1 stage
     
+    # 1. Determine active stage (the stage of the first uncompleted block)
+    found_active = False
     for i, b in enumerate(blocks):
-        # 1. Positional order_index (1-based)
+        if not found_active and b.id not in completed_block_ids:
+            active_stage = (i // 2) + 1
+            current_block_id = b.id
+            found_active = True
+            
+    # If all completed, let them see everything
+    if not found_active and blocks:
+        active_stage = all_stages_count
+
+    # 2. Build and Filter block reads
+    for i, b in enumerate(blocks):
         pos_index = i + 1
+        pos_stage = (i // 2) + 1
         
-        # 2. Next block ID
+        # Skip FUTURE stages (progressive unlocking)
+        if pos_stage > active_stage:
+            continue
+            
         next_id = blocks[i + 1].id if i + 1 < len(blocks) else None
         
-        # 3. Track first uncompleted block as current
-        if current_block_id is None and b.id not in completed_block_ids:
-            current_block_id = b.id
-            
         block_reads.append(
             BlockRead(
                 id=b.id,
@@ -172,8 +184,7 @@ async def list_blocks(course_id: uuid.UUID, db: Session, user: OptionalUser):
                 audience_label=aud_label,
                 level_label=lvl_label,
                 next_block_id=next_id,
-                all_blocks=all_blocks_count,
-                stage=(i // 2) + 1,
+                stage=pos_stage,
                 progress=CourseProgress(
                     completed=1 if b.id in completed_block_ids else 0,
                     total=question_counts.get(b.id, 0),
