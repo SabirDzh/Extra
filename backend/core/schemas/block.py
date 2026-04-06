@@ -51,3 +51,6 @@ class BlockRead(BaseModel):
 
 class CourseBlocksResponse(BaseModel):
     blocks: list[BlockRead]
+    audience_label: str
+    level_label: str
+    progress: CourseProgress | None

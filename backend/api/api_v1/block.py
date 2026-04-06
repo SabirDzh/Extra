@@ -59,9 +59,15 @@ async def _format_block_read(
         )
         is_done = (await db.execute(stmt)).scalar() or False
         
+    # Count questions in this block
+    from core.models.test import Question
+    from sqlalchemy import func
+    stmt_count = select(func.count(Question.id)).where(Question.block_id == block.id)
+    n_questions = (await db.execute(stmt_count)).scalar() or 0
+
     block_progress = CourseProgress(
         completed=1 if is_done else 0,
-        total=1,
+        total=n_questions,
         percent=100.0 if is_done else 0.0,
         status=CourseStatus.completed if is_done else CourseStatus.not_started,
     )
@@ -101,6 +107,15 @@ async def list_blocks(course_id: uuid.UUID, db: Session, user: OptionalUser):
         )
         completed_block_ids = set((await db.execute(stmt_progress)).scalars().all())
 
+    # Fetch question counts for all blocks in the course
+    from core.models.test import Question
+    from sqlalchemy import func
+    stmt_counts = select(Question.block_id, func.count(Question.id)).where(
+        Question.block_id.in_([b.id for b in blocks])
+    ).group_by(Question.block_id)
+    counts_res = await db.execute(stmt_counts)
+    question_counts = {row[0]: row[1] for row in counts_res.all()}
+
     aud_label = AUDIENCE_DISPLAY_NAMES.get(course.audience, str(course.audience))
     lvl_label = LEVEL_DISPLAY_NAMES.get(course.level, str(course.level))
 
@@ -118,7 +133,7 @@ async def list_blocks(course_id: uuid.UUID, db: Session, user: OptionalUser):
             level_label=lvl_label,
             progress=CourseProgress(
                 completed=1 if b.id in completed_block_ids else 0,
-                total=1,
+                total=question_counts.get(b.id, 0),
                 percent=100.0 if b.id in completed_block_ids else 0.0,
                 status=CourseStatus.completed if b.id in completed_block_ids else CourseStatus.not_started,
             ),
@@ -126,7 +141,20 @@ async def list_blocks(course_id: uuid.UUID, db: Session, user: OptionalUser):
         for b in blocks
     ]
 
-    return CourseBlocksResponse(blocks=block_reads)
+    return CourseBlocksResponse(
+        blocks=block_reads,
+        audience_label=aud_label,
+        level_label=lvl_label,
+        progress=await _get_course_progress(db, course, user.id if user else None),
+    )
+
+
+async def _get_course_progress(db: AsyncSession, course: Course, user_id: uuid.UUID | None):
+    from crud import course as course_crud
+    if not user_id:
+        return None
+    await course_crud.attach_course_progress(db, [course], user_id)
+    return course.progress
 
 
 @router.post("/", response_model=BlockRead, status_code=status.HTTP_201_CREATED)

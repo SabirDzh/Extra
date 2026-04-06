@@ -120,4 +120,6 @@ class BlockTestResults(BaseModel):
     submission_id: uuid.UUID | None
     total_score: int | None
     max_score: int
+    correct_count: int = 0
+    incorrect_count: int = 0
     questions: list[QuestionResult]

@@ -50,39 +50,58 @@ async def get_test_results_for_block(
     result_q = await db.execute(stmt_q)
     questions = result_q.scalars().all()
 
-    # Create mapping of user answers
-    # Each question_id points to the user's TestAnswer
-    user_answers_map = {ans.question_id: ans for ans in submission.answers}
+    from collections import defaultdict
+    from core.models.test import QuestionType
+    
+    # Create mapping of user answers: Each question_id points to a list of TestAnswer
+    user_answers_map = defaultdict(list)
+    for ans in submission.answers:
+        user_answers_map[ans.question_id].append(ans)
 
     question_results = []
     for q in questions:
-        # Find correct options text
+        # Find correct options
         correct_options = [opt for opt in q.options if opt.is_correct]
         correct_text = ", ".join([opt.text for opt in correct_options]) if correct_options else None
+        correct_option_ids = {opt.id for opt in correct_options}
         
-        user_answer_obj = user_answers_map.get(q.id)
+        q_answers = user_answers_map.get(q.id, [])
         user_answer_text = None
         status = TestResultStatus.INCORRECT
         score = 0
 
-        if user_answer_obj:
-            if user_answer_obj.selected_option:
-                user_answer_text = user_answer_obj.selected_option.text
-            elif user_answer_obj.text_answer:
-                user_answer_text = user_answer_obj.text_answer
+        # Calculate user answer text and selected IDs
+        user_selected_texts = []
+        user_selected_ids = set()
+        text_answer = None
+        
+        for ans in q_answers:
+            if ans.selected_option:
+                user_selected_texts.append(ans.selected_option.text)
+                user_selected_ids.add(ans.selected_answer_id)
+            if ans.text_answer:
+                text_answer = ans.text_answer # Usually for free_text questions
+                
+        if user_selected_texts:
+            user_answer_text = ", ".join(user_selected_texts)
+        elif text_answer:
+            user_answer_text = text_answer
 
+        if q_answers:
             if block.block_type == BlockType.auto_test:
-                correct_option_ids = {opt.id for opt in correct_options}
-                if user_answer_obj.selected_answer_id and user_answer_obj.selected_answer_id in correct_option_ids:
-                    status = TestResultStatus.CORRECT
-                    score = 1
+                if q.question_type == QuestionType.single_choice:
+                    if len(user_selected_ids) == 1 and list(user_selected_ids)[0] in correct_option_ids:
+                        status = TestResultStatus.CORRECT
+                        score = 1
+                elif q.question_type == QuestionType.multiple_choice:
+                    if user_selected_ids == correct_option_ids and correct_option_ids:
+                        status = TestResultStatus.CORRECT
+                        score = 1
             elif block.block_type == BlockType.manual_test:
                 if not submission.is_graded:
                     status = TestResultStatus.REQUIRES_REVIEW
                 else:
-                    # For manual test, if it's graded and overall score > 0, we'll mark it Верно,
-                    # since we lack per-question score in DB. Otherwise, Неверно.
-                    # Or we could just fallback to checking if submission score is max_score.
+                    # For manual tests, we use the submission's score as an indicator
                     if submission.score and submission.score > 0:
                         status = TestResultStatus.CORRECT
                         score = 1
@@ -90,6 +109,7 @@ async def get_test_results_for_block(
                         status = TestResultStatus.INCORRECT
                         score = 0
         else:
+            # No answers provided
             if block.block_type == BlockType.manual_test and not submission.is_graded:
                 status = TestResultStatus.REQUIRES_REVIEW
             else:
@@ -106,10 +126,16 @@ async def get_test_results_for_block(
             )
         )
 
+    # 4. Calculate stats (excluding REQUIRES_REVIEW)
+    correct_count = sum(1 for r in question_results if r.status == TestResultStatus.CORRECT)
+    incorrect_count = sum(1 for r in question_results if r.status == TestResultStatus.INCORRECT)
+
     return BlockTestResults(
         block_id=block_id,
         submission_id=submission.id,
         total_score=submission.score,
         max_score=len(questions),
+        correct_count=correct_count,
+        incorrect_count=incorrect_count,
         questions=question_results,
     )

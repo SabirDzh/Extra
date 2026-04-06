@@ -201,6 +201,30 @@ async def list_submissions(
     return result.scalars().all()
 
 
+@router.get("/courses/{course_id}/pending-submissions", response_model=list[TestSubmissionRead])
+async def list_pending_course_submissions(
+    course_id: uuid.UUID, 
+    db: Session, 
+    admin: User = Depends(current_admin)
+):
+    """
+    Returns all ungraded submissions for manual test blocks within a specific course.
+    Used by admins to find work that needs review.
+    """
+    result = await db.execute(
+        select(TestSubmission)
+        .join(Block, TestSubmission.block_id == Block.id)
+        .where(
+            Block.course_id == course_id,
+            Block.block_type == BlockType.manual_test,
+            TestSubmission.is_graded == False
+        )
+        .options(selectinload(TestSubmission.answers))
+        .order_by(TestSubmission.submitted_at.desc())
+    )
+    return result.scalars().all()
+
+
 @router.post("/submissions/{submission_id}/grade", response_model=TestSubmissionRead)
 async def grade_submission(
     submission_id: uuid.UUID,

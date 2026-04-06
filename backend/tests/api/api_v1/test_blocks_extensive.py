@@ -200,6 +200,11 @@ async def test_get_blocks_for_course(client: AsyncClient, session: AsyncSession,
     assert "audience_label" in data["blocks"][0]
     assert data["blocks"][0]["audience_label"] == "Для всех"
     assert "progress" in data["blocks"][0]
+    
+    # Verify root-level fields are ALSO present (restored)
+    assert "audience_label" in data
+    assert data["audience_label"] == "Для всех"
+    assert "progress" in data
 
 # 17. Get block sequence for nonexistent course
 @pytest.mark.anyio
