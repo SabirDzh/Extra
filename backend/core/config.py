@@ -60,6 +60,7 @@ class ApiV1Prefix(BaseModel):
     search: str = "/search"
     error: str = "/error"
     recommendations: str = "/recommendation"
+    tests: str = "/tests"
 
 
 class ApiPrefix(BaseModel):

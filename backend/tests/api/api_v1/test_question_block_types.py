@@ -65,7 +65,7 @@ async def test_cannot_add_question_to_lesson_block(
     }
     
     response = await client.post(
-        f"/api/v1/api/tests/blocks/{lesson_block.id}/questions",
+        f"/api/v1/tests/blocks/{lesson_block.id}/questions",
         json=payload,
         headers=superuser_token_headers
     )
@@ -93,7 +93,7 @@ async def test_can_add_question_to_test_block(
     }
     
     response = await client.post(
-        f"/api/v1/api/tests/blocks/{test_block.id}/questions",
+        f"/api/v1/tests/blocks/{test_block.id}/questions",
         json=payload,
         headers=superuser_token_headers
     )

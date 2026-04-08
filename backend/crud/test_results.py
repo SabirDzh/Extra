@@ -20,7 +20,7 @@ async def get_test_results_for_block(
     """
     # 1. Fetch Block
     block = await db.get(Block, block_id)
-    if not block or block.block_type not in (BlockType.auto_test, BlockType.manual_test):
+    if not block or block.block_type not in (BlockType.auto_test, BlockType.manual_test, BlockType.mixed_test):
         return None
 
     # 2. Fetch the latest TestSubmission for this user and block
@@ -31,7 +31,7 @@ async def get_test_results_for_block(
             TestSubmission.block_id == block_id,
         )
         .options(selectinload(TestSubmission.answers).selectinload(TestAnswer.selected_option))
-        .order_by(TestSubmission.submitted_at.desc())
+        .order_by(TestSubmission.submitted_at.desc(), TestSubmission.id.desc())
         .limit(1)
     )
     result_sub = await db.execute(stmt_sub)
@@ -80,7 +80,7 @@ async def get_test_results_for_block(
                 user_selected_texts.append(ans.selected_option.text)
                 user_selected_ids.add(ans.selected_answer_id)
             if ans.text_answer:
-                text_answer = ans.text_answer # Usually for free_text questions
+                text_answer = ans.text_answer
                 
         if user_selected_texts:
             user_answer_text = ", ".join(user_selected_texts)
@@ -88,29 +88,32 @@ async def get_test_results_for_block(
             user_answer_text = text_answer
 
         if q_answers:
-            if block.block_type == BlockType.auto_test:
-                if q.question_type == QuestionType.single_choice:
-                    if len(user_selected_ids) == 1 and list(user_selected_ids)[0] in correct_option_ids:
-                        status = TestResultStatus.CORRECT
-                        score = 1
-                elif q.question_type == QuestionType.multiple_choice:
-                    if user_selected_ids == correct_option_ids and correct_option_ids:
-                        status = TestResultStatus.CORRECT
-                        score = 1
-            elif block.block_type == BlockType.manual_test:
+            if q.question_type == QuestionType.single_choice:
+                if len(user_selected_ids) == 1 and list(user_selected_ids)[0] in correct_option_ids:
+                    status = TestResultStatus.CORRECT
+                    score = 1
+                else:
+                    status = TestResultStatus.INCORRECT
+            elif q.question_type == QuestionType.multiple_choice:
+                if user_selected_ids == correct_option_ids and correct_option_ids:
+                    status = TestResultStatus.CORRECT
+                    score = 1
+                else:
+                    status = TestResultStatus.INCORRECT
+            elif q.question_type == QuestionType.free_text:
                 if not submission.is_graded:
                     status = TestResultStatus.REQUIRES_REVIEW
+                    score = 0
                 else:
-                    # For manual tests, we use the submission's score as an indicator
-                    if submission.score and submission.score > 0:
-                        status = TestResultStatus.CORRECT
-                        score = 1
+                   
+                    if submission.score and submission.score >= (max_score if block.block_type == BlockType.auto_test else 1):
+                         status = TestResultStatus.CORRECT
+                         score = 1
                     else:
-                        status = TestResultStatus.INCORRECT
-                        score = 0
+                         status = TestResultStatus.INCORRECT
+                         score = 0
         else:
-            # No answers provided
-            if block.block_type == BlockType.manual_test and not submission.is_graded:
+            if q.question_type == QuestionType.free_text and not submission.is_graded:
                 status = TestResultStatus.REQUIRES_REVIEW
             else:
                 status = TestResultStatus.INCORRECT

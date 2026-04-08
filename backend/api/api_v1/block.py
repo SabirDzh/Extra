@@ -341,7 +341,7 @@ async def get_block_test_results(
     block = await _get_block_or_404(db, block_id, course_id)
     
     # Needs to handle if it's not a test block
-    if block.block_type not in (BlockType.auto_test, BlockType.manual_test):
+    if block.block_type not in (BlockType.auto_test, BlockType.manual_test, BlockType.mixed_test):
         raise HTTPException(status_code=400, detail="Block is not a test block")
 
     results = await get_test_results_for_block(db, user.id, block_id)

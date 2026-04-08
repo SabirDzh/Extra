@@ -55,7 +55,7 @@ async def _create_base_env(session: AsyncSession):
 
 async def _get_auth_token(client: AsyncClient, user, password="Password12345!"):
     resp = await client.post("/api/v1/auth/login", data={"username": user.email, "password": password})
-    return resp.cookies.get("fastapiusersauth", "")
+    return resp.cookies.get("auth_user", "")
 
 @pytest.fixture
 async def base_env(session: AsyncSession):
@@ -75,7 +75,7 @@ async def test_2_unauthorized_invalid_token(client: AsyncClient, base_env):
     course, block, *_ = base_env
     resp = await client.get(
         f"/api/v1/courses/{course.id}/blocks/{block.id}/test-results",
-        cookies={"fastapiusersauth": "invalid_fake_token"}
+        cookies={"auth_user": "invalid_fake_token"}
     )
     assert resp.status_code == 401
 
@@ -87,7 +87,7 @@ async def test_3_nonexistent_course(client: AsyncClient, create_user, base_env):
     
     resp = await client.get(
         f"/api/v1/courses/{uuid.uuid4()}/blocks/{block.id}/test-results",
-        cookies={"fastapiusersauth": token}
+        cookies={"auth_user": token}
     )
     assert resp.status_code == 404
 
@@ -99,7 +99,7 @@ async def test_4_nonexistent_block(client: AsyncClient, create_user, base_env):
     
     resp = await client.get(
         f"/api/v1/courses/{course.id}/blocks/{uuid.uuid4()}/test-results",
-        cookies={"fastapiusersauth": token}
+        cookies={"auth_user": token}
     )
     assert resp.status_code == 404
 
@@ -112,7 +112,7 @@ async def test_5_not_a_test_block(client: AsyncClient, session: AsyncSession, cr
     
     resp = await client.get(
         f"/api/v1/courses/{course.id}/blocks/{lesson_block.id}/test-results",
-        cookies={"fastapiusersauth": token}
+        cookies={"auth_user": token}
     )
     assert resp.status_code == 400
     assert resp.json()["detail"] == "Block is not a test block"
@@ -125,7 +125,7 @@ async def test_6_no_submission_yet(client: AsyncClient, create_user, base_env):
     
     resp = await client.get(
         f"/api/v1/courses/{course.id}/blocks/{block.id}/test-results",
-        cookies={"fastapiusersauth": token}
+        cookies={"auth_user": token}
     )
     assert resp.status_code == 404
     assert "not found" in resp.json()["detail"].lower()
@@ -148,7 +148,7 @@ async def test_7_auto_test_all_correct(client: AsyncClient, session: AsyncSessio
     ])
     await session.commit()
     
-    resp = await client.get(f"/api/v1/courses/{course.id}/blocks/{block.id}/test-results", cookies={"fastapiusersauth": token})
+    resp = await client.get(f"/api/v1/courses/{course.id}/blocks/{block.id}/test-results", cookies={"auth_user": token})
     assert resp.status_code == 200
     data = resp.json()
     assert data["total_score"] == 2
@@ -171,7 +171,7 @@ async def test_8_auto_test_all_wrong(client: AsyncClient, session: AsyncSession,
     ])
     await session.commit()
     
-    resp = await client.get(f"/api/v1/courses/{course.id}/blocks/{block.id}/test-results", cookies={"fastapiusersauth": token})
+    resp = await client.get(f"/api/v1/courses/{course.id}/blocks/{block.id}/test-results", cookies={"auth_user": token})
     assert resp.status_code == 200
     data = resp.json()
     assert data["total_score"] == 0
@@ -194,7 +194,7 @@ async def test_9_auto_test_partial(client: AsyncClient, session: AsyncSession, c
     ])
     await session.commit()
     
-    resp = await client.get(f"/api/v1/courses/{course.id}/blocks/{block.id}/test-results", cookies={"fastapiusersauth": token})
+    resp = await client.get(f"/api/v1/courses/{course.id}/blocks/{block.id}/test-results", cookies={"auth_user": token})
     assert resp.status_code == 200
     data = resp.json()
     qts = {q["question_id"]: q for q in data["questions"]}
@@ -226,7 +226,7 @@ async def test_10_multiple_submissions_returns_latest(client: AsyncClient, sessi
     ])
     await session.commit()
     
-    resp = await client.get(f"/api/v1/courses/{course.id}/blocks/{block.id}/test-results", cookies={"fastapiusersauth": token})
+    resp = await client.get(f"/api/v1/courses/{course.id}/blocks/{block.id}/test-results", cookies={"auth_user": token})
     assert resp.status_code == 200
     data = resp.json()
     assert data["submission_id"] == str(sub2.id)
@@ -253,7 +253,7 @@ async def test_11_manual_test_ungraded(client: AsyncClient, session: AsyncSessio
     session.add(TestAnswer(submission_id=sub.id, question_id=q1.id, text_answer="My free text answer"))
     await session.commit()
     
-    resp = await client.get(f"/api/v1/courses/{course.id}/blocks/{block.id}/test-results", cookies={"fastapiusersauth": token})
+    resp = await client.get(f"/api/v1/courses/{course.id}/blocks/{block.id}/test-results", cookies={"auth_user": token})
     data = resp.json()
     assert data["questions"][0]["status"] == TestResultStatus.REQUIRES_REVIEW
     assert data["questions"][0]["score"] == 0
@@ -275,7 +275,7 @@ async def test_12_manual_test_graded_zero(client: AsyncClient, session: AsyncSes
     session.add(TestAnswer(submission_id=sub.id, question_id=q1.id, text_answer="Wrong answer"))
     await session.commit()
     
-    resp = await client.get(f"/api/v1/courses/{course.id}/blocks/{block.id}/test-results", cookies={"fastapiusersauth": token})
+    resp = await client.get(f"/api/v1/courses/{course.id}/blocks/{block.id}/test-results", cookies={"auth_user": token})
     data = resp.json()
     assert data["questions"][0]["status"] == TestResultStatus.INCORRECT
 
@@ -296,7 +296,7 @@ async def test_13_manual_test_graded_full(client: AsyncClient, session: AsyncSes
     session.add(TestAnswer(submission_id=sub.id, question_id=q1.id, text_answer="Great answer"))
     await session.commit()
     
-    resp = await client.get(f"/api/v1/courses/{course.id}/blocks/{block.id}/test-results", cookies={"fastapiusersauth": token})
+    resp = await client.get(f"/api/v1/courses/{course.id}/blocks/{block.id}/test-results", cookies={"auth_user": token})
     data = resp.json()
     assert data["questions"][0]["status"] == TestResultStatus.CORRECT
     assert data["questions"][0]["score"] == 1
@@ -317,7 +317,7 @@ async def test_14_unanswered_questions_marked_wrong(client: AsyncClient, session
     session.add(TestAnswer(submission_id=sub.id, question_id=q1.id, selected_answer_id=o1_c.id))
     await session.commit()
     
-    resp = await client.get(f"/api/v1/courses/{course.id}/blocks/{block.id}/test-results", cookies={"fastapiusersauth": token})
+    resp = await client.get(f"/api/v1/courses/{course.id}/blocks/{block.id}/test-results", cookies={"auth_user": token})
     data = resp.json()
     assert len(data["questions"]) == 2
     
@@ -343,7 +343,7 @@ async def test_15_multiple_answers_text_concatenation(client: AsyncClient, sessi
     session.add(sub)
     await session.commit()
     
-    resp = await client.get(f"/api/v1/courses/{course.id}/blocks/{block.id}/test-results", cookies={"fastapiusersauth": token})
+    resp = await client.get(f"/api/v1/courses/{course.id}/blocks/{block.id}/test-results", cookies={"auth_user": token})
     data = resp.json()
     
     q1_res = next(q for q in data["questions"] if q["question_id"] == str(q1.id))
@@ -369,7 +369,7 @@ async def test_16_user_answer_is_text(client: AsyncClient, session: AsyncSession
     session.add(TestAnswer(submission_id=sub.id, question_id=q1.id, text_answer="User Input Text"))
     await session.commit()
     
-    resp = await client.get(f"/api/v1/courses/{course.id}/blocks/{block.id}/test-results", cookies={"fastapiusersauth": token})
+    resp = await client.get(f"/api/v1/courses/{course.id}/blocks/{block.id}/test-results", cookies={"auth_user": token})
     data = resp.json()
     
     q1_res = next(q for q in data["questions"] if q["question_id"] == str(q1.id))
@@ -391,7 +391,7 @@ async def test_17_different_user_submission_hidden(client: AsyncClient, session:
     user2 = await create_user("u17_2@test.com")
     token2 = await _get_auth_token(client, user2)
     
-    resp = await client.get(f"/api/v1/courses/{course.id}/blocks/{block.id}/test-results", cookies={"fastapiusersauth": token2})
+    resp = await client.get(f"/api/v1/courses/{course.id}/blocks/{block.id}/test-results", cookies={"auth_user": token2})
     assert resp.status_code == 404
     assert "not found" in resp.json()["detail"].lower()
 
@@ -405,7 +405,7 @@ async def test_18_course_mismatch(client: AsyncClient, session: AsyncSession, cr
     user = await create_user("u18@test.com")
     token = await _get_auth_token(client, user)
     
-    resp = await client.get(f"/api/v1/courses/{course_fake.id}/blocks/{block.id}/test-results", cookies={"fastapiusersauth": token})
+    resp = await client.get(f"/api/v1/courses/{course_fake.id}/blocks/{block.id}/test-results", cookies={"auth_user": token})
     # Because _get_block_or_404 checks block.course_id == course_id, it returns 404
     assert resp.status_code == 404
 
@@ -422,7 +422,7 @@ async def test_19_no_answers_empty_test_handled_gracefully(client: AsyncClient, 
     session.add(sub)
     await session.commit()
     
-    resp = await client.get(f"/api/v1/courses/{course.id}/blocks/{block.id}/test-results", cookies={"fastapiusersauth": token})
+    resp = await client.get(f"/api/v1/courses/{course.id}/blocks/{block.id}/test-results", cookies={"auth_user": token})
     assert resp.status_code == 200
     data = resp.json()
     assert data["max_score"] == 0
@@ -442,6 +442,6 @@ async def test_20_deleted_block_prevents_getting_results(client: AsyncClient, se
     await session.delete(block)
     await session.commit()
     
-    resp = await client.get(f"/api/v1/courses/{course.id}/blocks/{block.id}/test-results", cookies={"fastapiusersauth": token})
+    resp = await client.get(f"/api/v1/courses/{course.id}/blocks/{block.id}/test-results", cookies={"auth_user": token})
     assert resp.status_code == 404
 

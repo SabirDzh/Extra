@@ -26,8 +26,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from utils.product import current_admin
 from utils.role import UserRole
+from core.config import settings 
 
-router = APIRouter(prefix="/api/tests", tags=["Tests"])
+router = APIRouter(prefix=settings.api.v1.tests, tags=["Tests"])
 
 Session = Annotated[AsyncSession, Depends(db_helper.session_getter)]
 
@@ -141,7 +142,7 @@ async def submit_test(
     block = await db.get(Block, block_id)
     if not block:
         raise HTTPException(status_code=404, detail="Block not found")
-    if block.block_type not in (BlockType.auto_test, BlockType.manual_test):
+    if block.block_type not in (BlockType.auto_test, BlockType.manual_test, BlockType.mixed_test):
         raise HTTPException(status_code=400, detail="Block is not a test")
 
     questions = (
@@ -170,8 +171,7 @@ async def submit_test(
         )
     await db.flush()
 
-    if block.block_type == BlockType.auto_test:
-        submission = await auto_grade_submission(db, submission)
+    submission = await auto_grade_submission(db, submission)
 
     await db.commit()
     return await _load_submission(db, submission.id)

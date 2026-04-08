@@ -14,11 +14,12 @@ class BlockType(str, enum.Enum):
     lesson = "lesson"
     auto_test = "auto_test"
     manual_test = "manual_test"
+    mixed_test = "mixed_test"
 
 
 # Block types that count towards course progress (total / completed).
 # Lesson blocks are informational and do NOT contribute to progress tracking.
-TEST_BLOCK_TYPES = {BlockType.auto_test, BlockType.manual_test}
+TEST_BLOCK_TYPES = {BlockType.auto_test, BlockType.manual_test, BlockType.mixed_test}
 
 
 class Block(IdUuidPkMixin, Base):

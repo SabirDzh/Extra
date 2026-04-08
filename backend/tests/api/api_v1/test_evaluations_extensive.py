@@ -19,8 +19,8 @@ async def admin_user(create_user):
 
 async def _get_auth_headers(client: AsyncClient, user_data: dict) -> dict:
     resp = await client.post("/api/v1/auth/login", data={"username": user_data["email"], "password": user_data["password"]})
-    token = resp.cookies.get("fastapiusersauth", "")
-    return {"cookie": f"fastapiusersauth={token}"} if token else {}
+    token = resp.cookies.get("auth_user", "")
+    return {"cookie": f"auth_user={token}"} if token else {}
 
 async def _create_course_and_block(session: AsyncSession, admin_id: uuid.UUID, block_type=BlockType.auto_test):
     course = Course(title=f"Course {uuid.uuid4().hex[:4]}", created_by=admin_id)
@@ -43,7 +43,7 @@ async def test_admin_create_question_single(client: AsyncClient, session: AsyncS
         "text": "What is 2+2?", "question_type": "single_choice", "order_index": 0,
         "options": [{"text": "3", "is_correct": False}, {"text": "4", "is_correct": True}]
     }
-    resp = await client.post(f"/api/v1/api/tests/blocks/{block.id}/questions", json=payload, headers=superuser_token_headers)
+    resp = await client.post(f"/api/v1/tests/blocks/{block.id}/questions", json=payload, headers=superuser_token_headers)
     assert resp.status_code == 201
 
 # 2. Admin creates multiple_choice question
@@ -54,7 +54,7 @@ async def test_admin_create_question_multiple(client: AsyncClient, session: Asyn
         "text": "Select primes", "question_type": "multiple_choice", "order_index": 0,
         "options": [{"text": "2", "is_correct": True}, {"text": "4", "is_correct": False}, {"text": "5", "is_correct": True}]
     }
-    resp = await client.post(f"/api/v1/api/tests/blocks/{block.id}/questions", json=payload, headers=superuser_token_headers)
+    resp = await client.post(f"/api/v1/tests/blocks/{block.id}/questions", json=payload, headers=superuser_token_headers)
     assert resp.status_code == 201
 
 # 3. Create question on lesson block fails (already tested but good redundancy)
@@ -62,7 +62,7 @@ async def test_admin_create_question_multiple(client: AsyncClient, session: Asyn
 async def test_create_question_on_lesson_block_fails(client: AsyncClient, session: AsyncSession, admin_user, superuser_token_headers):
     _, block = await _create_course_and_block(session, admin_user.id, BlockType.lesson)
     payload = {"text": "Q?", "question_type": "free_text", "options": []}
-    resp = await client.post(f"/api/v1/api/tests/blocks/{block.id}/questions", json=payload, headers=superuser_token_headers)
+    resp = await client.post(f"/api/v1/tests/blocks/{block.id}/questions", json=payload, headers=superuser_token_headers)
     assert resp.status_code == 400
 
 # 4. User fails to create question
@@ -71,14 +71,14 @@ async def test_user_cannot_create_question(client: AsyncClient, session: AsyncSe
     _, block = await _create_course_and_block(session, admin_user.id)
     user = await create_user("hacker_q@test.com")
     headers = await _get_auth_headers(client, {"email": "hacker_q@test.com", "password": "Password12345!"})
-    resp = await client.post(f"/api/v1/api/tests/blocks/{block.id}/questions", json={"text": "Q", "question_type": "free_text"}, headers=headers)
+    resp = await client.post(f"/api/v1/tests/blocks/{block.id}/questions", json={"text": "Q", "question_type": "free_text"}, headers=headers)
     assert resp.status_code in (401, 403)
 
 # 5. Anonymous fails to create question
 @pytest.mark.anyio
 async def test_anonymous_cannot_create_question(client: AsyncClient, session: AsyncSession, admin_user):
     _, block = await _create_course_and_block(session, admin_user.id)
-    resp = await client.post(f"/api/v1/api/tests/blocks/{block.id}/questions", json={"text": "Q", "question_type": "free_text"})
+    resp = await client.post(f"/api/v1/tests/blocks/{block.id}/questions", json={"text": "Q", "question_type": "free_text"})
     assert resp.status_code == 401
 
 # 6. Admin updates question
@@ -86,9 +86,9 @@ async def test_anonymous_cannot_create_question(client: AsyncClient, session: As
 async def test_admin_updates_question(client: AsyncClient, session: AsyncSession, admin_user, superuser_token_headers):
     _, block = await _create_course_and_block(session, admin_user.id)
     payload = {"text": "Old", "question_type": "free_text"}
-    resp = await client.post(f"/api/v1/api/tests/blocks/{block.id}/questions", json=payload, headers=superuser_token_headers)
+    resp = await client.post(f"/api/v1/tests/blocks/{block.id}/questions", json=payload, headers=superuser_token_headers)
     q_id = resp.json()["id"]
-    resp2 = await client.put(f"/api/v1/api/tests/questions/{q_id}", json={"text": "New Text"}, headers=superuser_token_headers)
+    resp2 = await client.put(f"/api/v1/tests/questions/{q_id}", json={"text": "New Text"}, headers=superuser_token_headers)
     assert resp2.status_code == 200
     assert resp2.json()["text"] == "New Text"
 
@@ -97,10 +97,10 @@ async def test_admin_updates_question(client: AsyncClient, session: AsyncSession
 async def test_update_question_options_replacement(client: AsyncClient, session: AsyncSession, admin_user, superuser_token_headers):
     _, block = await _create_course_and_block(session, admin_user.id)
     payload = {"text": "Old", "question_type": "single_choice", "options": [{"text": "A", "is_correct": True}]}
-    resp = await client.post(f"/api/v1/api/tests/blocks/{block.id}/questions", json=payload, headers=superuser_token_headers)
+    resp = await client.post(f"/api/v1/tests/blocks/{block.id}/questions", json=payload, headers=superuser_token_headers)
     q_id = resp.json()["id"]
     
-    resp2 = await client.put(f"/api/v1/api/tests/questions/{q_id}", json={"options": [{"text": "B", "is_correct": False}]}, headers=superuser_token_headers)
+    resp2 = await client.put(f"/api/v1/tests/questions/{q_id}", json={"options": [{"text": "B", "is_correct": False}]}, headers=superuser_token_headers)
     assert resp2.status_code == 200
     opts = resp2.json()["options"]
     assert len(opts) == 1
@@ -110,28 +110,28 @@ async def test_update_question_options_replacement(client: AsyncClient, session:
 @pytest.mark.anyio
 async def test_user_cannot_update_question(client: AsyncClient, session: AsyncSession, admin_user, create_user, superuser_token_headers):
     _, block = await _create_course_and_block(session, admin_user.id)
-    resp = await client.post(f"/api/v1/api/tests/blocks/{block.id}/questions", json={"text": "Old", "question_type": "free_text"}, headers=superuser_token_headers)
+    resp = await client.post(f"/api/v1/tests/blocks/{block.id}/questions", json={"text": "Old", "question_type": "free_text"}, headers=superuser_token_headers)
     q_id = resp.json()["id"]
     
     user = await create_user("hacker_q2@test.com")
     headers = await _get_auth_headers(client, {"email": "hacker_q2@test.com", "password": "Password12345!"})
-    resp2 = await client.put(f"/api/v1/api/tests/questions/{q_id}", json={"text": "Hacked Text"}, headers=headers)
+    resp2 = await client.put(f"/api/v1/tests/questions/{q_id}", json={"text": "Hacked Text"}, headers=headers)
     assert resp2.status_code in (401, 403)
 
 # 9. Delete question
 @pytest.mark.anyio
 async def test_admin_delete_question(client: AsyncClient, session: AsyncSession, admin_user, superuser_token_headers):
     _, block = await _create_course_and_block(session, admin_user.id)
-    resp = await client.post(f"/api/v1/api/tests/blocks/{block.id}/questions", json={"text": "Drop me", "question_type": "free_text"}, headers=superuser_token_headers)
+    resp = await client.post(f"/api/v1/tests/blocks/{block.id}/questions", json={"text": "Drop me", "question_type": "free_text"}, headers=superuser_token_headers)
     q_id = resp.json()["id"]
     
-    resp2 = await client.delete(f"/api/v1/api/tests/questions/{q_id}", headers=superuser_token_headers)
+    resp2 = await client.delete(f"/api/v1/tests/questions/{q_id}", headers=superuser_token_headers)
     assert resp2.status_code == 204
 
 # 10. Delete non-existent question
 @pytest.mark.anyio
 async def test_delete_nonexistent_question(client: AsyncClient, superuser_token_headers):
-    resp = await client.delete(f"/api/v1/api/tests/questions/{uuid.uuid4()}", headers=superuser_token_headers)
+    resp = await client.delete(f"/api/v1/tests/questions/{uuid.uuid4()}", headers=superuser_token_headers)
     assert resp.status_code == 404
 
 # 11. User list questions hides is_correct
@@ -139,11 +139,11 @@ async def test_delete_nonexistent_question(client: AsyncClient, superuser_token_
 async def test_user_list_questions_hides_correct_answers(client: AsyncClient, session: AsyncSession, admin_user, create_user, superuser_token_headers):
     _, block = await _create_course_and_block(session, admin_user.id)
     payload = {"text": "Secret", "question_type": "single_choice", "options": [{"text": "A", "is_correct": True}]}
-    await client.post(f"/api/v1/api/tests/blocks/{block.id}/questions", json=payload, headers=superuser_token_headers)
+    await client.post(f"/api/v1/tests/blocks/{block.id}/questions", json=payload, headers=superuser_token_headers)
     
     user = await create_user("student@test.com")
     headers = await _get_auth_headers(client, {"email": "student@test.com", "password": "Password12345!"})
-    resp = await client.get(f"/api/v1/api/tests/blocks/{block.id}/questions", headers=headers)
+    resp = await client.get(f"/api/v1/tests/blocks/{block.id}/questions", headers=headers)
     assert resp.status_code == 200
     assert "is_correct" not in resp.json()[0]["options"][0]
 
@@ -152,9 +152,9 @@ async def test_user_list_questions_hides_correct_answers(client: AsyncClient, se
 async def test_admin_list_questions_shows_correct_answers(client: AsyncClient, session: AsyncSession, admin_user, superuser_token_headers):
     _, block = await _create_course_and_block(session, admin_user.id)
     payload = {"text": "Secret", "question_type": "single_choice", "options": [{"text": "A", "is_correct": True}]}
-    await client.post(f"/api/v1/api/tests/blocks/{block.id}/questions", json=payload, headers=superuser_token_headers)
+    await client.post(f"/api/v1/tests/blocks/{block.id}/questions", json=payload, headers=superuser_token_headers)
     
-    resp = await client.get(f"/api/v1/api/tests/blocks/{block.id}/questions", headers=superuser_token_headers)
+    resp = await client.get(f"/api/v1/tests/blocks/{block.id}/questions", headers=superuser_token_headers)
     assert resp.status_code == 200
     assert "is_correct" in resp.json()[0]["options"][0]
 
@@ -163,7 +163,7 @@ async def test_admin_list_questions_shows_correct_answers(client: AsyncClient, s
 async def test_submit_auto_test_success(client: AsyncClient, session: AsyncSession, admin_user, create_user, superuser_token_headers):
     _, block = await _create_course_and_block(session, admin_user.id, BlockType.auto_test)
     payload = {"text": "Math", "question_type": "single_choice", "options": [{"text": "Right", "is_correct": True}, {"text": "Wrong", "is_correct": False}]}
-    q_resp = await client.post(f"/api/v1/api/tests/blocks/{block.id}/questions", json=payload, headers=superuser_token_headers)
+    q_resp = await client.post(f"/api/v1/tests/blocks/{block.id}/questions", json=payload, headers=superuser_token_headers)
     q_id = q_resp.json()["id"]
     opt_id = [o["id"] for o in q_resp.json()["options"] if o["is_correct"]][0]
     
@@ -172,7 +172,7 @@ async def test_submit_auto_test_success(client: AsyncClient, session: AsyncSessi
     headers = await _get_auth_headers(client, {"email": "good_student@test.com", "password": "Password12345!"})
     
     sub = {"answers": [{"question_id": q_id, "selected_answer_id": opt_id}]}
-    resp = await client.post(f"/api/v1/api/tests/blocks/{block.id}/submit", json=sub, headers=headers)
+    resp = await client.post(f"/api/v1/tests/blocks/{block.id}/submit", json=sub, headers=headers)
     assert resp.status_code == 200
     assert resp.json()["score"] == 1
     assert resp.json()["is_graded"] is True
@@ -182,7 +182,7 @@ async def test_submit_auto_test_success(client: AsyncClient, session: AsyncSessi
 async def test_submit_auto_test_fail(client: AsyncClient, session: AsyncSession, admin_user, create_user, superuser_token_headers):
     _, block = await _create_course_and_block(session, admin_user.id, BlockType.auto_test)
     payload = {"text": "Math", "question_type": "single_choice", "options": [{"text": "Right", "is_correct": True}, {"text": "Wrong", "is_correct": False}]}
-    q_resp = await client.post(f"/api/v1/api/tests/blocks/{block.id}/questions", json=payload, headers=superuser_token_headers)
+    q_resp = await client.post(f"/api/v1/tests/blocks/{block.id}/questions", json=payload, headers=superuser_token_headers)
     q_id = q_resp.json()["id"]
     opt_bad = [o["id"] for o in q_resp.json()["options"] if not o["is_correct"]][0]
     
@@ -190,7 +190,7 @@ async def test_submit_auto_test_fail(client: AsyncClient, session: AsyncSession,
     headers = await _get_auth_headers(client, {"email": "bad_student@test.com", "password": "Password12345!"})
     
     sub = {"answers": [{"question_id": q_id, "selected_answer_id": opt_bad}]}
-    resp = await client.post(f"/api/v1/api/tests/blocks/{block.id}/submit", json=sub, headers=headers)
+    resp = await client.post(f"/api/v1/tests/blocks/{block.id}/submit", json=sub, headers=headers)
     assert resp.status_code == 200
     assert resp.json()["score"] == 0
 
@@ -199,16 +199,16 @@ async def test_submit_auto_test_fail(client: AsyncClient, session: AsyncSession,
 async def test_submit_manual_test_ungraded(client: AsyncClient, session: AsyncSession, admin_user, create_user, superuser_token_headers):
     _, block = await _create_course_and_block(session, admin_user.id, BlockType.manual_test)
     payload = {"text": "Tell me a story", "question_type": "free_text"}
-    q_resp = await client.post(f"/api/v1/api/tests/blocks/{block.id}/questions", json=payload, headers=superuser_token_headers)
+    q_resp = await client.post(f"/api/v1/tests/blocks/{block.id}/questions", json=payload, headers=superuser_token_headers)
     q_id = q_resp.json()["id"]
     
     user = await create_user("story@test.com")
     headers = await _get_auth_headers(client, {"email": "story@test.com", "password": "Password12345!"})
     
     sub = {"answers": [{"question_id": q_id, "text_answer": "Once upon a time"}]}
-    resp = await client.post(f"/api/v1/api/tests/blocks/{block.id}/submit", json=sub, headers=headers)
+    resp = await client.post(f"/api/v1/tests/blocks/{block.id}/submit", json=sub, headers=headers)
     assert resp.status_code == 200
-    assert resp.json()["score"] is None
+    assert resp.json()["score"] == 0
     assert resp.json()["is_graded"] is False
 
 # 16. Admin grades submission
@@ -216,18 +216,18 @@ async def test_submit_manual_test_ungraded(client: AsyncClient, session: AsyncSe
 async def test_admin_grades_submission(client: AsyncClient, session: AsyncSession, admin_user, create_user, superuser_token_headers):
     _, block = await _create_course_and_block(session, admin_user.id, BlockType.manual_test)
     payload = {"text": "Manual", "question_type": "free_text"}
-    q_resp = await client.post(f"/api/v1/api/tests/blocks/{block.id}/questions", json=payload, headers=superuser_token_headers)
+    q_resp = await client.post(f"/api/v1/tests/blocks/{block.id}/questions", json=payload, headers=superuser_token_headers)
     q_id = q_resp.json()["id"]
     
     user = await create_user("manual@test.com")
     headers = await _get_auth_headers(client, {"email": "manual@test.com", "password": "Password12345!"})
     
     sub = {"answers": [{"question_id": q_id, "text_answer": "Answer"}]}
-    resp = await client.post(f"/api/v1/api/tests/blocks/{block.id}/submit", json=sub, headers=headers)
+    resp = await client.post(f"/api/v1/tests/blocks/{block.id}/submit", json=sub, headers=headers)
     sub_id = resp.json()["id"]
     
     admin_headers = await _get_auth_headers(client, {"email": "test_admin@test.com", "password": "Password12345!"})
-    grade_resp = await client.post(f"/api/v1/api/tests/submissions/{sub_id}/grade", json={"score": 100, "admin_comment": "Good"}, headers=admin_headers)
+    grade_resp = await client.post(f"/api/v1/tests/submissions/{sub_id}/grade", json={"score": 100, "admin_comment": "Good"}, headers=admin_headers)
     assert grade_resp.status_code == 200
     assert grade_resp.json()["score"] == 100
     assert grade_resp.json()["is_graded"] is True
@@ -240,7 +240,7 @@ async def test_user_fails_grading(client: AsyncClient, session: AsyncSession, ad
     headers = await _get_auth_headers(client, {"email": "hack_grade@test.com", "password": "Password12345!"})
     
     # We will just try grading a fake ID assuming that if it checks role first, it might return 401/403
-    grade_resp = await client.post(f"/api/v1/api/tests/submissions/{uuid.uuid4()}/grade", json={"score": 10}, headers=headers)
+    grade_resp = await client.post(f"/api/v1/tests/submissions/{uuid.uuid4()}/grade", json={"score": 10}, headers=headers)
     assert grade_resp.status_code in (401, 403, 404) # Usually fastAPI checks auth/deps before 404
 
 # 18. Submit nonexistent block test fails
@@ -248,21 +248,21 @@ async def test_user_fails_grading(client: AsyncClient, session: AsyncSession, ad
 async def test_submit_nonexistent_block(client: AsyncClient, admin_user, create_user):
     user = await create_user("fake_submit@test.com")
     headers = await _get_auth_headers(client, {"email": "fake_submit@test.com", "password": "Password12345!"})
-    resp = await client.post(f"/api/v1/api/tests/blocks/{uuid.uuid4()}/submit", json={"answers": []}, headers=headers)
+    resp = await client.post(f"/api/v1/tests/blocks/{uuid.uuid4()}/submit", json={"answers": []}, headers=headers)
     assert resp.status_code == 404
 
 # 19. Get submission info (user requesting own)
 @pytest.mark.anyio
 async def test_get_own_submission(client: AsyncClient, session: AsyncSession, admin_user, create_user, superuser_token_headers):
     _, block = await _create_course_and_block(session, admin_user.id, BlockType.auto_test)
-    q_resp = await client.post(f"/api/v1/api/tests/blocks/{block.id}/questions", json={"text": "Math", "question_type": "free_text"}, headers=superuser_token_headers)
+    q_resp = await client.post(f"/api/v1/tests/blocks/{block.id}/questions", json={"text": "Math", "question_type": "free_text"}, headers=superuser_token_headers)
     
     user = await create_user("own_sub@test.com")
     headers = await _get_auth_headers(client, {"email": "own_sub@test.com", "password": "Password12345!"})
-    resp = await client.post(f"/api/v1/api/tests/blocks/{block.id}/submit", json={"answers": [{"question_id": q_resp.json()["id"], "text_answer": "txt"}]}, headers=headers)
+    resp = await client.post(f"/api/v1/tests/blocks/{block.id}/submit", json={"answers": [{"question_id": q_resp.json()["id"], "text_answer": "txt"}]}, headers=headers)
     sub_id = resp.json()["id"]
     
-    get_resp = await client.get(f"/api/v1/api/tests/submissions/{sub_id}", headers=headers)
+    get_resp = await client.get(f"/api/v1/tests/submissions/{sub_id}", headers=headers)
     assert get_resp.status_code == 200
     assert get_resp.json()["id"] == sub_id
 
@@ -270,16 +270,16 @@ async def test_get_own_submission(client: AsyncClient, session: AsyncSession, ad
 @pytest.mark.anyio
 async def test_cannot_see_others_submission(client: AsyncClient, session: AsyncSession, admin_user, create_user, superuser_token_headers):
     _, block = await _create_course_and_block(session, admin_user.id, BlockType.auto_test)
-    q_resp = await client.post(f"/api/v1/api/tests/blocks/{block.id}/questions", json={"text": "Math", "question_type": "free_text"}, headers=superuser_token_headers)
+    q_resp = await client.post(f"/api/v1/tests/blocks/{block.id}/questions", json={"text": "Math", "question_type": "free_text"}, headers=superuser_token_headers)
     
     user1 = await create_user("user1@test.com")
     headers1 = await _get_auth_headers(client, {"email": "user1@test.com", "password": "Password12345!"})
-    resp = await client.post(f"/api/v1/api/tests/blocks/{block.id}/submit", json={"answers": [{"question_id": q_resp.json()["id"], "text_answer": "txt"}]}, headers=headers1)
+    resp = await client.post(f"/api/v1/tests/blocks/{block.id}/submit", json={"answers": [{"question_id": q_resp.json()["id"], "text_answer": "txt"}]}, headers=headers1)
     sub_id = resp.json()["id"]
     
     client.cookies.clear()
     user2 = await create_user("user2@test.com")
     headers2 = await _get_auth_headers(client, {"email": "user2@test.com", "password": "Password12345!"})
     
-    get_resp = await client.get(f"/api/v1/api/tests/submissions/{sub_id}", headers=headers2)
+    get_resp = await client.get(f"/api/v1/tests/submissions/{sub_id}", headers=headers2)
     assert get_resp.status_code in (403, 404)

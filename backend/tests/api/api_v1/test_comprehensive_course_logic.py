@@ -186,7 +186,7 @@ class TestGradingLogic:
         
         payload = {"answers": [{"question_id": str(q1.id), "selected_answer_id": str(opts[0].id)},
                                {"question_id": str(q1.id), "selected_answer_id": str(opts[1].id)}]}
-        resp = await client.post(f"/api/v1/api/tests/blocks/{block.id}/submit", json=payload)
+        resp = await client.post(f"/api/v1/tests/blocks/{block.id}/submit", json=payload)
         assert resp.json()["score"] == 1
 
     async def test_mcq_partial_match_is_zero(self, client, session, create_user):
@@ -196,7 +196,7 @@ class TestGradingLogic:
         await client.post("/api/v1/auth/login", data={"username": user.email, "password": "Password12345!"})
         
         payload = {"answers": [{"question_id": str(q1.id), "selected_answer_id": str(opts[0].id)}]}
-        resp = await client.post(f"/api/v1/api/tests/blocks/{block.id}/submit", json=payload)
+        resp = await client.post(f"/api/v1/tests/blocks/{block.id}/submit", json=payload)
         assert resp.json()["score"] == 0
 
     async def test_mcq_over_selection_is_zero(self, client, session, create_user):
@@ -208,7 +208,7 @@ class TestGradingLogic:
         payload = {"answers": [{"question_id": str(q1.id), "selected_answer_id": str(opts[0].id)},
                                {"question_id": str(q1.id), "selected_answer_id": str(opts[1].id)},
                                {"question_id": str(q1.id), "selected_answer_id": str(opts[2].id)}]}
-        resp = await client.post(f"/api/v1/api/tests/blocks/{block.id}/submit", json=payload)
+        resp = await client.post(f"/api/v1/tests/blocks/{block.id}/submit", json=payload)
         assert resp.json()["score"] == 0
 
     async def test_duplicate_answers_in_payload(self, client, session):
@@ -220,7 +220,7 @@ class TestGradingLogic:
         # Student sends same answer twice
         payload = {"answers": [{"question_id": str(q1.id), "selected_answer_id": str(opts[0].id)},
                                {"question_id": str(q1.id), "selected_answer_id": str(opts[0].id)}]}
-        resp = await client.post(f"/api/v1/api/tests/blocks/{block.id}/submit", json=payload)
+        resp = await client.post(f"/api/v1/tests/blocks/{block.id}/submit", json=payload)
         # Should be graded as partial (since only 1 unique ID was found out of 2 correct)
         assert resp.json()["score"] == 0
 
@@ -230,7 +230,7 @@ class TestGradingLogic:
         user = await _create_user(session, "student_mc5@test.com")
         await client.post("/api/v1/auth/login", data={"username": user.email, "password": "Password12345!"})
         
-        resp = await client.post(f"/api/v1/api/tests/blocks/{block.id}/submit", json={"answers": []})
+        resp = await client.post(f"/api/v1/tests/blocks/{block.id}/submit", json={"answers": []})
         assert resp.json()["score"] == 0
 
 # ─── TEST SUITE C: STATS & PROGRESS (10 TESTS) ───────────────────────────────
@@ -277,7 +277,7 @@ class TestSecurityPermissions:
         await client.post("/api/v1/auth/login", data={"username": user.email, "password": "Password12345!"})
         
         # Block 0 is a lesson
-        resp = await client.post(f"/api/v1/api/tests/blocks/{blocks[0].id}/submit", json={"answers": []})
+        resp = await client.post(f"/api/v1/tests/blocks/{blocks[0].id}/submit", json={"answers": []})
         assert resp.status_code == 400
         assert "is not a test" in resp.json()["detail"]
 
@@ -305,14 +305,14 @@ class TestSecurityPermissions:
         
         # Regular user tries to access admin endpoint
         await client.post("/api/v1/auth/login", data={"username": user.email, "password": "Password12345!"})
-        resp = await client.get(f"/api/v1/api/tests/courses/{course.id}/pending-submissions")
+        resp = await client.get(f"/api/v1/tests/courses/{course.id}/pending-submissions")
         assert resp.status_code == 403 # Forbidden
         
         # Admin tries to access
         # Wait, I need a new client or logout. conftest client is scoped.
         # Let's just relogin
         await client.post("/api/v1/auth/login", data={"username": admin.email, "password": "Password12345!"})
-        resp = await client.get(f"/api/v1/api/tests/courses/{course.id}/pending-submissions")
+        resp = await client.get(f"/api/v1/tests/courses/{course.id}/pending-submissions")
         assert resp.status_code == 200
 
     async def test_submit_with_invalid_uuids(self, client, session):
@@ -323,7 +323,7 @@ class TestSecurityPermissions:
         
         # Random UUID for question
         payload = {"answers": [{"question_id": str(uuid.uuid4()), "selected_answer_id": str(uuid.uuid4())}]}
-        resp = await client.post(f"/api/v1/api/tests/blocks/{blocks[1].id}/submit", json=payload)
+        resp = await client.post(f"/api/v1/tests/blocks/{blocks[1].id}/submit", json=payload)
         # Should NOT crash. Since the question isn't found in this block, score will be 0.
         assert resp.status_code == 200
         assert resp.json()["score"] == 0
@@ -336,7 +336,7 @@ class TestSecurityPermissions:
         
         # Submit correct answers for Block 2 (T1) BUT to Block 4 (T2) endpoint
         payload = {"answers": [{"question_id": str(questions[0].id), "selected_answer_id": str(options[0].id)}]}
-        resp = await client.post(f"/api/v1/api/tests/blocks/{blocks[3].id}/submit", json=payload)
+        resp = await client.post(f"/api/v1/tests/blocks/{blocks[3].id}/submit", json=payload)
         # Score should be 0 because question 0 does not belong to block 3
         assert resp.json()["score"] == 0
 
@@ -355,7 +355,7 @@ class TestSecurityPermissions:
         await client.post("/api/v1/auth/login", data={"username": user.email, "password": "Password12345!"})
         
         # Submit manual test
-        await client.post(f"/api/v1/api/tests/blocks/{b1.id}/submit", json={"answers": [{"question_id": str(q1.id), "text_answer": "Done"}]})
+        await client.post(f"/api/v1/tests/blocks/{b1.id}/submit", json={"answers": [{"question_id": str(q1.id), "text_answer": "Done"}]})
         
         # Check results
         resp = await client.get(f"/api/v1/courses/{course.id}/blocks/{b1.id}/test-results")
@@ -381,7 +381,7 @@ class TestSecurityPermissions:
         await client.post("/api/v1/auth/login", data={"username": user.email, "password": "Password12345!"})
         
         payload = {"answers": [{"question_id": str(q1.id), "selected_answer_id": str(o.id)} for o in opts]}
-        resp = await client.post(f"/api/v1/api/tests/blocks/{block.id}/submit", json=payload)
+        resp = await client.post(f"/api/v1/tests/blocks/{block.id}/submit", json=payload)
         assert resp.json()["score"] == 1
 
     async def test_stage_calculation_boundaries(self, client, session):

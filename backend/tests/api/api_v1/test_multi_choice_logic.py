@@ -59,7 +59,7 @@ async def test_multichoice_full_match(client: AsyncClient, session: AsyncSession
             {"question_id": str(q2.id), "selected_answer_id": str(o2[0].id)} # Correct X
         ]
     }
-    resp = await client.post(f"/api/v1/api/tests/blocks/{block.id}/submit", json=payload)
+    resp = await client.post(f"/api/v1/tests/blocks/{block.id}/submit", json=payload)
     assert resp.status_code == 200
     assert resp.json()["score"] == 2 # Both Q1 and Q2 correct
 
@@ -79,7 +79,7 @@ async def test_multichoice_partial_match(client: AsyncClient, session: AsyncSess
             {"question_id": str(q2.id), "selected_answer_id": str(o2[0].id)}
         ]
     }
-    resp = await client.post(f"/api/v1/api/tests/blocks/{block.id}/submit", json=payload)
+    resp = await client.post(f"/api/v1/tests/blocks/{block.id}/submit", json=payload)
     assert resp.status_code == 200
     assert resp.json()["score"] == 1 # Only Q2 correct
 
@@ -101,7 +101,7 @@ async def test_multichoice_over_selection(client: AsyncClient, session: AsyncSes
             {"question_id": str(q2.id), "selected_answer_id": str(o2[0].id)}
         ]
     }
-    resp = await client.post(f"/api/v1/api/tests/blocks/{block.id}/submit", json=payload)
+    resp = await client.post(f"/api/v1/tests/blocks/{block.id}/submit", json=payload)
     assert resp.status_code == 200
     assert resp.json()["score"] == 1 # Only Q2 correct
 
@@ -121,7 +121,7 @@ async def test_test_results_multichoice_display(client: AsyncClient, session: As
             {"question_id": str(q1.id), "selected_answer_id": str(o1[1].id)}
         ]
     }
-    await client.post(f"/api/v1/api/tests/blocks/{block.id}/submit", json=payload)
+    await client.post(f"/api/v1/tests/blocks/{block.id}/submit", json=payload)
     
     # Get results
     resp = await client.get(f"/api/v1/courses/{course.id}/blocks/{block.id}/test-results")

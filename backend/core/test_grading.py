@@ -16,7 +16,7 @@ async def auto_grade_submission(
     db: AsyncSession, submission: TestSubmission
 ) -> TestSubmission:
     block = await db.get(Block, submission.block_id)
-    if block.block_type != BlockType.auto_test:
+    if block.block_type not in (BlockType.auto_test, BlockType.manual_test, BlockType.mixed_test):
         return submission
 
     questions = (
@@ -33,6 +33,7 @@ async def auto_grade_submission(
 
     max_score = len(questions)
     score = 0
+    has_manual_questions = False
 
     answers = (
         (
@@ -53,8 +54,12 @@ async def auto_grade_submission(
         answer_map[a.question_id].append(a)
 
     for question in questions:
+        if question.question_type == QuestionType.free_text:
+            has_manual_questions = True
+            continue
+
         q_answers = answer_map.get(question.id, [])
-        if not q_answers and question.block.block_type == BlockType.auto_test:
+        if not q_answers:
             # No answer provided for this question
             continue
 
@@ -69,13 +74,18 @@ async def auto_grade_submission(
             # Multiple choice: Set of selected IDs must exactly match set of correct IDs
             if user_selected_ids == correct_option_ids and correct_option_ids:
                 score += 1
-        # Free text questions (manual tests) are not auto-graded here
 
     submission.score = score
     submission.max_score = max_score
-    submission.is_graded = True
+    
+    # Submission is fully graded only if it's an auto_test AND there are no questions requiring manual review.
+    # Mixed and manual tests always require admin finalization as per requirements.
+    if block.block_type in (BlockType.manual_test, BlockType.mixed_test):
+        submission.is_graded = False
+    else:
+        submission.is_graded = not has_manual_questions
 
-    if score == max_score:
+    if submission.is_graded and score == max_score:
         await _mark_block_completed(db, submission.user_id, submission.block_id)
 
     return submission

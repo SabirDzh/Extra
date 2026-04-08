@@ -9,19 +9,19 @@ from core.models.progress import UserBlockProgress
 # ─── HELPERS ─────────────────────────────────────────────────────────────────
 
 async def _create_multi_stage_env(session: AsyncSession, admin_id: uuid.UUID):
-    course = Course(title="Progessive Course", created_by=admin_id, is_published=True)
+    course = Course(id=uuid.uuid4(), title="Progessive Course", created_by=admin_id, is_published=True)
     session.add(course)
     await session.flush()
     
     # Stage 1: B1, B2
-    b1 = Block(course_id=course.id, title="L1", block_type=BlockType.lesson, order_index=1)
-    b2 = Block(course_id=course.id, title="T1", block_type=BlockType.auto_test, order_index=2)
+    b1 = Block(id=uuid.uuid4(), course_id=course.id, title="L1", block_type=BlockType.lesson, order_index=1)
+    b2 = Block(id=uuid.uuid4(), course_id=course.id, title="T1", block_type=BlockType.auto_test, order_index=2)
     # Stage 2: B3, B4
-    b3 = Block(course_id=course.id, title="L2", block_type=BlockType.lesson, order_index=3)
-    b4 = Block(course_id=course.id, title="T2", block_type=BlockType.auto_test, order_index=4)
+    b3 = Block(id=uuid.uuid4(), course_id=course.id, title="L2", block_type=BlockType.lesson, order_index=3)
+    b4 = Block(id=uuid.uuid4(), course_id=course.id, title="T2", block_type=BlockType.auto_test, order_index=4)
     # Stage 3: B5, B6
-    b5 = Block(course_id=course.id, title="L3", block_type=BlockType.lesson, order_index=5)
-    b6 = Block(course_id=course.id, title="T3", block_type=BlockType.auto_test, order_index=6)
+    b5 = Block(id=uuid.uuid4(), course_id=course.id, title="L3", block_type=BlockType.lesson, order_index=5)
+    b6 = Block(id=uuid.uuid4(), course_id=course.id, title="T3", block_type=BlockType.auto_test, order_index=6)
     
     session.add_all([b1, b2, b3, b4, b5, b6])
     await session.commit()
