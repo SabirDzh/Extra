@@ -5,6 +5,7 @@ from typing import List, Literal
 from core.models.block import Block, TEST_BLOCK_TYPES
 from core.models.course import Course, CourseAudience, CourseEnrollment, CourseLevel, CourseStatus
 from core.models.progress import UserBlockProgress
+from core.models.test import TestSubmission
 from core.schemas.course import CourseCreate, CourseUpdate
 from sqlalchemy import delete, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -358,4 +359,46 @@ async def attach_course_progress(
         c.progress = CourseProgress(
             completed=completed, total=total, percent=percent, status=status
         )
+
+
+async def reset_course_progress(
+    session: AsyncSession,
+    user_id: uuid.UUID,
+    course_id: uuid.UUID,
+) -> bool:
+    """
+    Permanently deletes all progress and test submissions for a user in a course.
+    Returns True if enrollment was found and reset, False otherwise.
+    """
+    enrollment = await get_enrollment(session, user_id, course_id)
+    if not enrollment:
+        return False
+
+    # 1. Get all block IDs for this course
+    stmt_blocks = select(Block.id).where(Block.course_id == course_id)
+    result_blocks = await session.execute(stmt_blocks)
+    block_ids = [row[0] for row in result_blocks.all()]
+
+    if block_ids:
+        # 2. Delete UserBlockProgress
+        await session.execute(
+            delete(UserBlockProgress).where(
+                UserBlockProgress.user_id == user_id,
+                UserBlockProgress.block_id.in_(block_ids),
+            )
+        )
+
+        # 3. Delete TestSubmission (TestAnswer will be deleted by cascade)
+        await session.execute(
+            delete(TestSubmission).where(
+                TestSubmission.user_id == user_id,
+                TestSubmission.block_id.in_(block_ids),
+            )
+        )
+
+    # 4. Reset enrollment completion
+    enrollment.completed_at = None
+
+    await session.commit()
+    return True
 

@@ -219,6 +219,28 @@ async def get_progress(
     return CourseProgress(completed=completed_count, total=total, percent=percent)
 
 
+@router.post("/{course_id}/users/{user_id}/reset")
+async def reset_progress(
+    course_id: uuid.UUID,
+    user_id: uuid.UUID,
+    db: Session,
+    admin: AdminUser,
+):
+    course = await course_crud.get_course(db, course_id)
+    if not course:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Course not found"
+        )
+
+    reset_done = await course_crud.reset_course_progress(db, user_id, course_id)
+    if not reset_done:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="User not enrolled in this course"
+        )
+
+    return {"detail": "Progress reset successfully"}
+
+
 @router.delete("/", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_courses(
     db: Session, courses_id: Annotated[list[uuid.UUID], Query()], admin: AdminUser
