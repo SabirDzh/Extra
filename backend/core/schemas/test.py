@@ -91,8 +91,8 @@ class TestSubmissionRead(BaseModel):
     user_id: uuid.UUID
     block_id: uuid.UUID
     submitted_at: datetime
-    score: int | None
-    max_score: int
+    score: float | None
+    max_score: float
     is_graded: bool
     graded_by: uuid.UUID | None
     admin_comment: str | None
@@ -102,7 +102,7 @@ class TestSubmissionRead(BaseModel):
 
 
 class GradeSubmission(BaseModel):
-    score: int
+    score: float
     admin_comment: str | None = None
 
 
@@ -112,14 +112,14 @@ class QuestionResult(BaseModel):
     status: TestResultStatus
     correct_answer: str | None
     user_answer: str | None
-    score: int
+    score: float
 
 
 class BlockTestResults(BaseModel):
     block_id: uuid.UUID
     submission_id: uuid.UUID | None
-    total_score: int | None
-    max_score: int
+    total_score: float | None
+    max_score: float
     correct_count: int = 0
     incorrect_count: int = 0
     questions: list[QuestionResult]

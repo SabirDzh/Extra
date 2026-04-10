@@ -9,13 +9,55 @@ from fastapi_cache.backends.inmemory import InMemoryBackend
 from fastapi_users.password import PasswordHelper
 from httpx import ASGITransport, AsyncClient
 from main import main_app
-from sqlalchemy.dialects.postgresql import JSONB, TSVECTOR
+from sqlalchemy import UUID as SaUUID
+from sqlalchemy.dialects.postgresql import JSONB, TSVECTOR, UUID as PgUUID
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.ext.compiler import compiles
 from sqlalchemy.pool import StaticPool
+import uuid
 
-# Use in-memory SQLite for tests
-DATABASE_URL = "sqlite+aiosqlite:///:memory:"
+from sqlalchemy.types import TypeDecorator, CHAR
+from sqlalchemy.dialects.postgresql import UUID as PgUUID
+from sqlalchemy import UUID as SaUUID
+
+class GUID(TypeDecorator):
+    """Platform-independent GUID type."""
+    impl = CHAR
+    cache_ok = True
+
+    def load_dialect_impl(self, dialect):
+        if dialect.name == "postgresql":
+            return dialect.type_descriptor(PgUUID())
+        else:
+            return dialect.type_descriptor(CHAR(36))
+
+    def process_bind_param(self, value, dialect):
+        if value is None:
+            return value
+        elif dialect.name == "postgresql":
+            return str(value)
+        else:
+            if not isinstance(value, uuid.UUID):
+                return str(uuid.UUID(value))
+            else:
+                return str(value)
+
+    def process_result_value(self, value, dialect):
+        if value is None:
+            return value
+        else:
+            if not isinstance(value, uuid.UUID):
+                return uuid.UUID(value)
+            else:
+                return value
+
+@compiles(PgUUID, "sqlite")
+@compiles(SaUUID, "sqlite")
+def compile_guid(type_, compiler, **kw):
+    return "CHAR(36)"
+
+# Use file-based SQLite for tests
+DATABASE_URL = "sqlite+aiosqlite:///./test_db.sqlite"
 
 
 @compiles(JSONB, "sqlite")

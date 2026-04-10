@@ -19,7 +19,7 @@ from core.schemas.test import (
     TestSubmissionRead,
     TestSubmit,
 )
-from core.test_grading import auto_grade_submission
+from crud.test_grading import auto_grade_submission, _mark_block_completed
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -63,7 +63,7 @@ async def create_question(
     return await _load_question(db, question.id)
 
 
-@router.put("/questions/{question_id}", response_model=QuestionReadAdmin)
+@router.patch("/questions/{question_id}", response_model=QuestionReadAdmin)
 async def update_question(
     question_id: uuid.UUID,
     data: QuestionUpdate,
@@ -236,14 +236,13 @@ async def grade_submission(
     if not submission:
         raise HTTPException(status_code=404, detail="Submission not found")
 
-    submission.score = data.score
+    submission.score = float(data.score) / 100.0
+    submission.max_score = 1.0
     submission.admin_comment = data.admin_comment
     submission.is_graded = True
     submission.graded_by = admin.id
 
     if data.score > 0:
-        from core.test_grading import _mark_block_completed
-
         await _mark_block_completed(db, submission.user_id, submission.block_id)
 
     await db.commit()

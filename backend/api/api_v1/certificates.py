@@ -34,7 +34,6 @@ async def generate_certificate(
     if not course:
         raise HTTPException(status_code=404, detail="Course not found")
 
-    # check existing
     existing = (
         await db.execute(
             select(Certificate).where(
@@ -46,7 +45,6 @@ async def generate_certificate(
     if existing:
         return existing
 
-    # check 100% progress
     total = len(course.blocks)
     if total == 0:
         raise HTTPException(status_code=400, detail="Course has no blocks")

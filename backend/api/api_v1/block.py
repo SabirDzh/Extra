@@ -10,7 +10,9 @@ from core.models.course import Course, AUDIENCE_DISPLAY_NAMES, LEVEL_DISPLAY_NAM
 from core.models.db_helper import db_helper
 from core.models.progress import UserBlockProgress
 from core.models.user import User
+from core.models.test import TestSubmission
 from core.schemas.block import BlockCreate, BlockRead, BlockUpdate, CourseBlocksResponse
+from crud.test_grading import _mark_block_completed
 from crud import course as course_crud
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, status
 from sqlalchemy import select
@@ -51,13 +53,21 @@ async def _format_block_read(
     lvl_label = LEVEL_DISPLAY_NAMES.get(course.level, str(course.level))
     
     is_done = False
+    is_attempted = False
     if user_id:
-        stmt = select(UserBlockProgress.is_completed).where(
+        stmt_done = select(UserBlockProgress.is_completed).where(
             UserBlockProgress.user_id == user_id,
             UserBlockProgress.block_id == block.id,
             UserBlockProgress.is_completed == True,
         )
-        is_done = (await db.execute(stmt)).scalar() or False
+        is_done = (await db.execute(stmt_done)).scalar() or False
+        
+        if not is_done:
+            stmt_attempt = select(TestSubmission.id).where(
+                TestSubmission.user_id == user_id,
+                TestSubmission.block_id == block.id,
+            ).limit(1)
+            is_attempted = (await db.execute(stmt_attempt)).scalar() is not None
         
     # Count questions in this block
     from core.models.test import Question
@@ -86,11 +96,17 @@ async def _format_block_read(
     # Stage calculation (Lesson + Test = 1 stage)
     pos_stage = (pos_index - 1) // 2 + 1
 
+    status = CourseStatus.not_started
+    if is_done:
+        status = CourseStatus.completed
+    elif is_attempted:
+        status = CourseStatus.in_progress
+
     block_progress = CourseProgress(
         completed=1 if is_done else 0,
         total=n_questions,
         percent=100.0 if is_done else 0.0,
-        status=CourseStatus.completed if is_done else CourseStatus.not_started,
+        status=status,
     )
     
     return BlockRead(
@@ -130,6 +146,15 @@ async def list_blocks(course_id: uuid.UUID, db: Session, user: OptionalUser):
         )
         completed_block_ids = set((await db.execute(stmt_progress)).scalars().all())
 
+        # Optimized submission fetch for "in_progress" status
+        stmt_submissions = select(TestSubmission.block_id).where(
+            TestSubmission.user_id == user.id,
+            TestSubmission.block_id.in_([b.id for b in blocks]),
+        )
+        submitted_block_ids = set((await db.execute(stmt_submissions)).scalars().all())
+    else:
+        submitted_block_ids = set()
+
     # Fetch question counts for all blocks in the course
     from core.models.test import Question
     from sqlalchemy import func
@@ -156,8 +181,11 @@ async def list_blocks(course_id: uuid.UUID, db: Session, user: OptionalUser):
             current_block_id = b.id
             found_active = True
             
+    # If admin, let them see everything
+    if user and (user.role == "administrator" or user.is_superuser):
+        active_stage = all_stages_count
     # If all completed, let them see everything
-    if not found_active and blocks:
+    elif not found_active and blocks:
         active_stage = all_stages_count
 
     # 2. Build and Filter block reads
@@ -189,7 +217,11 @@ async def list_blocks(course_id: uuid.UUID, db: Session, user: OptionalUser):
                     completed=1 if b.id in completed_block_ids else 0,
                     total=question_counts.get(b.id, 0),
                     percent=100.0 if b.id in completed_block_ids else 0.0,
-                    status=CourseStatus.completed if b.id in completed_block_ids else CourseStatus.not_started,
+                    status=(
+                        CourseStatus.completed if b.id in completed_block_ids 
+                        else CourseStatus.in_progress if b.id in submitted_block_ids 
+                        else CourseStatus.not_started
+                    ),
                 ),
             )
         )
@@ -238,7 +270,7 @@ async def get_block(
     return await _format_block_read(db, block, course, user.id if user else None)
 
 
-@router.put("/{block_id}", response_model=BlockRead)
+@router.patch("/{block_id}", response_model=BlockRead)
 async def update_block(
     course_id: uuid.UUID,
     block_id: uuid.UUID,
@@ -298,32 +330,10 @@ async def mark_complete(
 ):
     block = await _get_block_or_404(db, block_id, course_id)
 
-    existing = (
-        await db.execute(
-            select(UserBlockProgress).where(
-                UserBlockProgress.user_id == user.id,
-                UserBlockProgress.block_id == block_id,
-            )
-        )
-    ).scalar_one_or_none()
-
-    if existing:
-        existing.is_completed = True
-        existing.completed_at = datetime.now(timezone.utc)
-    else:
-        db.add(
-            UserBlockProgress(
-                user_id=user.id,
-                block_id=block_id,
-                is_completed=True,
-                completed_at=datetime.now(timezone.utc),
-            )
-        )
+    await _mark_block_completed(db, user.id, block_id, course_id)
 
     await db.commit()
 
-    # Automatically recalculate course completion status (business logic in crud)
-    await course_crud.update_course_completion_status(db, user.id, course_id)
 
     return {"detail": "Block marked as completed"}
 

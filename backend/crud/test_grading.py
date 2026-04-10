@@ -1,3 +1,4 @@
+import uuid
 from datetime import datetime, timezone
 
 from sqlalchemy import select
@@ -10,6 +11,7 @@ from core.models.block import (
 )
 from core.models.progress import UserBlockProgress
 from core.models.test import Question, TestAnswer, TestSubmission
+from crud import course as course_crud
 
 
 async def auto_grade_submission(
@@ -75,8 +77,8 @@ async def auto_grade_submission(
             if user_selected_ids == correct_option_ids and correct_option_ids:
                 score += 1
 
-    submission.score = score
-    submission.max_score = max_score
+    submission.score = float(score) / float(max_score) if max_score > 0 else 0.0
+    submission.max_score = 1.0
     
     # Submission is fully graded only if it's an auto_test AND there are no questions requiring manual review.
     # Mixed and manual tests always require admin finalization as per requirements.
@@ -85,13 +87,22 @@ async def auto_grade_submission(
     else:
         submission.is_graded = not has_manual_questions
 
-    if submission.is_graded and score == max_score:
-        await _mark_block_completed(db, submission.user_id, submission.block_id)
+    if block.block_type == BlockType.auto_test or (submission.is_graded and submission.score > 0):
+        # NOTE: Auto-tests are marked completed regardless of score per requirements.
+        # Manual/Mixed tests are marked completed only after admin grades successfully (score > 0).
+        await _mark_block_completed(db, submission.user_id, submission.block_id, block.course_id)
 
     return submission
 
 
-async def _mark_block_completed(db: AsyncSession, user_id: int, block_id: int) -> None:
+async def _mark_block_completed(
+    db: AsyncSession, user_id: uuid.UUID, block_id: uuid.UUID, course_id: uuid.UUID | None = None
+) -> None:
+    if course_id is None:
+        block = await db.get(Block, block_id)
+        if block:
+            course_id = block.course_id
+
     existing = (
         await db.execute(
             select(UserBlockProgress).where(
@@ -113,3 +124,8 @@ async def _mark_block_completed(db: AsyncSession, user_id: int, block_id: int) -
                 completed_at=datetime.now(timezone.utc),
             )
         )
+    
+    await db.flush()
+
+    if course_id:
+        await course_crud.update_course_completion_status(db, user_id, course_id)

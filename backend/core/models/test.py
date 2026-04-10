@@ -2,7 +2,7 @@ import enum
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, Enum, ForeignKey, Integer, String, Text, func
+from sqlalchemy import DateTime, Enum, Float, ForeignKey, Integer, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from core.models.base import Base
@@ -49,8 +49,8 @@ class TestSubmission(IdUuidPkMixin, Base):
     submitted_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
-    score: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    max_score: Mapped[int] = mapped_column(Integer, default=0)
+    score: Mapped[float | None] = mapped_column(Float, nullable=True)
+    max_score: Mapped[float] = mapped_column(Float, default=0.0)
     is_graded: Mapped[bool] = mapped_column(default=False)
     graded_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     admin_comment: Mapped[str | None] = mapped_column(Text, nullable=True)
