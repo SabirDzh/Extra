@@ -74,16 +74,22 @@ async def get_courses_progress(
     result = await db.execute(stmt)
     items = []
     for course, _, total_blocks, completed_blocks in result.all():
-        total = total_blocks or 0
-        completed = completed_blocks or 0
-        percent = round((completed / total) * 100, 2) if total else 0.0
+        total_cnt = total_blocks or 0
+        completed_cnt = completed_blocks or 0
+        percent = round((completed_cnt / total_cnt) * 100, 2) if total_cnt else 0.0
+        
+        # 1 stage = Lesson + Test (2 blocks)
+        completed_stages = completed_cnt // 2
+        
         items.append(
             {
                 "course_id": course.id,
                 "course_title": course.title,
-                "total_blocks": total,
-                "completed_blocks": completed,
+                "total_blocks": total_cnt,
+                "completed_blocks": completed_cnt,
                 "percent": percent,
+                "total": completed_stages,
+                "progress": {"total": completed_stages},
             }
         )
     return items

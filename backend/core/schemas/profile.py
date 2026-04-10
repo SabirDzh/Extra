@@ -28,6 +28,8 @@ class CourseProgressRead(BaseModel):
     total_blocks: int
     completed_blocks: int
     percent: float
+    total: int = 0
+    progress: dict[str, int] | None = None
 
     model_config = ConfigDict(from_attributes=True)
 

@@ -206,11 +206,14 @@ async def get_progress(
             status_code=status.HTTP_404_NOT_FOUND, detail="Course not found"
         )
 
-    total = len(course.blocks)
+    from core.models.block import TEST_BLOCK_TYPES
+    test_blocks = [b for b in course.blocks if b.block_type in TEST_BLOCK_TYPES]
+    total = len(test_blocks)
+    
     if total == 0:
-        return CourseProgress(completed=0, total=0, percent=0.0)
+        return CourseProgress(completed=0, total=0, percent=0.0, progress={"total": 0})
 
-    block_ids = [b.id for b in course.blocks]
+    block_ids = [b.id for b in test_blocks]
     completed_count = await course_crud.get_completed_blocks_count(
         db, user.id, block_ids
     )
