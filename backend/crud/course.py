@@ -357,7 +357,11 @@ async def attach_course_progress(
             status = CourseStatus.not_started
 
         c.progress = CourseProgress(
-            completed=completed, total=total, percent=percent, status=status
+            completed=completed,
+            total=total,
+            percent=percent,
+            status=status,
+            progress={"total": completed},
         )
 
 

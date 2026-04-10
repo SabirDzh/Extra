@@ -216,7 +216,12 @@ async def get_progress(
     )
 
     percent = round((completed_count / total) * 100, 2)
-    return CourseProgress(completed=completed_count, total=total, percent=percent)
+    return CourseProgress(
+        completed=completed_count,
+        total=total,
+        percent=percent,
+        progress={"total": completed_count},
+    )
 
 
 @router.post("/{course_id}/users/{user_id}/reset")

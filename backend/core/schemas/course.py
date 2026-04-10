@@ -61,4 +61,5 @@ class CourseProgress(BaseModel):
     total: int = 0
     percent: float = 0.0
     status: CourseStatus = CourseStatus.not_started
+    progress: dict[str, int] | None = None
 
