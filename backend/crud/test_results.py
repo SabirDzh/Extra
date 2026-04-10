@@ -161,10 +161,11 @@ async def get_test_results_for_block(
         correct_count=correct_count,
         incorrect_count=incorrect_count,
         completed_at=submission.submitted_at,
-        topic=block.title,
+        title=course.title,
         total_stages=total_stages,
         passed_stages=current_stage,
         progress=course.progress,
         questions=question_results,
     )
+
 

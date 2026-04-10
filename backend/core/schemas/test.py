@@ -126,8 +126,9 @@ class BlockTestResults(BaseModel):
     correct_count: int = 0
     incorrect_count: int = 0
     completed_at: datetime | None = None
-    topic: str | None = None
+    title: str | None = None
     total_stages: int | None = None
+
     passed_stages: int | None = None
     progress: CourseProgress | None = None
     questions: list[QuestionResult]
