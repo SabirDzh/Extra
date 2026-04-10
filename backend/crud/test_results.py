@@ -133,6 +133,26 @@ async def get_test_results_for_block(
     correct_count = sum(1 for r in question_results if r.status == TestResultStatus.CORRECT)
     incorrect_count = sum(1 for r in question_results if r.status == TestResultStatus.INCORRECT)
 
+    # 5. Additional context: Topic, completion time, stages and progress
+    from core.models.course import Course
+    from crud import course as course_crud
+
+    course = await db.get(Course, block.course_id)
+    await course_crud.attach_course_progress(db, [course], user_id)
+
+    # Calculate stages
+    stmt_all_blocks = select(Block).where(Block.course_id == block.course_id).order_by(Block.order_index)
+    all_blocks = (await db.execute(stmt_all_blocks)).scalars().all()
+    total_stages = (len(all_blocks) + 1) // 2
+
+    # Find current block index to determine its stage
+    current_block_index = 1
+    for i, b in enumerate(all_blocks):
+        if b.id == block_id:
+            current_block_index = i + 1
+            break
+    current_stage = (current_block_index - 1) // 2 + 1
+
     return BlockTestResults(
         block_id=block_id,
         submission_id=submission.id,
@@ -140,5 +160,11 @@ async def get_test_results_for_block(
         max_score=len(questions),
         correct_count=correct_count,
         incorrect_count=incorrect_count,
+        completed_at=submission.submitted_at,
+        topic=block.title,
+        total_stages=total_stages,
+        passed_stages=current_stage,
+        progress=course.progress,
         questions=question_results,
     )
+

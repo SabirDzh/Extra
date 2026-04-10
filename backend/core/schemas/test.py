@@ -115,6 +115,9 @@ class QuestionResult(BaseModel):
     score: float
 
 
+from core.schemas.course import CourseProgress
+
+
 class BlockTestResults(BaseModel):
     block_id: uuid.UUID
     submission_id: uuid.UUID | None
@@ -122,4 +125,10 @@ class BlockTestResults(BaseModel):
     max_score: float
     correct_count: int = 0
     incorrect_count: int = 0
+    completed_at: datetime | None = None
+    topic: str | None = None
+    total_stages: int | None = None
+    passed_stages: int | None = None
+    progress: CourseProgress | None = None
     questions: list[QuestionResult]
+
