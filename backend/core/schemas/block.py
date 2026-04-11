@@ -44,6 +44,7 @@ class BlockRead(BaseModel):
     
     audience_label: str
     level_label: str
+    description: str | None = None
     progress: CourseProgress | None
     next_block_id: uuid.UUID | None = None
     stage: int = 1

@@ -120,6 +120,7 @@ async def _format_block_read(
         created_at=block.created_at,
         audience_label=aud_label,
         level_label=lvl_label,
+        description=course.description,
         progress=block_progress,
         next_block_id=next_id,
         stage=pos_stage,
@@ -211,6 +212,7 @@ async def list_blocks(course_id: uuid.UUID, db: Session, user: OptionalUser):
                 created_at=b.created_at,
                 audience_label=aud_label,
                 level_label=lvl_label,
+                description=course.description,
                 next_block_id=next_id,
                 stage=pos_stage,
                 progress=CourseProgress(
