@@ -361,6 +361,8 @@ async def attach_course_progress(
             total=total,
             percent=percent,
             status=status,
+            all_total=total,
+            current_stage=min(completed + 1, total) if total > 0 else 0,
             progress={"total": completed},
         )
 

@@ -79,6 +79,7 @@ async def get_courses_progress(
         percent = round((completed_cnt / total_cnt) * 100, 2) if total_cnt else 0.0
         
         # 1 stage = Lesson + Test (2 blocks)
+        all_stages = total_cnt // 2
         completed_stages = completed_cnt // 2
         
         items.append(
@@ -89,6 +90,9 @@ async def get_courses_progress(
                 "completed_blocks": completed_cnt,
                 "percent": percent,
                 "total": completed_stages,
+                "completed": completed_stages,
+                "all_total": all_stages,
+                "current_stage": min(completed_stages + 1, all_stages) if all_stages > 0 else 0,
                 "progress": {"total": completed_stages},
             }
         )

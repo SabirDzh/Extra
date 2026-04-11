@@ -223,6 +223,8 @@ async def get_progress(
         completed=completed_count,
         total=total,
         percent=percent,
+        all_total=total,
+        current_stage=min(completed_count + 1, total) if total > 0 else 0,
         progress={"total": completed_count},
     )
 
