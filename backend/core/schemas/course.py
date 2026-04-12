@@ -28,18 +28,13 @@ class CourseUpdate(BaseModel):
     is_published: bool | None = None
 
 
-class CourseRead(BaseModel):
+class CourseBase(BaseModel):
     id: uuid.UUID
     title: str
     description: str
     level: CourseLevel
     audience: CourseAudience
-    is_published: bool
-    created_by: uuid.UUID
     created_at: datetime
-    updated_at: datetime
-
-    progress: "CourseProgress" = None  # type: ignore[assignment]
 
     model_config = {"from_attributes": True}
 
@@ -54,6 +49,17 @@ class CourseRead(BaseModel):
     def audience_label(self) -> str:
         """Human-readable audience name for the frontend (e.g. 'Для всех')."""
         return AUDIENCE_DISPLAY_NAMES[self.audience]
+
+
+class CourseListRead(CourseBase):
+    progress: "CourseProgress" = None  # type: ignore[assignment]
+
+
+class CourseRead(CourseBase):
+    is_published: bool
+    created_by: uuid.UUID
+    updated_at: datetime
+    progress: "CourseProgress" = None  # type: ignore[assignment]
 
 
 class CourseProgress(BaseModel):

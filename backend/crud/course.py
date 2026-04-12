@@ -9,7 +9,7 @@ from core.models.test import TestSubmission
 from core.schemas.course import CourseCreate, CourseUpdate
 from sqlalchemy import delete, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import load_only, selectinload
 from utils.db import ensure_unique_field
 
 
@@ -124,7 +124,6 @@ async def get_completed_blocks_count(
     result = await session.execute(stmt)
     return result.scalar() or 0
 
-
 async def search_courses(
     session: AsyncSession,
     q: str | None = None,
@@ -137,7 +136,20 @@ async def search_courses(
     level: CourseLevel | None = None,
     audience: CourseAudience | None = None,
 ):
-    query = select(Course).where(Course.is_published)
+    query = (
+        select(Course)
+        .where(Course.is_published)
+        .options(
+            load_only(
+                Course.id,
+                Course.title,
+                Course.description,
+                Course.level,
+                Course.audience,
+                Course.created_at,
+            )
+        )
+    )
 
     # 1. Text Search
     if q:

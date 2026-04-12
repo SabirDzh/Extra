@@ -7,7 +7,7 @@ from core.models.course import CourseAudience, CourseLevel
 from core.models.db_helper import db_helper
 from core.models.user import User
 from core.schemas.base import PaginationParams
-from core.schemas.course import CourseCreate, CourseProgress, CourseRead, CourseUpdate
+from core.schemas.course import CourseCreate, CourseListRead, CourseProgress, CourseRead, CourseUpdate
 from crud import course as course_crud
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -24,7 +24,7 @@ IsUser = Annotated[User, Depends(current_active_user)]
 OptionalUser = Annotated[User | None, Depends(current_optional_user)]
 
 
-@router.get("/", response_model=list[CourseRead])
+@router.get("/", response_model=list[CourseListRead])
 async def list_courses(
     db: Session,
     pagination: Annotated[PaginationParams, Depends()],
@@ -55,7 +55,7 @@ async def list_courses(
     return courses
 
 
-@router.get("/search", response_model=list[CourseRead])
+@router.get("/search", response_model=list[CourseListRead])
 async def search_courses(
     db: Session,
     pagination: Annotated[PaginationParams, Depends()],
