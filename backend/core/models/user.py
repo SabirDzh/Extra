@@ -1,9 +1,10 @@
+from datetime import datetime
 from typing import TYPE_CHECKING
 
 from fastapi_users_db_sqlalchemy import (
     SQLAlchemyUserDatabase as SQLAlchemyUserDatabaseGeneric,
 )
-from sqlalchemy import JSON, Boolean, String, select
+from sqlalchemy import JSON, Boolean, DateTime, String, func, select
 from sqlalchemy.dialects.postgresql import (
     ENUM as PgEnum,
 )
@@ -55,6 +56,10 @@ class User(IdUuidPkMixin, Base):
     )
 
     image_url: Mapped[str | None] = mapped_column(String, nullable=True)
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
 
     enrollments: Mapped[list["CourseEnrollment"]] = relationship(back_populates="user")
     created_courses: Mapped[list["Course"]] = relationship(back_populates="creator")
