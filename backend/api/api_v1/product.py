@@ -7,6 +7,7 @@ from core.models.user import User
 from core.schemas.base import PaginationParams
 from core.schemas.product import (
     ProductCreate,
+    ProductListRead,
     ProductRead,
     ProductSummaryInfo,
     ProductUpdate,
@@ -22,6 +23,7 @@ from fastapi import (
     UploadFile,
     status,
 )
+from fastapi_cache.decorator import cache
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 from utils.analytics import (
@@ -55,12 +57,13 @@ def _get_client_identifier(request: Request) -> str:
     return request.client.host if request.client else "unknown"
 
 
-@router.get("/", response_model=list[ProductRead])
+@router.get("/", response_model=list[ProductListRead])
+@cache(expire=60)
 async def list_products(
     db: Session,
     redis: RedisDep,
     pagination: PaginationParams = Depends(),
-    sort_by: Literal["title", "created_at", "article"] = Query("title"),
+    sort_by: Literal["title", "created_at", "description"] = Query("title"),
     order: Literal["asc", "desc"] = Query("asc"),
     features: list[str] | None = Query(
         None, description="Filter by product attributes (e.g. 'Модуль Wi-Fi')"
@@ -75,22 +78,17 @@ async def list_products(
         features=features,
     )
 
-    product_ids = [p.id for p in products]
-    views = await get_multiple_product_views(redis, product_ids)
-
-    for product, view_count in zip(products, views):
-        product.views = view_count
-
     return products
 
 
-@router.get("/search", response_model=list[ProductRead])
+@router.get("/search", response_model=list[ProductListRead])
+@cache(expire=60)
 async def search_products(
     db: Session,
     redis: RedisDep,
     pagination: PaginationParams = Depends(),
     q: str | None = Query(None, description="Search query"),
-    sort_by: Literal["title", "created_at", "article"] = Query("title"),
+    sort_by: Literal["title", "created_at", "description"] = Query("title"),
     order: Literal["asc", "desc"] = Query("asc"),
     features: list[str] | None = Query(
         None, description="Filter by product attributes"
@@ -105,12 +103,6 @@ async def search_products(
         order=order,
         features=features,
     )
-
-    product_ids = [p.id for p in products]
-    views = await get_multiple_product_views(redis, product_ids)
-
-    for product, view_count in zip(products, views):
-        product.views = view_count
 
     return products
 
@@ -254,7 +246,8 @@ async def import_products(
     return await product_crud.import_products(db, file)
 
 
-@router.get("/popular/", response_model=list[ProductRead])
+@router.get("/popular/", response_model=list[ProductListRead])
+@cache(expire=60)
 async def get_popular_product(
     db: Session,
     redis: RedisDep,
@@ -274,10 +267,5 @@ async def get_popular_product(
     product_ids = [uuid.UUID(pid) for pid in top_ids_str]
 
     products = await product_crud.get_products_by_ids(db, product_ids)
-
-    actual_views = await get_multiple_product_views(redis, [p.id for p in products])
-
-    for product, view_count in zip(products, actual_views):
-        product.views = view_count
 
     return products

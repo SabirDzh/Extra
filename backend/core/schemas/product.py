@@ -4,21 +4,26 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field
 
 
-class ProductRead(BaseModel):
+class ProductBase(BaseModel):
     id: uuid.UUID
     title: str
-    description: str
-    documentation: (
-        str | None
-    )  # TODO clarify whether this stores a link or the documentation content
-    schema_connect: str | None  # TODO revisit this field
-    attributes: dict[str, Any]
     image_url: list[str]
-    views: int = 0
 
     model_config = ConfigDict(
         from_attributes=True,
     )
+
+
+class ProductListRead(ProductBase):
+    pass
+
+
+class ProductRead(ProductBase):
+    description: str
+    documentation: str | None
+    schema_connect: str | None
+    views: int = 0
+    attributes: dict[str, Any]
 
 
 class ProductCreate(BaseModel):

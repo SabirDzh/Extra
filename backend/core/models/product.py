@@ -16,16 +16,16 @@ class Product(IdUuidPkMixin, Base):
     image_url: Mapped[list[str]] = mapped_column(
         JSONB,
         default=list,
-    )  # TODO revisit: JSONB is used to store multiple images
+    )  
 
     schema_connect: Mapped[str] = mapped_column(
         Text,
         nullable=True,
-    )  # TODO revisit naming/storage format; kept as-is for tests
+    )  
     documentation: Mapped[str] = mapped_column(
         Text,
         nullable=True,
-    )  # TODO consider moving attributes into JSONB
+    )  
 
     attributes: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
 
@@ -53,4 +53,5 @@ class Product(IdUuidPkMixin, Base):
             postgresql_using="gin",
             postgresql_ops={"description": "gin_trgm_ops"},
         ),
+        Index("idx_product_attributes_gin", "attributes", postgresql_using="gin"),
     )

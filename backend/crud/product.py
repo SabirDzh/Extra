@@ -14,6 +14,7 @@ from openpyxl_image_loader import SheetImageLoader
 from PIL import Image as PILImage
 from sqlalchemy import delete, func, insert, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import load_only
 from utils.db import ensure_unique_field
 
 
@@ -25,7 +26,15 @@ async def get_products(
     order: str = "asc",
     features: list[str] | None = None,
 ):
-    stmt = select(Product)
+    # Optimize query by loading only necessary fields for the list view
+    stmt = select(Product).options(
+        load_only(
+            Product.id,
+            Product.title,
+            Product.image_url,
+            Product.created_at,
+        )
+    )
     if features:
         for feature in features:
             stmt = stmt.where(Product.attributes[feature].as_boolean())
@@ -34,8 +43,8 @@ async def get_products(
         sort_column = Product.title
     elif sort_by == "created_at":
         sort_column = Product.created_at
-    elif sort_by == "article":
-        sort_column = Product.attributes["Артикул"].as_string().cast(sa.BigInteger)
+    elif sort_by == "description":
+        sort_column = Product.description
     else:
         sort_column = Product.title
 
@@ -131,7 +140,16 @@ async def search_products(
     order: str = "asc",
     features: list[str] | None = None,
 ):
-    stmt = select(Product)
+    # Optimize query by loading only necessary fields for the list view
+    stmt = select(Product).options(
+        load_only(
+            Product.id,
+            Product.title,
+            Product.image_url,
+            Product.created_at,
+        )
+    )
+
     if q and len(q) >= 2:
         is_sqlite = session.bind.url.drivername.startswith("sqlite")
         if is_sqlite:
@@ -144,6 +162,7 @@ async def search_products(
             )
         else:
             ts_query = func.websearch_to_tsquery("russian", q)
+            # Filter first using indices (GIST/GIN for @@ and %)
             stmt = stmt.where(
                 or_(
                     Product.search_product.bool_op("@@")(ts_query),
@@ -151,11 +170,14 @@ async def search_products(
                     Product.description.bool_op("%")(q),
                 )
             )
+
+            # Apply relevance ranking only if not sorting by a specific column
             if sort_by == "title" and order == "asc":
+                # Only use similarity for title (cheaper) and ts_rank for everything else
+                # similarity on full description can be heavy
                 relevance = (
                     func.ts_rank(Product.search_product, ts_query)
                     + func.similarity(Product.title, q) * 2
-                    + func.similarity(Product.description, q) * 0.5
                 )
                 stmt = stmt.order_by(relevance.desc())
     elif q:
@@ -176,8 +198,8 @@ async def search_products(
             sort_column = Product.title
         elif sort_by == "created_at":
             sort_column = Product.created_at
-        elif sort_by == "article":
-            sort_column = Product.attributes["Артикул"].as_string().cast(sa.BigInteger)
+        elif sort_by == "description":
+            sort_column = Product.description
         else:
             sort_column = Product.title
 
