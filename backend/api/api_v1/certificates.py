@@ -17,7 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from core.config import settings
 
-router = APIRouter(prefix=settings.api.v1.certificates, tags=["Certificates"])
+router = APIRouter(prefix=f"/api{settings.api.v1.certificates}", tags=["Certificates"])
 
 Session = Annotated[AsyncSession, Depends(db_helper.session_getter)]
 

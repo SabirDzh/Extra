@@ -134,7 +134,7 @@ async def test_admin_update_block(client: AsyncClient, session: AsyncSession, ad
     course = await _create_course(session, admin_user.id)
     block = await _create_block(session, course.id, title="Old")
     payload = {"title": "New", "text_content": "updated content"}
-    resp = await client.put(f"/api/v1/courses/{course.id}/blocks/{block.id}", json=payload, headers=superuser_token_headers)
+    resp = await client.patch(f"/api/v1/courses/{course.id}/blocks/{block.id}", json=payload, headers=superuser_token_headers)
     assert resp.status_code == 200
     assert resp.json()["title"] == "New"
     assert resp.json()["text_content"] == "updated content"
@@ -146,14 +146,14 @@ async def test_user_update_block_fails(client: AsyncClient, session: AsyncSessio
     block = await _create_block(session, course.id, title="Safe")
     user = await create_user("hacker2@test.com")
     headers = await _get_auth_headers(client, {"email": "hacker2@test.com", "password": "Password12345!"})
-    resp = await client.put(f"/api/v1/courses/{course.id}/blocks/{block.id}", json={"title": "Hacked"}, headers=headers)
+    resp = await client.patch(f"/api/v1/courses/{course.id}/blocks/{block.id}", json={"title": "Hacked"}, headers=headers)
     assert resp.status_code in (401, 403)
 
 
 @pytest.mark.anyio
 async def test_update_nonexistent_block(client: AsyncClient, session: AsyncSession, admin_user, superuser_token_headers):
     course = await _create_course(session, admin_user.id)
-    resp = await client.put(f"/api/v1/courses/{course.id}/blocks/{uuid.uuid4()}", json={"title": "Ghost"}, headers=superuser_token_headers)
+    resp = await client.patch(f"/api/v1/courses/{course.id}/blocks/{uuid.uuid4()}", json={"title": "Ghost"}, headers=superuser_token_headers)
     assert resp.status_code == 404
 
 

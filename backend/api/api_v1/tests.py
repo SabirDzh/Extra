@@ -64,7 +64,6 @@ async def create_question(
 
 
 @router.patch("/questions/{question_id}", response_model=QuestionReadAdmin)
-@router.put("/questions/{question_id}", response_model=QuestionReadAdmin)
 async def update_question(
     question_id: uuid.UUID,
     data: QuestionUpdate,

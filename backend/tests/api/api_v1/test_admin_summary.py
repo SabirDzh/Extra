@@ -22,8 +22,8 @@ async def test_get_admin_summary_forbidden_for_regular_user(client: AsyncClient,
     await create_user("regular_stats@test.com", password="Password12345!")
 
     resp_login = await client.post("/api/v1/auth/login", data={"username": "regular_stats@test.com", "password": "Password12345!"})
-    token = resp_login.cookies.get("fastapiusersauth", "")
-    headers = {"cookie": f"fastapiusersauth={token}"}
+    token = resp_login.cookies.get("auth_user", "")
+    headers = {"cookie": f"auth_user={token}"}
     
     resp = await client.get("/api/v1/users/summary", headers=headers)
     assert resp.status_code == 403

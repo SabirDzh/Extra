@@ -88,7 +88,7 @@ async def test_admin_updates_question(client: AsyncClient, session: AsyncSession
     payload = {"text": "Old", "question_type": "free_text"}
     resp = await client.post(f"/api/v1/tests/blocks/{block.id}/questions", json=payload, headers=superuser_token_headers)
     q_id = resp.json()["id"]
-    resp2 = await client.put(f"/api/v1/tests/questions/{q_id}", json={"text": "New Text"}, headers=superuser_token_headers)
+    resp2 = await client.patch(f"/api/v1/tests/questions/{q_id}", json={"text": "New Text"}, headers=superuser_token_headers)
     assert resp2.status_code == 200
     assert resp2.json()["text"] == "New Text"
 
@@ -100,7 +100,7 @@ async def test_update_question_options_replacement(client: AsyncClient, session:
     resp = await client.post(f"/api/v1/tests/blocks/{block.id}/questions", json=payload, headers=superuser_token_headers)
     q_id = resp.json()["id"]
     
-    resp2 = await client.put(f"/api/v1/tests/questions/{q_id}", json={"options": [{"text": "B", "is_correct": False}]}, headers=superuser_token_headers)
+    resp2 = await client.patch(f"/api/v1/tests/questions/{q_id}", json={"options": [{"text": "B", "is_correct": False}]}, headers=superuser_token_headers)
     assert resp2.status_code == 200
     opts = resp2.json()["options"]
     assert len(opts) == 1
@@ -115,7 +115,7 @@ async def test_user_cannot_update_question(client: AsyncClient, session: AsyncSe
     
     user = await create_user("hacker_q2@test.com")
     headers = await _get_auth_headers(client, {"email": "hacker_q2@test.com", "password": "Password12345!"})
-    resp2 = await client.put(f"/api/v1/tests/questions/{q_id}", json={"text": "Hacked Text"}, headers=headers)
+    resp2 = await client.patch(f"/api/v1/tests/questions/{q_id}", json={"text": "Hacked Text"}, headers=headers)
     assert resp2.status_code in (401, 403)
 
 

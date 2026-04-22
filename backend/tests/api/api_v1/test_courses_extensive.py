@@ -80,7 +80,7 @@ async def test_course_default_publish_status_is_false(client: AsyncClient, super
 @pytest.mark.anyio
 async def test_update_course_as_admin(client: AsyncClient, session: AsyncSession, superuser_token_headers: dict, admin_user):
     course = await _create_course(session, admin_user.id, "Old Title")
-    resp = await client.put(f"/api/v1/courses/{course.id}", json={"title": "New Title"}, headers=superuser_token_headers)
+    resp = await client.patch(f"/api/v1/courses/{course.id}", json={"title": "New Title"}, headers=superuser_token_headers)
     assert resp.status_code == 200
     assert resp.json()["title"] == "New Title"
 
@@ -90,7 +90,7 @@ async def test_update_course_as_non_admin_fails(client: AsyncClient, session: As
     course = await _create_course(session, admin_user.id, "Admin Title")
     user = await create_user("basic_updater@test.com")
     headers = await _get_auth_headers(client, {"email": "basic_updater@test.com", "password": "Password12345!"})
-    resp = await client.put(f"/api/v1/courses/{course.id}", json={"title": "Hacked Title"}, headers=headers)
+    resp = await client.patch(f"/api/v1/courses/{course.id}", json={"title": "Hacked Title"}, headers=headers)
     assert resp.status_code in (401, 403)
 
 
@@ -226,4 +226,3 @@ async def test_enroll_in_nonexistent_course_fails(client: AsyncClient, create_us
     fake_uuid = str(uuid.uuid4())
     resp = await client.post(f"/api/v1/courses/{fake_uuid}/enroll", headers=headers)
     assert resp.status_code == 404
-

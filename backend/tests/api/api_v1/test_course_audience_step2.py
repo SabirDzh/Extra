@@ -130,7 +130,7 @@ async def test_update_course_audience_from_everyone_to_installer(
     course_id = create_resp.json()["id"]
 
 
-    update_resp = await client.put(
+    update_resp = await client.patch(
         f"/api/v1/courses/{course_id}",
         json={"audience": "installer"},
         headers=superuser_token_headers,
@@ -158,7 +158,7 @@ async def test_audience_persists_after_other_field_update(
     course_id = create_resp.json()["id"]
 
 
-    update_resp = await client.put(
+    update_resp = await client.patch(
         f"/api/v1/courses/{course_id}",
         json={"description": "Updated description only"},
         headers=superuser_token_headers,
