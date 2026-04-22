@@ -105,8 +105,11 @@ async def get_test_results_for_block(
                     status = TestResultStatus.REQUIRES_REVIEW
                     score = 0
                 else:
-                   
-                    if submission.score and submission.score >= (max_score if block.block_type == BlockType.auto_test else 1):
+                    if (
+                        submission.score is not None
+                        and submission.score >= submission.max_score
+                        and submission.max_score > 0
+                    ):
                          status = TestResultStatus.CORRECT
                          score = 1
                     else:
@@ -167,5 +170,4 @@ async def get_test_results_for_block(
         progress=course.progress,
         questions=question_results,
     )
-
 

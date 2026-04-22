@@ -64,6 +64,7 @@ async def create_question(
 
 
 @router.patch("/questions/{question_id}", response_model=QuestionReadAdmin)
+@router.put("/questions/{question_id}", response_model=QuestionReadAdmin)
 async def update_question(
     question_id: uuid.UUID,
     data: QuestionUpdate,
@@ -236,8 +237,7 @@ async def grade_submission(
     if not submission:
         raise HTTPException(status_code=404, detail="Submission not found")
 
-    submission.score = float(data.score) / 100.0
-    submission.max_score = 1.0
+    submission.score = float(data.score)
     submission.admin_comment = data.admin_comment
     submission.is_graded = True
     submission.graded_by = admin.id

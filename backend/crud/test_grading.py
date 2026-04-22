@@ -77,8 +77,8 @@ async def auto_grade_submission(
             if user_selected_ids == correct_option_ids and correct_option_ids:
                 score += 1
 
-    submission.score = float(score) / float(max_score) if max_score > 0 else 0.0
-    submission.max_score = 1.0
+    submission.score = float(score)
+    submission.max_score = float(max_score)
     
 
 

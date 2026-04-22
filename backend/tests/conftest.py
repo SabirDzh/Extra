@@ -57,7 +57,7 @@ def compile_guid(type_, compiler, **kw):
     return "CHAR(36)"
 
 
-DATABASE_URL = "sqlite+aiosqlite:///./test_db.sqlite"
+DATABASE_URL = "sqlite+aiosqlite:///:memory:"
 
 
 @compiles(JSONB, "sqlite")

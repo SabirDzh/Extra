@@ -18,7 +18,7 @@ async def math_setup(session: AsyncSession, create_user):
 
 @pytest.mark.anyio
 async def test_auto_grading_fractional_scores(client: AsyncClient, session: AsyncSession, math_setup, create_user):
-    """Verify that auto-grading correctly calculates and stores fractional scores."""
+    """Verify that auto-grading correctly calculates and stores absolute scores."""
     admin, course = math_setup
     block = Block(course_id=course.id, title="3-Question Test", block_type=BlockType.auto_test)
     session.add(block)
@@ -58,8 +58,8 @@ async def test_auto_grading_fractional_scores(client: AsyncClient, session: Asyn
     
     data = resp.json()
 
-    assert 0.66 < data["score"] < 0.67
-    assert data["max_score"] == 1.0
+    assert data["score"] == 2
+    assert data["max_score"] == 3
 
 @pytest.mark.anyio
 async def test_course_progress_percentage_calculation(client: AsyncClient, session: AsyncSession, math_setup, create_user):

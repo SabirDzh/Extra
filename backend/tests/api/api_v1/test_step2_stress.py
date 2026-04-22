@@ -9,7 +9,7 @@ from core.models.test import Question, QuestionType, AnswerOption, TestSubmissio
 
 @pytest.mark.anyio
 async def test_admin_grade_normalization(client: AsyncClient, session: AsyncSession, create_user):
-    """Stress Test: Admin grades 0-100, should be stored as 0.0-1.0."""
+    """Stress Test: Admin grades are stored as absolute points."""
     admin = await create_user("adm_s2@test.com", is_superuser=True, role="administrator")
     course = Course(title="S2 Course", created_by=admin.id, is_published=True)
     session.add(course)
@@ -38,17 +38,16 @@ async def test_admin_grade_normalization(client: AsyncClient, session: AsyncSess
     assert resp_grade.status_code == 200
     
     data = resp_grade.json()
-    assert data["score"] == 0.85
-    assert data["max_score"] == 1.0
+    assert data["score"] == 85
     
 
     stmt = select(TestSubmission).where(TestSubmission.id == uuid.UUID(submission_id))
     submission = (await session.execute(stmt)).scalar_one()
-    assert submission.score == 0.85
+    assert submission.score == 85
 
 @pytest.mark.anyio
 async def test_admin_grade_boundaries(client: AsyncClient, session: AsyncSession, create_user):
-    """Stress Test: Admin grades 0 and 100."""
+    """Stress Test: Admin grades 0 and 100 as absolute points."""
     admin = await create_user("adm_s2_bound@test.com", is_superuser=True, role="administrator")
     course = Course(title="S2 Bounds", created_by=admin.id, is_published=True)
     session.add(course)
@@ -83,11 +82,11 @@ async def test_admin_grade_boundaries(client: AsyncClient, session: AsyncSession
     assert sub1.score == 0.0
     
     sub2 = (await session.execute(select(TestSubmission).where(TestSubmission.id == uuid.UUID(sub2_id)))).scalar_one()
-    assert sub2.score == 1.0
+    assert sub2.score == 100.0
 
 @pytest.mark.anyio
 async def test_auto_grade_normalization(client: AsyncClient, session: AsyncSession, create_user):
-    """Stress Test: Auto-test with 1/2 correct answers should show 0.5."""
+    """Stress Test: Auto-test with 1/2 correct answers should show 1/2 points."""
     admin = await create_user("adm_s2_auto@test.com", is_superuser=True, role="administrator")
     course = Course(title="S2 Auto", created_by=admin.id, is_published=True)
     session.add(course)
@@ -120,8 +119,8 @@ async def test_auto_grade_normalization(client: AsyncClient, session: AsyncSessi
     assert resp.status_code == 200
     
     data = resp.json()
-    assert data["score"] == 0.5
-    assert data["max_score"] == 1.0
+    assert data["score"] == 1
+    assert data["max_score"] == 2
 
 @pytest.mark.anyio
 async def test_submission_read_float_schema(client: AsyncClient, session: AsyncSession, create_user):

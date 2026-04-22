@@ -116,7 +116,10 @@ async def create_product(
 ):
     product = await product_crud.create_product(db, data)
     product.views = 0
-    await redis.zadd("products:popularity", {str(product.id): 0})
+    try:
+        await redis.zadd("products:popularity", {str(product.id): 0})
+    except Exception:
+        pass
     return product
 
 
