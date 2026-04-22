@@ -8,6 +8,8 @@ jobs:
   tests:
     name: Tests (Python 3.12)
     runs-on: ubuntu-latest
+    env:
+      WEBHOOK_URL: ""
 
     steps:
       - name: Checkout
