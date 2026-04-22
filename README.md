@@ -125,3 +125,34 @@ git pull origin zr_dev
 
 git push -u origin <your branch name>
 ```
+
+## CI/CD (GitHub Actions)
+
+В репозитории добавлены workflow-файлы:
+
+- `.github/workflows/ci.yml`:
+  - запускается на `push` и `pull_request`;
+  - ставит Python 3.12 и Poetry;
+  - устанавливает зависимости;
+  - запускает `pytest` из директории `backend/`.
+
+- `.github/workflows/cd.yml`:
+  - запускается на `push` в `main`, на теги `v*` и вручную через `workflow_dispatch`;
+  - собирает Docker-образ из `backend/Dockerfile`;
+  - публикует образ в GitHub Container Registry (`ghcr.io/<owner>/<repo>`).
+
+### Опциональный авто-деплой на сервер
+
+`cd.yml` содержит необязательный job `deploy`, который выполняется только если заданы секреты:
+
+- `DEPLOY_HOST`
+- `DEPLOY_USER`
+- `DEPLOY_SSH_KEY`
+- `DEPLOY_SCRIPT`
+- `DEPLOY_PORT` (опционально, по умолчанию `22`)
+
+Переменная окружения `IMAGE` передается в `DEPLOY_SCRIPT` автоматически и содержит:
+
+```text
+ghcr.io/<owner>/<repo>:main
+```
