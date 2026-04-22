@@ -61,15 +61,26 @@ jobs:
     name: Deploy on server (optional)
     needs: build-and-publish
     runs-on: ubuntu-latest
-    if: >-
-      github.ref == 'refs/heads/main' &&
-      secrets.DEPLOY_HOST != '' &&
-      secrets.DEPLOY_USER != '' &&
-      secrets.DEPLOY_SSH_KEY != '' &&
-      secrets.DEPLOY_SCRIPT != ''
+    if: github.ref == 'refs/heads/main'
 
     steps:
+      - name: Check deploy secrets
+        id: check
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_SCRIPT: ${{ secrets.DEPLOY_SCRIPT }}
+        run: |
+          if [ -n "$DEPLOY_HOST" ] && [ -n "$DEPLOY_USER" ] && [ -n "$DEPLOY_SSH_KEY" ] && [ -n "$DEPLOY_SCRIPT" ]; then
+            echo "should_deploy=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "should_deploy=false" >> "$GITHUB_OUTPUT"
+            echo "Skipping deploy: required DEPLOY_* secrets are not fully configured."
+          fi
+
       - name: Execute deploy script over SSH
+        if: steps.check.outputs.should_deploy == 'true'
         uses: appleboy/ssh-action@v1.2.0
         env:
           IMAGE: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:main
