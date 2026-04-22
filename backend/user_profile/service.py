@@ -78,7 +78,7 @@ async def get_courses_progress(
         completed_cnt = completed_blocks or 0
         percent = round((completed_cnt / total_cnt) * 100, 2) if total_cnt else 0.0
         
-        # 1 stage = Lesson + Test (2 blocks)
+
         all_stages = total_cnt // 2
         completed_stages = completed_cnt // 2
         

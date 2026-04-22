@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 @pytest.mark.anyio
 async def test_search_performance(session: AsyncSession, benchmark):
-    # 1. Setup: Insert 1000 sample products
+
     new_products = []
     for i in range(1000):
         new_products.append({
@@ -22,13 +22,13 @@ async def test_search_performance(session: AsyncSession, benchmark):
     await session.execute(insert(Product).values(new_products))
     await session.commit()
 
-    # 2. Benchmark Hybrid Search
-    # We use a lambda because benchmark needs a callable
+
+
     async def run_search():
         return await search_products(session, q="АКД насос", limit=20)
 
-    # Note: pytest-benchmark with async requires a bit of a wrapper 
-    # but for simple measurement we can use this pattern:
+
+
     start_time = time.perf_counter()
     for _ in range(10):
         await run_search()
@@ -38,7 +38,7 @@ async def test_search_performance(session: AsyncSession, benchmark):
 
 @pytest.mark.anyio
 async def test_import_performance(session: AsyncSession):
-    # Benchmark raw insert speed
+
     new_products = []
     for i in range(500):
         new_products.append({

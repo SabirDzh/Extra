@@ -23,13 +23,13 @@ async def test_admin_grade_normalization(client: AsyncClient, session: AsyncSess
     session.add(CourseEnrollment(user_id=student.id, course_id=course.id))
     await session.commit()
     
-    # Login student and submit
+
     auth_resp = await client.post("/api/v1/auth/login", data={"username": "student_s2_1@test.com", "password": "Password12345!"})
     cookies = {"fastapiusersauth": auth_resp.cookies.get("fastapiusersauth")}
     resp_sub = await client.post(f"/api/v1/tests/blocks/{b.id}/submit", json={"answers": []}, cookies=cookies)
     submission_id = resp_sub.json()["id"]
     
-    # Admin grades with 85
+
     admin_auth = await client.post("/api/v1/auth/login", data={"username": "adm_s2@test.com", "password": "Password12345!"})
     admin_cookies = {"fastapiusersauth": admin_auth.cookies.get("fastapiusersauth")}
     
@@ -41,7 +41,7 @@ async def test_admin_grade_normalization(client: AsyncClient, session: AsyncSess
     assert data["score"] == 0.85
     assert data["max_score"] == 1.0
     
-    # Check DB
+
     stmt = select(TestSubmission).where(TestSubmission.id == uuid.UUID(submission_id))
     submission = (await session.execute(stmt)).scalar_one()
     assert submission.score == 0.85
@@ -64,7 +64,7 @@ async def test_admin_grade_boundaries(client: AsyncClient, session: AsyncSession
     auth_resp = await client.post("/api/v1/auth/login", data={"username": "std_bound@test.com", "password": "Password12345!"})
     cookies = {"fastapiusersauth": auth_resp.cookies.get("fastapiusersauth")}
     
-    # Submission 1 -> Grade 0
+
     resp1 = await client.post(f"/api/v1/tests/blocks/{b.id}/submit", json={"answers": []}, cookies=cookies)
     sub1_id = resp1.json()["id"]
     
@@ -73,12 +73,12 @@ async def test_admin_grade_boundaries(client: AsyncClient, session: AsyncSession
     
     await client.post(f"/api/v1/tests/submissions/{sub1_id}/grade", json={"score": 0}, cookies=admin_cookies)
     
-    # Submission 2 -> Grade 100
+
     resp2 = await client.post(f"/api/v1/tests/blocks/{b.id}/submit", json={"answers": []}, cookies=cookies)
     sub2_id = resp2.json()["id"]
     await client.post(f"/api/v1/tests/submissions/{sub2_id}/grade", json={"score": 100}, cookies=admin_cookies)
     
-    # Verifying
+
     sub1 = (await session.execute(select(TestSubmission).where(TestSubmission.id == uuid.UUID(sub1_id)))).scalar_one()
     assert sub1.score == 0.0
     
@@ -114,7 +114,7 @@ async def test_auto_grade_normalization(client: AsyncClient, session: AsyncSessi
     auth_resp = await client.post("/api/v1/auth/login", data={"username": "std_auto_s2@test.com", "password": "Password12345!"})
     cookies = {"fastapiusersauth": auth_resp.cookies.get("fastapiusersauth")}
     
-    # Submit 1 correct, 1 skipped (0 points)
+
     payload = {"answers": [{"question_id": str(q1.id), "selected_answer_id": str(o1.id)}]}
     resp = await client.post(f"/api/v1/tests/blocks/{b.id}/submit", json=payload, cookies=cookies)
     assert resp.status_code == 200
@@ -130,10 +130,10 @@ async def test_submission_read_float_schema(client: AsyncClient, session: AsyncS
     auth_resp = await client.post("/api/v1/auth/login", data={"username": "std_schema@test.com", "password": "Password12345!"})
     cookies = {"fastapiusersauth": auth_resp.cookies.get("fastapiusersauth")}
     
-    # Create a submission manually with float score to test schema
+
     admin = await create_user("adm_schema@test.com", role="administrator")
-    b = Block(course_id=uuid.uuid4(), title="B", block_type=BlockType.auto_test) # Using dummy block_id (needs FK constraint handling or flush)
-    # Actually simpler to just use the existing blocks from previous tests or create new correctly
+    b = Block(course_id=uuid.uuid4(), title="B", block_type=BlockType.auto_test)
+
     course = Course(title="Schema Course", created_by=admin.id)
     session.add(course)
     await session.flush()

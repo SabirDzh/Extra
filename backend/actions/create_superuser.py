@@ -12,9 +12,9 @@ from core.schemas.user import UserCreate, UserUsername
 from fastapi import BackgroundTasks
 from utils.role import UserRole
 
-# from fastapi_users.exceptions import UserAlreadyExists
 
-# get_async_session_context = contextlib.asynccontextmanager(get_async_session)
+
+
 get_users_db_context = contextlib.asynccontextmanager(get_users_db)
 get_user_manager_context = contextlib.asynccontextmanager(get_user_manager)
 

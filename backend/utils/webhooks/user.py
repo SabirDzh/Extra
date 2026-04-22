@@ -17,15 +17,15 @@ try:
             user=UserRead.model_validate(user),
             ts=int(time.time()),
         ).model_dump(mode="json")
-        # log.info("Notify user created with data: %s", wh_data)
+
         async with aiohttp.ClientSession() as session:
             async with session.post(WEBHOOK_URL, json=wh_data) as response:
                 data = await response.json()
-                # log.info("Sent webhook, got response: %s", data)
+
 
 except Exception as e:
     log.exception("Failed to send webhook for new user")
 
-# TODO without this there is a UUID serialization error.
-# The request is likely slower due to model_dump(mode="json"). Revisit this implementation
-# or consider removing it if it has no value.
+
+
+

@@ -29,12 +29,12 @@ async def test_empty_questions_block(client: AsyncClient, session: AsyncSession,
     auth_resp = await client.post("/api/v1/auth/login", data={"username": student_email, "password": "Password12345!"})
     cookies = {"fastapiusersauth": auth_resp.cookies.get("fastapiusersauth")}
     
-    # Submit empty answers to block with no questions
+
     payload = {"answers": []}
     resp = await client.post(f"/api/v1/tests/blocks/{b1.id}/submit", json=payload, cookies=cookies)
     assert resp.status_code == 200
     
-    # Check if block is completed
+
     stmt = select(UserBlockProgress).where(UserBlockProgress.user_id == student.id, UserBlockProgress.block_id == b1.id)
     progress = (await session.execute(stmt)).scalar_one_or_none()
     assert progress is not None
@@ -97,7 +97,7 @@ async def test_incorrect_answers_submission(client: AsyncClient, session: AsyncS
     auth_resp = await client.post("/api/v1/auth/login", data={"username": "student_s3@test.com", "password": "Password12345!"})
     cookies = {"fastapiusersauth": auth_resp.cookies.get("fastapiusersauth")}
     
-    # Submit WRONG answer
+
     payload = {"answers": [{"question_id": str(q.id), "selected_answer_id": str(o_wrong.id)}]}
     resp = await client.post(f"/api/v1/tests/blocks/{b.id}/submit", json=payload, cookies=cookies)
     assert resp.status_code == 200
@@ -137,10 +137,10 @@ async def test_multiple_submissions_consistency(client: AsyncClient, session: As
     auth_resp = await client.post("/api/v1/auth/login", data={"username": "student_s5@test.com", "password": "Password12345!"})
     cookies = {"fastapiusersauth": auth_resp.cookies.get("fastapiusersauth")}
     
-    # First submission
+
     await client.post(f"/api/v1/tests/blocks/{b.id}/submit", json={"answers": []}, cookies=cookies)
     
-    # Second submission
+
     resp = await client.post(f"/api/v1/tests/blocks/{b.id}/submit", json={"answers": []}, cookies=cookies)
     assert resp.status_code == 200
     

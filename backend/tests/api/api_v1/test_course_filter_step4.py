@@ -17,7 +17,7 @@ async def _create_course(client: AsyncClient, headers: dict, title: str, level: 
     return resp.json()
 
 
-# ─── Tests ─────────────────────────────────────────────────────────────────────
+
 
 
 @pytest.mark.anyio

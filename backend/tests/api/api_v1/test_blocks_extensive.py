@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from core.models.course import Course
 from core.models.block import Block, BlockType
 
-# ─── HELPERS ─────────────────────────────────────────────────────────────────
+
 
 @pytest.fixture
 async def admin_user(create_user):
@@ -48,9 +48,9 @@ async def _create_block(session: AsyncSession, course_id: uuid.UUID, block_type=
     await session.refresh(block)
     return block
 
-# ─── TESTS ───────────────────────────────────────────────────────────────────
 
-# 1. Admin can create lesson block
+
+
 @pytest.mark.anyio
 async def test_admin_create_lesson_block(client: AsyncClient, session: AsyncSession, admin_user, superuser_token_headers):
     course = await _create_course(session, admin_user.id)
@@ -59,7 +59,7 @@ async def test_admin_create_lesson_block(client: AsyncClient, session: AsyncSess
     assert resp.status_code == 201
     assert resp.json()["title"] == "Lesson 1"
 
-# 2. Admin can create test block
+
 @pytest.mark.anyio
 async def test_admin_create_test_block(client: AsyncClient, session: AsyncSession, admin_user, superuser_token_headers):
     course = await _create_course(session, admin_user.id)
@@ -68,7 +68,7 @@ async def test_admin_create_test_block(client: AsyncClient, session: AsyncSessio
     assert resp.status_code == 201
     assert resp.json()["block_type"] == "auto_test"
 
-# 3. Mismatch text_content stripped from auto_test
+
 @pytest.mark.anyio
 async def test_create_test_block_strips_text_content(client: AsyncClient, session: AsyncSession, admin_user, superuser_token_headers):
     course = await _create_course(session, admin_user.id)
@@ -77,7 +77,7 @@ async def test_create_test_block_strips_text_content(client: AsyncClient, sessio
     assert resp.status_code == 201
     assert resp.json()["text_content"] is None
 
-# 4. User cannot create block
+
 @pytest.mark.anyio
 async def test_user_cannot_create_block(client: AsyncClient, session: AsyncSession, admin_user, create_user):
     course = await _create_course(session, admin_user.id)
@@ -87,7 +87,7 @@ async def test_user_cannot_create_block(client: AsyncClient, session: AsyncSessi
     resp = await client.post(f"/api/v1/courses/{course.id}/blocks/", json=payload, headers=headers)
     assert resp.status_code in (401, 403)
 
-# 5. Anonymous cannot create block
+
 @pytest.mark.anyio
 async def test_anonymous_cannot_create_block(client: AsyncClient, session: AsyncSession, admin_user):
     course = await _create_course(session, admin_user.id)
@@ -95,7 +95,7 @@ async def test_anonymous_cannot_create_block(client: AsyncClient, session: Async
     resp = await client.post(f"/api/v1/courses/{course.id}/blocks/", json=payload)
     assert resp.status_code == 401
 
-# 6. Create block on nonexistent course
+
 @pytest.mark.anyio
 async def test_create_block_nonexistent_course(client: AsyncClient, superuser_token_headers):
     fake_url = f"/api/v1/courses/{uuid.uuid4()}/blocks/"
@@ -103,7 +103,7 @@ async def test_create_block_nonexistent_course(client: AsyncClient, superuser_to
     resp = await client.post(fake_url, json=payload, headers=superuser_token_headers)
     assert resp.status_code == 404
 
-# 7. Create block missing title
+
 @pytest.mark.anyio
 async def test_create_block_missing_title(client: AsyncClient, session: AsyncSession, admin_user, superuser_token_headers):
     course = await _create_course(session, admin_user.id)
@@ -111,7 +111,7 @@ async def test_create_block_missing_title(client: AsyncClient, session: AsyncSes
     resp = await client.post(f"/api/v1/courses/{course.id}/blocks/", json=payload, headers=superuser_token_headers)
     assert resp.status_code == 422
 
-# 8. Create block invalid type
+
 @pytest.mark.anyio
 async def test_create_block_invalid_type(client: AsyncClient, session: AsyncSession, admin_user, superuser_token_headers):
     course = await _create_course(session, admin_user.id)
@@ -119,7 +119,7 @@ async def test_create_block_invalid_type(client: AsyncClient, session: AsyncSess
     resp = await client.post(f"/api/v1/courses/{course.id}/blocks/", json=payload, headers=superuser_token_headers)
     assert resp.status_code == 422
 
-# 9. Admin stringifies ints for title
+
 @pytest.mark.anyio
 async def test_create_block_str_coercion(client: AsyncClient, session: AsyncSession, admin_user, superuser_token_headers):
     course = await _create_course(session, admin_user.id)
@@ -128,7 +128,7 @@ async def test_create_block_str_coercion(client: AsyncClient, session: AsyncSess
     assert resp.status_code == 201
     assert resp.json()["title"] == "12345"
 
-# 10. Admin updates block
+
 @pytest.mark.anyio
 async def test_admin_update_block(client: AsyncClient, session: AsyncSession, admin_user, superuser_token_headers):
     course = await _create_course(session, admin_user.id)
@@ -139,7 +139,7 @@ async def test_admin_update_block(client: AsyncClient, session: AsyncSession, ad
     assert resp.json()["title"] == "New"
     assert resp.json()["text_content"] == "updated content"
 
-# 11. User fails to update block
+
 @pytest.mark.anyio
 async def test_user_update_block_fails(client: AsyncClient, session: AsyncSession, admin_user, create_user):
     course = await _create_course(session, admin_user.id)
@@ -149,14 +149,14 @@ async def test_user_update_block_fails(client: AsyncClient, session: AsyncSessio
     resp = await client.put(f"/api/v1/courses/{course.id}/blocks/{block.id}", json={"title": "Hacked"}, headers=headers)
     assert resp.status_code in (401, 403)
 
-# 12. Update non-existent block fails
+
 @pytest.mark.anyio
 async def test_update_nonexistent_block(client: AsyncClient, session: AsyncSession, admin_user, superuser_token_headers):
     course = await _create_course(session, admin_user.id)
     resp = await client.put(f"/api/v1/courses/{course.id}/blocks/{uuid.uuid4()}", json={"title": "Ghost"}, headers=superuser_token_headers)
     assert resp.status_code == 404
 
-# 13. Admin deletes block
+
 @pytest.mark.anyio
 async def test_admin_delete_block(client: AsyncClient, session: AsyncSession, admin_user, superuser_token_headers):
     course = await _create_course(session, admin_user.id)
@@ -164,11 +164,11 @@ async def test_admin_delete_block(client: AsyncClient, session: AsyncSession, ad
     resp = await client.delete(f"/api/v1/courses/{course.id}/blocks/{block.id}", headers=superuser_token_headers)
     assert resp.status_code == 204
     
-    # Check deletion
+
     resp_get = await client.get(f"/api/v1/courses/{course.id}/blocks/{block.id}")
     assert resp_get.status_code == 404
 
-# 14. User fails to delete block
+
 @pytest.mark.anyio
 async def test_user_delete_block_fails(client: AsyncClient, session: AsyncSession, admin_user, create_user):
     course = await _create_course(session, admin_user.id)
@@ -178,14 +178,14 @@ async def test_user_delete_block_fails(client: AsyncClient, session: AsyncSessio
     resp = await client.delete(f"/api/v1/courses/{course.id}/blocks/{block.id}", headers=headers)
     assert resp.status_code in (401, 403)
 
-# 15. Delete non-existent block
+
 @pytest.mark.anyio
 async def test_delete_nonexistent_block(client: AsyncClient, session: AsyncSession, admin_user, superuser_token_headers):
     course = await _create_course(session, admin_user.id)
     resp = await client.delete(f"/api/v1/courses/{course.id}/blocks/{uuid.uuid4()}", headers=superuser_token_headers)
     assert resp.status_code == 404
 
-# 16. Get block sequence for course
+
 @pytest.mark.anyio
 async def test_get_blocks_for_course(client: AsyncClient, session: AsyncSession, admin_user):
     course = await _create_course(session, admin_user.id)
@@ -196,31 +196,31 @@ async def test_get_blocks_for_course(client: AsyncClient, session: AsyncSession,
     assert resp.status_code == 200
     data = resp.json()
     assert len(data["blocks"]) == 2
-    # Verify navigation fields
+
     assert "current_block_id" in data
     assert "next_block_id" in data["blocks"][0]
     
-    # Verify 1-based order_index
+
     assert data["blocks"][0]["order_index"] == 1
     
-    # Verify stage calculations
-    assert data["all_stages"] == 1 # (2+1)//2 = 1? No, (2+1)//2 = 1. Wait. 2//2 = 1.
-    # Actually, for 2 blocks: 1 stage.
+
+    assert data["all_stages"] == 1
+
     assert data["blocks"][0]["stage"] == 1
     assert data["blocks"][1]["stage"] == 1
     
-    # Verify all_blocks count
+
     assert data["all_blocks"] == 2
     assert "all_blocks" not in data["blocks"][0]
 
-# 17. Get block sequence for nonexistent course
+
 @pytest.mark.anyio
 async def test_get_blocks_nonexistent_course(client: AsyncClient):
     resp = await client.get(f"/api/v1/courses/{uuid.uuid4()}/blocks/")
-    # Currently behavior may return empty list or 404 depending on impl
+
     assert resp.status_code in (200, 404)
 
-# 18. Get specific block details
+
 @pytest.mark.anyio
 async def test_get_block_details(client: AsyncClient, session: AsyncSession, admin_user):
     course = await _create_course(session, admin_user.id)
@@ -229,7 +229,7 @@ async def test_get_block_details(client: AsyncClient, session: AsyncSession, adm
     assert resp.status_code == 200
     assert resp.json()["title"] == "Specific"
 
-# 19. Complete block for auth user
+
 @pytest.mark.anyio
 async def test_auth_user_complete_block_manual(client: AsyncClient, session: AsyncSession, admin_user, create_user):
     course = await _create_course(session, admin_user.id)
@@ -240,7 +240,7 @@ async def test_auth_user_complete_block_manual(client: AsyncClient, session: Asy
     resp = await client.post(f"/api/v1/courses/{course.id}/blocks/{block.id}/complete", headers=headers)
     assert resp.status_code == 200
 
-# 20. Anonymous complete block fails
+
 @pytest.mark.anyio
 async def test_anon_user_complete_block_fails(client: AsyncClient, session: AsyncSession, admin_user):
     course = await _create_course(session, admin_user.id)

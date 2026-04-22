@@ -62,7 +62,7 @@ def register_middlewares(app: FastAPI) -> None:
         log.info(
             "Request %s to %s",
             request.method,
-            # request.url,
+
             request.url.path,
         )
         return await call_next(request)

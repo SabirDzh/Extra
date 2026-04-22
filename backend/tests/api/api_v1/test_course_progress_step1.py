@@ -13,7 +13,7 @@ from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
 
-# ─── Helpers ───────────────────────────────────────────────────────────────────
+
 
 
 async def _create_course(session: AsyncSession, title: str = "Test Course") -> Course:
@@ -71,7 +71,7 @@ async def _complete_blocks(
     await session.commit()
 
 
-# ─── Tests ─────────────────────────────────────────────────────────────────────
+
 
 
 @pytest.mark.anyio
@@ -144,7 +144,7 @@ async def test_course_with_zero_blocks_returns_zero_total(
     Не должно быть деления на ноль или падения.
     """
     course = await _create_course(session, "Empty Blocks Course")
-    # No blocks added
+
 
     resp = await client.get(f"/api/v1/courses/{course.id}")
     assert resp.status_code == 200
@@ -240,7 +240,7 @@ async def test_enrolled_user_sees_correct_partial_progress(
     blocks = await _add_blocks(session, course.id, 10)
     await _enroll(session, user.id, course.id)
 
-    # Complete 4 out of 10 blocks
+
     await _complete_blocks(session, user.id, blocks[:4])
 
     resp = await client.post(

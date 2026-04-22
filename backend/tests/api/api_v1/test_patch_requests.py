@@ -38,7 +38,7 @@ async def test_patch_course_title_only(client: AsyncClient, patch_setup):
     assert resp.status_code == 200
     data = resp.json()
     assert data["title"] == new_title
-    assert data["level"] == CourseLevel.beginner.value  # Should NOT change
+    assert data["level"] == CourseLevel.beginner.value
 
 @pytest.mark.anyio
 async def test_patch_course_visibility_only(client: AsyncClient, patch_setup):
@@ -50,7 +50,7 @@ async def test_patch_course_visibility_only(client: AsyncClient, patch_setup):
     resp = await client.patch(f"/api/v1/courses/{course.id}", json={"is_published": False}, cookies=cookies)
     assert resp.status_code == 200
     assert resp.json()["is_published"] is False
-    assert resp.json()["title"] == "Patch Course"  # Should NOT change
+    assert resp.json()["title"] == "Patch Course"
 
 @pytest.mark.anyio
 async def test_patch_block_title(client: AsyncClient, patch_setup):
@@ -147,7 +147,7 @@ async def test_patch_data_integrity(client: AsyncClient, patch_setup):
     auth_resp = await client.post("/api/v1/auth/login", data={"username": admin.email, "password": "Password12345!"})
     cookies = {"auth_user": auth_resp.cookies.get("auth_user")}
     
-    # Send only title, check description remains
+
     original_desc = "Some description"
     await client.patch(f"/api/v1/courses/{course.id}", json={"description": original_desc}, cookies=cookies)
     

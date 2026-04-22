@@ -12,7 +12,7 @@ from alembic import op
 import sqlalchemy as sa
 
 
-# revision identifiers, used by Alembic.
+
 revision: str = "fcb9a1b833b8"
 down_revision: Union[str, None] = "365df826a665"
 branch_labels: Union[str, Sequence[str], None] = None
@@ -20,7 +20,7 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    # Change score and max_score to Float
+
     op.alter_column('test_submissions', 'score',
                existing_type=sa.INTEGER(),
                type_=sa.Float(),

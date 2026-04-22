@@ -16,22 +16,22 @@ def generate_certificate_pdf(
     width, height = landscape(A4)
     c = canvas.Canvas(buf, pagesize=landscape(A4))
 
-    # Border
+
     c.setStrokeColorRGB(0.2, 0.4, 0.7)
     c.setLineWidth(4)
     c.rect(1.5 * cm, 1.5 * cm, width - 3 * cm, height - 3 * cm)
 
-    # Title
+
     c.setFont("Helvetica-Bold", 36)
     c.setFillColorRGB(0.2, 0.3, 0.6)
     c.drawCentredString(width / 2, height - 4 * cm, "Certificate of Completion")
 
-    # Decorative line
+
     c.setStrokeColorRGB(0.7, 0.7, 0.7)
     c.setLineWidth(1)
     c.line(6 * cm, height - 5 * cm, width - 6 * cm, height - 5 * cm)
 
-    # Body
+
     c.setFont("Helvetica", 16)
     c.setFillColorRGB(0.3, 0.3, 0.3)
     c.drawCentredString(width / 2, height - 7 * cm, "This certifies that")
@@ -50,7 +50,7 @@ def generate_certificate_pdf(
     c.setFillColorRGB(0.2, 0.4, 0.7)
     c.drawCentredString(width / 2, height - 13 * cm, course_title)
 
-    # Footer
+
     c.setFont("Helvetica", 11)
     c.setFillColorRGB(0.5, 0.5, 0.5)
     date_str = issued_at.strftime("%B %d, %Y")

@@ -16,7 +16,7 @@ class BlockCreate(BaseModel):
     @model_validator(mode="after")
     def normalize_by_block_type(self):
         if self.block_type in TEST_BLOCK_TYPES:
-            # Поля урока не применимы к тестовым блокам — молча отсекаем
+
             self.text_content = None
             self.video_url = None
         elif self.block_type == BlockType.lesson:

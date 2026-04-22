@@ -42,7 +42,9 @@ async def search_errors(
     query: ListParams = Depends(),
     q: str | None = Query(None, description="Search query"),
 ):
-    return await error_crud.search_errors(db, q=q, limit=query.limit, offset=query.offset)
+    return await error_crud.search_errors(
+        db, q=q, limit=query.limit, offset=query.offset
+    )
 
 
 @router.get("/{error_id}", response_model=ErrorRead)

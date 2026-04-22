@@ -7,12 +7,6 @@ from fastapi import Request, Response
 
 type CallNext = Callable[[Request], Awaitable[Response]]
 
-
-# TODO replace this with Grafana + Prometheus.
-# This in-memory counter resets on restart and doesn't work correctly with gunicorn workers
-# (each worker has its own memory), so the metrics are incomplete.
-
-
 @dataclass
 class PathCounts:
     count: int = 0

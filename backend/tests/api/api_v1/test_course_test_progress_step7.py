@@ -13,7 +13,7 @@ from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
 
-# ─── Helpers ───────────────────────────────────────────────────────────────────
+
 
 
 async def _create_course(session: AsyncSession, title: str) -> Course:
@@ -62,7 +62,7 @@ async def _complete_block(session: AsyncSession, user_id: uuid.UUID, block: Bloc
     await session.commit()
 
 
-# ─── Tests ─────────────────────────────────────────────────────────────────────
+
 
 
 @pytest.mark.anyio
@@ -122,7 +122,7 @@ async def test_completed_ignores_lesson_completion(
     test_block = await _add_block(session, course.id, BlockType.auto_test, "Test")
     await _enroll(session, user.id, course.id)
 
-    # Проходим только урок
+
     await _complete_block(session, user.id, lesson)
 
     resp = await client.post(
@@ -181,7 +181,7 @@ async def test_full_test_progress_gives_100_percent(
     t2 = await _add_block(session, course.id, BlockType.manual_test, "T2")
 
     await _enroll(session, user.id, course.id)
-    # Проходим всё
+
     for block in [l1, l2, l3, t1, t2]:
         await _complete_block(session, user.id, block)
 

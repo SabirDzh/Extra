@@ -198,7 +198,7 @@ def parse_error_csv_file(contents: bytes) -> list[dict]:
 def parse_error_excel_file(contents: bytes) -> list[dict]:
     df = pd.read_excel(io.BytesIO(contents))
 
-    # Support for both English and Russian column names
+
     title_col = None
     if "title" in df.columns:
         title_col = "title"
@@ -311,7 +311,7 @@ async def import_errors(
         if not items:
             return {"message": "Файл пуст или не содержит валидных данных для импорта"}
 
-        # Exclude duplicates
+
         incoming_titles = []
         valid_items = []
         for item in items:

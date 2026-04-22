@@ -15,7 +15,7 @@ async def run_benchmark():
     SessionLocal = async_sessionmaker(engine, expire_on_commit=False)
     
     async with SessionLocal() as session:
-        # 1. Замер скорости вставки (Write)
+
         print("\n1. Тестирование записи (Bulk Insert)...")
         test_products = []
         for i in range(1000):
@@ -33,7 +33,7 @@ async def run_benchmark():
         write_time = time.perf_counter() - start
         print(f"   [OK] 1000 товаров создано за {write_time:.4f} сек ({1000/write_time:.1f} оп/сек)")
 
-        # 2. Замер гибридного поиска (Hybrid Search)
+
         print("\n2. Тестирование гибридного поиска (FTS + Trigram)...")
         queries = ["ПРИБОР", "насос давление", "БЕНЧМАРК", "900050"]
         total_search_time = 0
@@ -48,14 +48,14 @@ async def run_benchmark():
         avg_search = total_search_time / len(queries)
         print(f"   [AVG] Среднее время поиска: {avg_search:.4f} сек")
 
-        # 3. Замер сортировки по Артикулу (JSONB Sort)
+
         print("\n3. Тестирование сортировки по JSONB Артикулу...")
         start = time.perf_counter()
         results = await get_products(session, sort_by="article", order="desc", limit=50)
         elapsed = time.perf_counter() - start
         print(f"   [SORT] Сортировка по артикулу (50 записей): {elapsed:.4f} сек")
 
-        # Очистка
+
         print("\n4. Очистка тестовых данных...")
         await session.execute(delete(Product).where(Product.title.like("БЕНЧМАРК %")))
         await session.commit()

@@ -20,7 +20,7 @@ async def global_search_entities(
     async def search_single_model(model):
         stmt = select(model)
 
-        # Apply filters like is_published if available
+
         if hasattr(model, "is_published"):
             stmt = stmt.where(model.is_published)
 

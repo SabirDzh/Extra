@@ -26,7 +26,7 @@ class AccessTokenAdmin(ModelView, model=AccessToken):
     ]
     form_create_rules = [
         "user",
-        # "token",
+
     ]
 
     def insert_model(

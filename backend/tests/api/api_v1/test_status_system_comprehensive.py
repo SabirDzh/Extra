@@ -78,7 +78,7 @@ async def test_block_status_transitions(
         )
         assert resp_grade.status_code == 200
 
-    # Verify status via list API
+
     resp_list = await client.get(f"/api/v1/courses/{course.id}/blocks/", cookies=cookies)
     if resp_list.status_code == 418:
         pytest.fail(f"DEBUG RESPONSE: {resp_list.json()}")
@@ -101,11 +101,11 @@ async def test_lesson_block_status(client: AsyncClient, session: AsyncSession, s
     auth_resp = await client.post("/api/v1/auth/login", data={"username": student.email, "password": "Password12345!"})
     cookies = {"fastapiusersauth": auth_resp.cookies.get("fastapiusersauth")}
     
-    # Not started
+
     resp1 = await client.get(f"/api/v1/courses/{course.id}/blocks/", cookies=cookies)
     assert resp1.json()["blocks"][0]["progress"]["status"] == CourseStatus.not_started
     
-    # Complete it (simulated via progress endpoint if exists, or manual mark)
+
     from crud.test_grading import _mark_block_completed
     await _mark_block_completed(session, student.id, block.id, course.id)
     await session.commit()
@@ -127,10 +127,10 @@ async def test_multiple_submissions_status_persistence(client: AsyncClient, sess
     auth_resp = await client.post("/api/v1/auth/login", data={"username": student.email, "password": "Password12345!"})
     cookies = {"fastapiusersauth": auth_resp.cookies.get("fastapiusersauth")}
     
-    # Submission 1
+
     await client.post(f"/api/v1/tests/blocks/{block.id}/submit", json={"answers": []}, cookies=cookies)
     
-    # Submission 2
+
     await client.post(f"/api/v1/tests/blocks/{block.id}/submit", json={"answers": []}, cookies=cookies)
     
     resp = await client.get(f"/api/v1/courses/{course.id}/blocks/", cookies=cookies)

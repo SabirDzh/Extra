@@ -50,7 +50,7 @@ async def auto_grade_submission(
     from collections import defaultdict
     from core.models.test import QuestionType
     
-    # Group all TestAnswers by question_id to support multi-select
+
     answer_map = defaultdict(list)
     for a in answers:
         answer_map[a.question_id].append(a)
@@ -62,34 +62,34 @@ async def auto_grade_submission(
 
         q_answers = answer_map.get(question.id, [])
         if not q_answers:
-            # No answer provided for this question
+
             continue
 
         correct_option_ids = {o.id for o in question.options if o.is_correct}
         user_selected_ids = {a.selected_answer_id for a in q_answers if a.selected_answer_id}
 
         if question.question_type == QuestionType.single_choice:
-            # Single choice: Exactly one answer provided and it matches any correct ID
+
             if len(user_selected_ids) == 1 and list(user_selected_ids)[0] in correct_option_ids:
                 score += 1
         elif question.question_type == QuestionType.multiple_choice:
-            # Multiple choice: Set of selected IDs must exactly match set of correct IDs
+
             if user_selected_ids == correct_option_ids and correct_option_ids:
                 score += 1
 
     submission.score = float(score) / float(max_score) if max_score > 0 else 0.0
     submission.max_score = 1.0
     
-    # Submission is fully graded only if it's an auto_test AND there are no questions requiring manual review.
-    # Mixed and manual tests always require admin finalization as per requirements.
+
+
     if block.block_type in (BlockType.manual_test, BlockType.mixed_test):
         submission.is_graded = False
     else:
         submission.is_graded = not has_manual_questions
 
     if block.block_type == BlockType.auto_test or (submission.is_graded and submission.score > 0):
-        # NOTE: Auto-tests are marked completed regardless of score per requirements.
-        # Manual/Mixed tests are marked completed only after admin grades successfully (score > 0).
+
+
         await _mark_block_completed(db, submission.user_id, submission.block_id, block.course_id)
 
     return submission

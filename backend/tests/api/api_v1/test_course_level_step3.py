@@ -10,7 +10,7 @@ import pytest
 from httpx import AsyncClient
 
 
-# ─── Helpers ───────────────────────────────────────────────────────────────────
+
 
 
 async def _create_course(
@@ -25,7 +25,7 @@ async def _create_course(
     return resp.json()
 
 
-# ─── Tests ─────────────────────────────────────────────────────────────────────
+
 
 
 @pytest.mark.anyio

@@ -56,7 +56,7 @@ class GUID(TypeDecorator):
 def compile_guid(type_, compiler, **kw):
     return "CHAR(36)"
 
-# Use file-based SQLite for tests
+
 DATABASE_URL = "sqlite+aiosqlite:///./test_db.sqlite"
 
 
@@ -77,7 +77,7 @@ def anyio_backend():
 
 @pytest.fixture(scope="function")
 async def async_db_engine():
-    # Re-create engine per test to ensure clean state
+
     engine = create_async_engine(
         DATABASE_URL,
         connect_args={"check_same_thread": False},
@@ -129,8 +129,8 @@ async def client(session) -> AsyncGenerator[AsyncClient, None]:
 
     main_app.dependency_overrides[db_helper.session_getter] = override_get_db
 
-    # Initialize FastAPICache with InMemoryBackend for tests with UNIQUE prefix
-    # This ensures that even if backend state persists (unlikely but possible), keys won't collide
+
+
     FastAPICache.init(
         InMemoryBackend(), prefix=f"test-cache-{uuid.uuid4()}", enable=False
     )

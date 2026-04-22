@@ -52,14 +52,14 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
             await FastAPICache.clear(
                 namespace=settings.cache.namespace.users_list,
             )
-        # log.warning(
-        #     "User %r has registered.",
-        #     user.id,
-        # )
+
+
+
+
         await send_new_user_notification(user)
 
-        # if request is not None:
-        #     await self.request_verify(user, request)
+
+
 
     async def on_after_forgot_password(
         self,
@@ -67,11 +67,11 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
         token: str,
         request: Optional["Request"] = None,
     ):
-        # log.warning(
-        #     "User %r has forgot their password. Token: %r. Generating a new password.",
-        #     user.id,
-        #     token,
-        # )
+
+
+
+
+
         new_password = secrets.token_urlsafe(12)
         hashed_password = self.password_helper.hash(new_password)
         await self.user_db.update(user, {"hashed_password": hashed_password})

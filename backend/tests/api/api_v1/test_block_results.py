@@ -62,7 +62,7 @@ async def base_env(session: AsyncSession):
     return await _create_base_env(session)
 
 
-# --- 1-6: Базовые проверки доступности и валидации (HTTP Ошибки) ---
+
 
 @pytest.mark.anyio
 async def test_1_unauthorized_missing_token(client: AsyncClient, base_env):
@@ -131,7 +131,7 @@ async def test_6_no_submission_yet(client: AsyncClient, create_user, base_env):
     assert "not found" in resp.json()["detail"].lower()
 
 
-# --- 7-10: Логика Auto Test ---
+
 
 @pytest.mark.anyio
 async def test_7_auto_test_all_correct(client: AsyncClient, session: AsyncSession, create_user, base_env):
@@ -207,7 +207,7 @@ async def test_10_multiple_submissions_returns_latest(client: AsyncClient, sessi
     user = await create_user("u10@test.com")
     token = await _get_auth_token(client, user)
     
-    # Submission 1 (Old) - All correct
+
     sub1 = TestSubmission(user_id=user.id, block_id=block.id, score=2, max_score=2, is_graded=True, submitted_at=datetime.now(timezone.utc) - timedelta(minutes=10))
     session.add(sub1)
     await session.flush()
@@ -216,7 +216,7 @@ async def test_10_multiple_submissions_returns_latest(client: AsyncClient, sessi
         TestAnswer(submission_id=sub1.id, question_id=q2.id, selected_answer_id=o2_c.id),
     ])
     
-    # Submission 2 (Latest) - All wrong
+
     sub2 = TestSubmission(user_id=user.id, block_id=block.id, score=0, max_score=2, is_graded=True, submitted_at=datetime.now(timezone.utc))
     session.add(sub2)
     await session.flush()
@@ -234,7 +234,7 @@ async def test_10_multiple_submissions_returns_latest(client: AsyncClient, sessi
     assert data["questions"][0]["status"] == TestResultStatus.INCORRECT
 
 
-# --- 11-13: Логика Manual Test ---
+
 
 @pytest.mark.anyio
 async def test_11_manual_test_ungraded(client: AsyncClient, session: AsyncSession, create_user):
@@ -302,7 +302,7 @@ async def test_13_manual_test_graded_full(client: AsyncClient, session: AsyncSes
     assert data["questions"][0]["score"] == 1
 
 
-# --- 14-20: Краевые случаи и нюансы ответов ---
+
 
 @pytest.mark.anyio
 async def test_14_unanswered_questions_marked_wrong(client: AsyncClient, session: AsyncSession, create_user, base_env):
@@ -313,7 +313,7 @@ async def test_14_unanswered_questions_marked_wrong(client: AsyncClient, session
     sub = TestSubmission(user_id=user.id, block_id=block.id, score=1, max_score=2, is_graded=True)
     session.add(sub)
     await session.flush()
-    # То есть отвечаем на 1 вопрос, а 2-й пропускаем
+
     session.add(TestAnswer(submission_id=sub.id, question_id=q1.id, selected_answer_id=o1_c.id))
     await session.commit()
     
@@ -331,7 +331,7 @@ async def test_15_multiple_answers_text_concatenation(client: AsyncClient, sessi
     q1.question_type = QuestionType.multiple_choice
     await session.flush()
     
-    # Добавляем для первого вопроса ещё один "правильный" вариант ответа
+
     o_extra = AnswerOption(question_id=q1.id, text="AnotherRight", is_correct=True, order_index=3)
     session.add(o_extra)
     await session.commit()
@@ -347,7 +347,7 @@ async def test_15_multiple_answers_text_concatenation(client: AsyncClient, sessi
     data = resp.json()
     
     q1_res = next(q for q in data["questions"] if q["question_id"] == str(q1.id))
-    # Оба правильных ответа должны быть перечислены через запятую
+
     assert "Right1" in q1_res["correct_answer"]
     assert "AnotherRight" in q1_res["correct_answer"]
 
@@ -365,7 +365,7 @@ async def test_16_user_answer_is_text(client: AsyncClient, session: AsyncSession
     sub = TestSubmission(user_id=user.id, block_id=block.id, score=0, max_score=2, is_graded=True)
     session.add(sub)
     await session.flush()
-    # Ответ дан текстом
+
     session.add(TestAnswer(submission_id=sub.id, question_id=q1.id, text_answer="User Input Text"))
     await session.commit()
     
@@ -379,7 +379,7 @@ async def test_16_user_answer_is_text(client: AsyncClient, session: AsyncSession
 @pytest.mark.anyio
 async def test_17_different_user_submission_hidden(client: AsyncClient, session: AsyncSession, create_user, base_env):
     course, block, q1, _, o1_c, _, _, _ = base_env
-    # User 1 submits
+
     user1 = await create_user("u17_1@test.com")
     sub1 = TestSubmission(user_id=user1.id, block_id=block.id, score=2, max_score=2, is_graded=True)
     session.add(sub1)
@@ -387,7 +387,7 @@ async def test_17_different_user_submission_hidden(client: AsyncClient, session:
     session.add(TestAnswer(submission_id=sub1.id, question_id=q1.id, selected_answer_id=o1_c.id))
     await session.commit()
     
-    # User 2 logs in but has NO submissions
+
     user2 = await create_user("u17_2@test.com")
     token2 = await _get_auth_token(client, user2)
     
@@ -397,23 +397,23 @@ async def test_17_different_user_submission_hidden(client: AsyncClient, session:
 
 @pytest.mark.anyio
 async def test_18_course_mismatch(client: AsyncClient, session: AsyncSession, create_user, base_env):
-    # block belongs to base_env course
+
     _, block, *_ = base_env
-    # create another course completely
+
     course_fake = await _create_course(session)
     
     user = await create_user("u18@test.com")
     token = await _get_auth_token(client, user)
     
     resp = await client.get(f"/api/v1/courses/{course_fake.id}/blocks/{block.id}/test-results", cookies={"auth_user": token})
-    # Because _get_block_or_404 checks block.course_id == course_id, it returns 404
+
     assert resp.status_code == 404
 
 @pytest.mark.anyio
 async def test_19_no_answers_empty_test_handled_gracefully(client: AsyncClient, session: AsyncSession, create_user):
     course = await _create_course(session)
     block = await _create_block(session, course.id, BlockType.auto_test)
-    # Block has NO questions
+
     
     user = await create_user("u19@test.com")
     token = await _get_auth_token(client, user)
@@ -438,7 +438,7 @@ async def test_20_deleted_block_prevents_getting_results(client: AsyncClient, se
     session.add(sub)
     await session.commit()
     
-    # Delete block
+
     await session.delete(block)
     await session.commit()
     

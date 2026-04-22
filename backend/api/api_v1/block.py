@@ -69,31 +69,31 @@ async def _format_block_read(
             ).limit(1)
             is_attempted = (await db.execute(stmt_attempt)).scalar() is not None
         
-    # Count questions in this block
+
     from core.models.test import Question
     from sqlalchemy import func
     stmt_count = select(func.count(Question.id)).where(Question.block_id == block.id)
     n_questions = (await db.execute(stmt_count)).scalar() or 0
 
-    # Calculate 1-based positional index
+
     stmt_pos = select(func.count(Block.id)).where(
         Block.course_id == block.course_id,
         Block.order_index <= block.order_index,
     )
     pos_index = (await db.execute(stmt_pos)).scalar() or 1
 
-    # Fetch next block ID
+
     stmt_next = select(Block.id).where(
         Block.course_id == block.course_id,
         Block.order_index > block.order_index,
     ).order_by(Block.order_index).limit(1)
     next_id = (await db.execute(stmt_next)).scalar()
 
-    # Total blocks in course
+
     stmt_all = select(func.count(Block.id)).where(Block.course_id == block.course_id)
     all_blocks_count = (await db.execute(stmt_all)).scalar() or 0
     
-    # Stage calculation (Lesson + Test = 1 stage)
+
     pos_stage = (pos_index - 1) // 2 + 1
 
     status = CourseStatus.not_started
@@ -137,7 +137,7 @@ async def list_blocks(course_id: uuid.UUID, db: Session, user: OptionalUser):
     )
     blocks = result.scalars().all()
 
-    # Optimized progress fetch for list
+
     completed_block_ids = set()
     if user:
         stmt_progress = select(UserBlockProgress.block_id).where(
@@ -147,7 +147,7 @@ async def list_blocks(course_id: uuid.UUID, db: Session, user: OptionalUser):
         )
         completed_block_ids = set((await db.execute(stmt_progress)).scalars().all())
 
-        # Optimized submission fetch for "in_progress" status
+
         stmt_submissions = select(TestSubmission.block_id).where(
             TestSubmission.user_id == user.id,
             TestSubmission.block_id.in_([b.id for b in blocks]),
@@ -156,7 +156,7 @@ async def list_blocks(course_id: uuid.UUID, db: Session, user: OptionalUser):
     else:
         submitted_block_ids = set()
 
-    # Fetch question counts for all blocks in the course
+
     from core.models.test import Question
     from sqlalchemy import func
     stmt_counts = select(Question.block_id, func.count(Question.id)).where(
@@ -172,9 +172,9 @@ async def list_blocks(course_id: uuid.UUID, db: Session, user: OptionalUser):
     active_stage = 1
     block_reads = []
     all_blocks_count = len(blocks)
-    all_stages_count = (all_blocks_count + 1) // 2 # Lesson + Test = 1 stage
+    all_stages_count = (all_blocks_count + 1) // 2
     
-    # 1. Determine active stage (the stage of the first uncompleted block)
+
     found_active = False
     for i, b in enumerate(blocks):
         if not found_active and b.id not in completed_block_ids:
@@ -182,19 +182,19 @@ async def list_blocks(course_id: uuid.UUID, db: Session, user: OptionalUser):
             current_block_id = b.id
             found_active = True
             
-    # If admin, let them see everything
+
     if user and (user.role == "administrator" or user.is_superuser):
         active_stage = all_stages_count
-    # If all completed, let them see everything
+
     elif not found_active and blocks:
         active_stage = all_stages_count
 
-    # 2. Build and Filter block reads
+
     for i, b in enumerate(blocks):
         pos_index = i + 1
         pos_stage = (i // 2) + 1
         
-        # Skip FUTURE stages (progressive unlocking)
+
         if pos_stage > active_stage:
             continue
             
@@ -352,7 +352,7 @@ async def get_block_test_results(
 ):
     block = await _get_block_or_404(db, block_id, course_id)
     
-    # Needs to handle if it's not a test block
+
     if block.block_type not in (BlockType.auto_test, BlockType.manual_test, BlockType.mixed_test):
         raise HTTPException(status_code=400, detail="Block is not a test block")
 

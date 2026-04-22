@@ -151,7 +151,7 @@ async def search_courses(
         )
     )
 
-    # 1. Text Search
+
     if q:
         if len(q) < 2:
             search_pattern = f"%{q}%"
@@ -168,23 +168,17 @@ async def search_courses(
                 | (Course.description.ilike(search_pattern))
             )
 
-    # 2. Level filter
     if level is not None:
         query = query.where(Course.level == level)
 
-    # 2b. Audience filter
     if audience is not None:
         query = query.where(Course.audience == audience)
 
-    # 3. Specific Filters
     if filter_type == "new":
-        # Added less than 24 hours ago
         day_ago = datetime.now(timezone.utc) - timedelta(days=1)
         query = query.where(Course.created_at >= day_ago)
 
     elif filter_type == "popular":
-        # Sort by number of enrollments
-        # We need a subquery or join to count enrollments
         enrollment_count = (
             select(
                 CourseEnrollment.course_id,
@@ -199,26 +193,24 @@ async def search_courses(
         query = query.order_by(func.coalesce(enrollment_count.c.count, 0).desc())
 
     elif filter_type == "not_started" and user_id:
-        # Not enrolled
+
         subq = select(CourseEnrollment.course_id).where(CourseEnrollment.user_id == user_id)
         query = query.where(Course.id.not_in(subq))
 
     elif filter_type == "in_progress" and user_id:
-        # Enrolled but not completed
+
         query = query.join(CourseEnrollment, Course.id == CourseEnrollment.course_id)
         query = query.where(
             CourseEnrollment.user_id == user_id, CourseEnrollment.completed_at.is_(None)
         )
 
     elif filter_type == "completed" and user_id:
-        # Enrolled and completed
+
         query = query.join(CourseEnrollment, Course.id == CourseEnrollment.course_id)
         query = query.where(
             CourseEnrollment.user_id == user_id,
             CourseEnrollment.completed_at.is_not(None),
         )
-
-    # Default ordering if not popular
     if filter_type != "popular":
         if q and len(q) >= 2:
             relevance = (
@@ -257,7 +249,6 @@ async def update_course_completion_status(
     if not enrollment:
         return
 
-    # Count total TEST blocks in the course (lessons are excluded from progress)
     stmt_total = select(func.count(Block.id)).where(
         Block.course_id == course_id,
         Block.block_type.in_(TEST_BLOCK_TYPES),
@@ -265,10 +256,8 @@ async def update_course_completion_status(
     total: int = (await session.execute(stmt_total)).scalar() or 0
 
     if total == 0:
-        # No blocks — nothing to complete
         return
 
-    # Count TEST blocks completed by this user in this course
     stmt_done = (
         select(func.count(UserBlockProgress.id))
         .join(Block, UserBlockProgress.block_id == Block.id)
@@ -282,12 +271,12 @@ async def update_course_completion_status(
     completed: int = (await session.execute(stmt_done)).scalar() or 0
 
     if completed >= total:
-        # All blocks done → mark course as completed
+
         if enrollment.completed_at is None:
             enrollment.completed_at = datetime.now(timezone.utc)
             await session.commit()
     else:
-        # Not all done → ensure completed_at is cleared (handles block un-completion)
+
         if enrollment.completed_at is not None:
             enrollment.completed_at = None
             await session.commit()
@@ -309,7 +298,6 @@ async def attach_course_progress(
 
     course_ids = [c.id for c in courses]
 
-    # 1. Total TEST blocks per course (lessons excluded from progress)
     stmt_total = (
         select(Block.course_id, func.count(Block.id).label("total"))
         .where(
@@ -321,7 +309,6 @@ async def attach_course_progress(
     result_total = await session.execute(stmt_total)
     total_blocks_map = {row.course_id: row.total for row in result_total}
 
-    # 2. Completed blocks and enrollments per course (only for authenticated users)
     completed_blocks_map: dict[uuid.UUID, int] = {}
     enrolled_courses: set[uuid.UUID] = set()
 
@@ -355,7 +342,7 @@ async def attach_course_progress(
         if user_id and c.id in enrolled_courses:
             completed = completed_blocks_map.get(c.id, 0)
             percent = round((completed / total) * 100, 2) if total > 0 else 0.0
-            # Determine status
+
             if completed == 0:
                 status = CourseStatus.not_started
             elif total > 0 and completed >= total:
@@ -363,7 +350,7 @@ async def attach_course_progress(
             else:
                 status = CourseStatus.in_progress
         else:
-            # Not enrolled or anonymous — default progress (0/total/0%)
+
             completed = 0
             percent = 0.0
             status = CourseStatus.not_started
@@ -392,13 +379,13 @@ async def reset_course_progress(
     if not enrollment:
         return False
 
-    # 1. Get all block IDs for this course
+
     stmt_blocks = select(Block.id).where(Block.course_id == course_id)
     result_blocks = await session.execute(stmt_blocks)
     block_ids = [row[0] for row in result_blocks.all()]
 
     if block_ids:
-        # 2. Delete UserBlockProgress
+
         await session.execute(
             delete(UserBlockProgress).where(
                 UserBlockProgress.user_id == user_id,
@@ -406,7 +393,7 @@ async def reset_course_progress(
             )
         )
 
-        # 3. Delete TestSubmission (TestAnswer will be deleted by cascade)
+
         await session.execute(
             delete(TestSubmission).where(
                 TestSubmission.user_id == user_id,
@@ -414,7 +401,7 @@ async def reset_course_progress(
             )
         )
 
-    # 4. Reset enrollment completion
+
     enrollment.completed_at = None
 
     await session.commit()

@@ -18,12 +18,12 @@ async def get_test_results_for_block(
     Retrieves the latest test submission for the given block and user,
     and returns detailed results including correctness per question.
     """
-    # 1. Fetch Block
+
     block = await db.get(Block, block_id)
     if not block or block.block_type not in (BlockType.auto_test, BlockType.manual_test, BlockType.mixed_test):
         return None
 
-    # 2. Fetch the latest TestSubmission for this user and block
+
     stmt_sub = (
         select(TestSubmission)
         .where(
@@ -40,7 +40,7 @@ async def get_test_results_for_block(
     if not submission:
         return None
 
-    # 3. Fetch questions and their options
+
     stmt_q = (
         select(Question)
         .where(Question.block_id == block_id)
@@ -53,14 +53,14 @@ async def get_test_results_for_block(
     from collections import defaultdict
     from core.models.test import QuestionType
     
-    # Create mapping of user answers: Each question_id points to a list of TestAnswer
+
     user_answers_map = defaultdict(list)
     for ans in submission.answers:
         user_answers_map[ans.question_id].append(ans)
 
     question_results = []
     for q in questions:
-        # Find correct options
+
         correct_options = [opt for opt in q.options if opt.is_correct]
         correct_text = ", ".join([opt.text for opt in correct_options]) if correct_options else None
         correct_option_ids = {opt.id for opt in correct_options}
@@ -70,7 +70,7 @@ async def get_test_results_for_block(
         status = TestResultStatus.INCORRECT
         score = 0
 
-        # Calculate user answer text and selected IDs
+
         user_selected_texts = []
         user_selected_ids = set()
         text_answer = None
@@ -129,23 +129,23 @@ async def get_test_results_for_block(
             )
         )
 
-    # 4. Calculate stats (excluding REQUIRES_REVIEW)
+
     correct_count = sum(1 for r in question_results if r.status == TestResultStatus.CORRECT)
     incorrect_count = sum(1 for r in question_results if r.status == TestResultStatus.INCORRECT)
 
-    # 5. Additional context: Topic, completion time, stages and progress
+
     from core.models.course import Course
     from crud import course as course_crud
 
     course = await db.get(Course, block.course_id)
     await course_crud.attach_course_progress(db, [course], user_id)
 
-    # Calculate stages
+
     stmt_all_blocks = select(Block).where(Block.course_id == block.course_id).order_by(Block.order_index)
     all_blocks = (await db.execute(stmt_all_blocks)).scalars().all()
     total_stages = (len(all_blocks) + 1) // 2
 
-    # Find current block index to determine its stage
+
     current_block_index = 1
     for i, b in enumerate(all_blocks):
         if b.id == block_id:

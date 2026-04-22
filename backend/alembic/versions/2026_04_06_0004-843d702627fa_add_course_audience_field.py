@@ -12,7 +12,7 @@ from alembic import op
 import sqlalchemy as sa
 
 
-# revision identifiers, used by Alembic.
+
 revision: str = "843d702627fa"
 down_revision: Union[str, None] = "d2f18f30147d"
 branch_labels: Union[str, Sequence[str], None] = None
@@ -20,7 +20,7 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    # Create the PostgreSQL enum type first
+
     courseaudience = sa.Enum("everyone", "installer", name="courseaudience")
     courseaudience.create(op.get_bind(), checkfirst=True)
 
@@ -33,7 +33,7 @@ def upgrade() -> None:
             server_default="everyone",
         ),
     )
-    # Remove server_default — driven by application logic from now on
+
     op.alter_column("courses", "audience", server_default=None)
 
 

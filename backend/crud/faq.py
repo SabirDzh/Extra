@@ -34,7 +34,7 @@ async def create_faq(
     session: AsyncSession,
     faq_in: FAQCreate,
 ) -> FAQ:
-    # Check for duplicate question using utility
+
     await ensure_unique_field(
         session,
         FAQ,
@@ -254,7 +254,7 @@ async def import_faqs(
         if not items:
             return {"message": "Файл пуст или не содержит валидных данных для импорта"}
 
-        # Exclude duplicates
+
         incoming_questions = []
         valid_items = []
         for item in items:
@@ -269,7 +269,7 @@ async def import_faqs(
 
         stmt = select(FAQ.question).where(FAQ.question.in_(incoming_questions))
         existing_result = await session.execute(stmt)
-        # SQLAlchemy may return lowercase or exact case, let's compare case-insensitively
+
         existing_questions = {q.lower() for q in existing_result.scalars().all()}
 
         new_faqs = []
@@ -283,7 +283,7 @@ async def import_faqs(
                         "is_published": item.get("is_published", True),
                     }
                 )
-                # Add to set to prevent duplicates within the file itself
+
                 existing_questions.add(item["question"].lower())
 
         if not new_faqs:

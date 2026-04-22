@@ -156,11 +156,11 @@ async def get_product(
             status_code=status.HTTP_404_NOT_FOUND, detail="Product not found"
         )
 
-    # Track unique view
+
     identifier = _get_client_identifier(request)
     await track_product_view(redis, product_id, identifier)
 
-    # Get total views
+
     views = await get_product_views(redis, product_id)
     product.views = views
 
@@ -200,7 +200,7 @@ async def delete_product(
         )
 
     await product_crud.delete_product(db, product)
-    # Safely delete from redis
+
     try:
         await redis.delete(f"product:{product_id}:unique_views")
         await redis.zrem("products:popularity", str(product_id))

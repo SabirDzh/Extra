@@ -21,7 +21,7 @@ def register_errors_handlers(app: FastAPI) -> None:
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             content={
                 "message": "Unhandled error",
-                "error": errors_data,  # exc.errors()
+                "error": errors_data,
             },
         )
 

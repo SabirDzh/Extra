@@ -38,13 +38,13 @@ class CourseBase(BaseModel):
 
     model_config = {"from_attributes": True}
 
-    @computed_field  # type: ignore[misc]
+    @computed_field
     @property
     def level_label(self) -> str:
         """Human-readable level name for the frontend (e.g. 'Начинающий')."""
         return LEVEL_DISPLAY_NAMES[self.level]
 
-    @computed_field  # type: ignore[misc]
+    @computed_field
     @property
     def audience_label(self) -> str:
         """Human-readable audience name for the frontend (e.g. 'Для всех')."""
@@ -52,14 +52,14 @@ class CourseBase(BaseModel):
 
 
 class CourseListRead(CourseBase):
-    progress: "CourseProgress" = None  # type: ignore[assignment]
+    progress: "CourseProgress" = None
 
 
 class CourseRead(CourseBase):
     is_published: bool
     created_by: uuid.UUID
     updated_at: datetime
-    progress: "CourseProgress" = None  # type: ignore[assignment]
+    progress: "CourseProgress" = None
 
 
 class CourseProgress(BaseModel):

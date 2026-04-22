@@ -24,7 +24,7 @@ from starlette.staticfiles import StaticFiles
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
-    # startup
+
     from api.dependencies.redis import redis_pool
     redis = Redis(connection_pool=redis_pool)
     
@@ -34,7 +34,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     )
 
     yield
-    # shutdown
+
     await db_helper.dispose()
     await redis_pool.disconnect()
 

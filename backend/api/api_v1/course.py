@@ -119,7 +119,7 @@ async def get_course(
             status_code=status.HTTP_404_NOT_FOUND, detail="Course not found"
         )
 
-    # Apply personal filters manually for the single course if requested
+
     if user and filter_type in ["in_progress", "completed", "not_started"]:
         enrollment = await course_crud.get_enrollment(db, user.id, course_id)
         if filter_type == "not_started" and enrollment:

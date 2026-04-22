@@ -10,7 +10,7 @@ from core.models.course import Course
 from core.models.test import Question, QuestionType, AnswerOption, TestSubmission, TestAnswer
 from core.schemas.test import TestResultStatus
 
-# --- Вспомогательные функции для подготовки окружения ---
+
 
 async def _create_course(session: AsyncSession, user_id=None) -> Course:
     course = Course(
@@ -37,7 +37,7 @@ async def _get_auth_cookies(client: AsyncClient, user, password="Password12345!"
     resp = await client.post("/api/v1/auth/login", data={"username": user.email, "password": password})
     return {"auth_user": resp.cookies.get("auth_user", "")}
 
-# --- 1-10: Базовая логика и типы блоков ---
+
 
 @pytest.mark.anyio
 async def test_01_create_mixed_block_success(client: AsyncClient, session: AsyncSession, create_user):
@@ -64,7 +64,7 @@ async def test_02_create_block_invalid_type(client: AsyncClient, session: AsyncS
         json={"title": "Invalid Block", "block_type": "super_test_123", "order_index": 1},
         cookies=cookies
     )
-    assert resp.status_code == 422 # Pydantic validation error
+    assert resp.status_code == 422
 
 @pytest.mark.anyio
 async def test_03_submit_mixed_test_flow(client: AsyncClient, session: AsyncSession, create_user):
@@ -73,7 +73,7 @@ async def test_03_submit_mixed_test_flow(client: AsyncClient, session: AsyncSess
     course = await _create_course(session)
     block = await _create_block(session, course.id, BlockType.mixed_test)
     
-    # Добавляем вопрос
+
     q1 = Question(block_id=block.id, text="Q1", question_type=QuestionType.single_choice)
     session.add(q1)
     await session.commit()
@@ -128,7 +128,7 @@ async def test_06_07_access_control_submissions(client: AsyncClient, session: As
     course = await _create_course(session)
     block = await _create_block(session, course.id)
     
-    # User submits
+
     sub = TestSubmission(user_id=user.id, block_id=block.id, max_score=1, is_graded=False)
     session.add(sub)
     await session.commit()
@@ -169,7 +169,7 @@ async def test_09_manual_test_still_needs_admin(client: AsyncClient, session: As
     await session.commit()
     
     resp = await client.post(f"/api/v1/tests/blocks/{block.id}/submit", json={"answers": []}, cookies=cookies)
-    assert resp.json()["is_graded"] is False # manual_test is NEVER auto-graded fully if it uses manual logic
+    assert resp.json()["is_graded"] is False
 
 @pytest.mark.anyio
 async def test_10_cascade_delete_block(client: AsyncClient, session: AsyncSession, create_user):
@@ -186,7 +186,7 @@ async def test_10_cascade_delete_block(client: AsyncClient, session: AsyncSessio
     q_check = (await session.execute(select(Question).where(Question.block_id == block.id))).scalar()
     assert q_check is None
 
-# --- 11-20: Автоматическое оценивание (Choices) ---
+
 
 @pytest.mark.anyio
 async def test_11_12_single_choice_logic(client: AsyncClient, session: AsyncSession, create_user):
@@ -202,12 +202,12 @@ async def test_11_12_single_choice_logic(client: AsyncClient, session: AsyncSess
     session.add_all([c_opt, w_opt])
     await session.commit()
     
-    # Test 11: Right
+
     r_right = await client.post(f"/api/v1/tests/blocks/{block.id}/submit", 
                                 json={"answers": [{"question_id": str(q1.id), "selected_answer_id": str(c_opt.id)}]}, cookies=cookies)
     assert r_right.json()["score"] == 1
     
-    # Test 12: Wrong
+
     r_wrong = await client.post(f"/api/v1/tests/blocks/{block.id}/submit", 
                                 json={"answers": [{"question_id": str(q1.id), "selected_answer_id": str(w_opt.id)}]}, cookies=cookies)
     assert r_wrong.json()["score"] == 0
@@ -227,18 +227,18 @@ async def test_14_15_16_multiple_choice_combinations(client: AsyncClient, sessio
     session.add_all([o1, o2, o3])
     await session.commit()
     
-    # 14: Exact match (Success)
+
     r1 = await client.post(f"/api/v1/tests/blocks/{block.id}/submit", 
                            json={"answers": [{"question_id": str(q.id), "selected_answer_id": str(o1.id)}, 
                                              {"question_id": str(q.id), "selected_answer_id": str(o2.id)}]}, cookies=cookies)
     assert r1.json()["score"] == 1
     
-    # 15: Partial match (Fail)
+
     r2 = await client.post(f"/api/v1/tests/blocks/{block.id}/submit", 
                            json={"answers": [{"question_id": str(q.id), "selected_answer_id": str(o1.id)}]}, cookies=cookies)
     assert r2.json()["score"] == 0
     
-    # 16: Extra wrong (Fail)
+
     r3 = await client.post(f"/api/v1/tests/blocks/{block.id}/submit", 
                            json={"answers": [{"question_id": str(q.id), "selected_answer_id": str(o1.id)}, 
                                              {"question_id": str(q.id), "selected_answer_id": str(o2.id)},
@@ -272,11 +272,11 @@ async def test_20_max_score_updated_on_question_add(client: AsyncClient, session
     cookies = await _get_auth_cookies(client, user)
     course = await _create_course(session)
     block = await _create_block(session, course.id)
-    # 0 questions -> max_score 0
+
     r0 = await client.post(f"/api/v1/tests/blocks/{block.id}/submit", json={"answers": []}, cookies=cookies)
     assert r0.json()["max_score"] == 0
     
-    # Add question
+
     q = Question(block_id=block.id, text="Q", question_type=QuestionType.single_choice)
     session.add(q)
     await session.commit()
@@ -284,7 +284,7 @@ async def test_20_max_score_updated_on_question_add(client: AsyncClient, session
     r1 = await client.post(f"/api/v1/tests/blocks/{block.id}/submit", json={"answers": []}, cookies=cookies)
     assert r1.json()["max_score"] == 1
 
-# --- 21-30: Ручная проверка (Admin Workflow) ---
+
 
 @pytest.mark.anyio
 async def test_21_22_admin_grading_update_score(client: AsyncClient, session: AsyncSession, create_user):
@@ -332,7 +332,7 @@ async def test_27_graded_by_tracked(client: AsyncClient, session: AsyncSession, 
     
     await client.post(f"/api/v1/tests/submissions/{sub.id}/grade", json={"score": 10}, cookies=cookies)
     
-    # Check in DB
+
     result = await session.execute(select(TestSubmission).where(TestSubmission.id == sub.id))
     assert result.scalar().graded_by == admin.id
 
@@ -344,7 +344,7 @@ async def test_30_pending_submissions_visibility(client: AsyncClient, session: A
     course = await _create_course(session)
     block = await _create_block(session, course.id, BlockType.manual_test)
     
-    # Ungraded
+
     sub = TestSubmission(user_id=user.id, block_id=block.id, is_graded=False)
     session.add(sub)
     await session.commit()
@@ -352,7 +352,7 @@ async def test_30_pending_submissions_visibility(client: AsyncClient, session: A
     resp = await client.get(f"/api/v1/tests/courses/{course.id}/pending-submissions", cookies=cookies)
     assert len(resp.json()) == 1
 
-# --- 31-40: Граничные значения ---
+
 
 @pytest.mark.anyio
 async def test_31_zero_questions_submission(client: AsyncClient, session: AsyncSession, create_user):
@@ -416,7 +416,7 @@ async def test_40_submit_to_lesson_block_fails(client: AsyncClient, session: Asy
     assert resp.status_code == 400
     assert "not a test" in resp.json()["detail"]
 
-# --- 41-50: Детальные результаты ---
+
 
 @pytest.mark.anyio
 async def test_41_results_correct_status(client: AsyncClient, session: AsyncSession, create_user):
@@ -459,13 +459,13 @@ async def test_47_always_returns_latest_submission(client: AsyncClient, session:
     course = await _create_course(session)
     block = await _create_block(session, course.id)
     
-    # Sub 1
+
     await client.post(f"/api/v1/tests/blocks/{block.id}/submit", json={"answers": []}, cookies=cookies)
-    # Sub 2
+
     await client.post(f"/api/v1/tests/blocks/{block.id}/submit", json={"answers": []}, cookies=cookies)
     
     resp = await client.get(f"/api/v1/courses/{course.id}/blocks/{block.id}/test-results", cookies=cookies)
-    # Check count in DB
+
     subs = (await session.execute(select(TestSubmission).where(TestSubmission.user_id == user.id).order_by(TestSubmission.submitted_at.desc(), TestSubmission.id.desc()))).scalars().all()
     assert len(subs) == 2
     assert resp.json()["submission_id"] == str(subs[0].id)
@@ -477,7 +477,7 @@ async def test_50_full_integration_path(client: AsyncClient, session: AsyncSessi
     cookies_user = await _get_auth_cookies(client, user)
     cookies_admin = await _get_auth_cookies(client, admin)
     
-    # 1. Admin creates course & mixed block
+
     course = await _create_course(session, admin.id)
     block = await _create_block(session, course.id, BlockType.mixed_test)
     q1 = Question(block_id=block.id, text="Auto Q", question_type=QuestionType.single_choice)
@@ -488,18 +488,18 @@ async def test_50_full_integration_path(client: AsyncClient, session: AsyncSessi
     session.add(opt)
     await session.commit()
     
-    # 2. User submits
+
     resp_sub = await client.post(f"/api/v1/tests/blocks/{block.id}/submit", 
                                  json={"answers": [{"question_id": str(q1.id), "selected_answer_id": str(opt.id)},
                                                    {"question_id": str(q2.id), "text_answer": "Text"}]}, cookies=cookies_user)
     sub_id = resp_sub.json()["id"]
     assert resp_sub.json()["is_graded"] is False
     
-    # 3. Admin reviews & grades
+
     await client.post(f"/api/v1/tests/submissions/{sub_id}/grade", 
                       json={"score": 2}, cookies=cookies_admin)
     
-    # 4. Check results finalized
+
     resp_res = await client.get(f"/api/v1/courses/{course.id}/blocks/{block.id}/test-results", cookies=cookies_user)
     assert resp_res.json()["questions"][0]["status"] == TestResultStatus.CORRECT
     assert resp_res.json()["questions"][1]["status"] == TestResultStatus.CORRECT
@@ -515,11 +515,11 @@ async def test_51_truly_mixed_all_types(client: AsyncClient, session: AsyncSessi
     course = await _create_course(session, admin.id)
     block = await _create_block(session, course.id, BlockType.mixed_test)
     
-    # Q1: Single Choice
+
     q1 = Question(block_id=block.id, text="Single", question_type=QuestionType.single_choice, order_index=1)
-    # Q2: Multiple Choice
+
     q2 = Question(block_id=block.id, text="Multi", question_type=QuestionType.multiple_choice, order_index=2)
-    # Q3: Free Text
+
     q3 = Question(block_id=block.id, text="Free", question_type=QuestionType.free_text, order_index=3)
     session.add_all([q1, q2, q3])
     await session.flush()
@@ -530,7 +530,7 @@ async def test_51_truly_mixed_all_types(client: AsyncClient, session: AsyncSessi
     session.add_all([o1_c, o2_c1, o2_c2])
     await session.commit()
     
-    # 1. User submits all correct choice answers + some text
+
     resp_sub = await client.post(
         f"/api/v1/tests/blocks/{block.id}/submit",
         json={
@@ -545,22 +545,22 @@ async def test_51_truly_mixed_all_types(client: AsyncClient, session: AsyncSessi
     )
     assert resp_sub.status_code == 200
     data = resp_sub.json()
-    assert data["score"] == 2 # 1 for q1, 1 for q2
+    assert data["score"] == 2
     assert data["max_score"] == 3
-    assert data["is_graded"] is False # Pending q3
+    assert data["is_graded"] is False
     
-    # 2. Check intermediate results
+
     resp_res = await client.get(f"/api/v1/courses/{course.id}/blocks/{block.id}/test-results", cookies=cookies_user)
     results = resp_res.json()["questions"]
-    assert results[0]["status"] == TestResultStatus.CORRECT # Q1 auto-graded
-    assert results[1]["status"] == TestResultStatus.CORRECT # Q2 auto-graded
-    assert results[2]["status"] == TestResultStatus.REQUIRES_REVIEW # Q3 pending
+    assert results[0]["status"] == TestResultStatus.CORRECT
+    assert results[1]["status"] == TestResultStatus.CORRECT
+    assert results[2]["status"] == TestResultStatus.REQUIRES_REVIEW
     
-    # 3. Admin grades manual part
+
     await client.post(f"/api/v1/tests/submissions/{data['id']}/grade", 
                       json={"score": 3, "admin_comment": "Excellent work on the free text section!"}, cookies=cookies_admin)
     
-    # 4. Final verification
+
     resp_final = await client.get(f"/api/v1/courses/{course.id}/blocks/{block.id}/test-results", cookies=cookies_user)
     final_results = resp_final.json()["questions"]
     assert all(r["status"] == TestResultStatus.CORRECT for r in final_results)

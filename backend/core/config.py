@@ -69,10 +69,10 @@ class ApiPrefix(BaseModel):
 
     @property
     def bearer_token_url(self) -> str:
-        # api/v1/auth/login
+
         parts = (self.prefix, self.v1.prefix, self.v1.auth, "/login")
         path = "".join(parts)
-        # return path[1:]
+
         return path.removeprefix("/")
 
 
@@ -119,9 +119,9 @@ class CacheConfig(BaseModel):
 
 class CookieConfig(BaseModel):
     lifetime_seconds: int = 28800
-    secure: bool = False  # TODO set to True when HTTPS is enabled
+    secure: bool = False
     name: str = "auth_user"
-    samesite: Literal["none", "lax", "strict"] = "lax"  # TODO set to "none" when Server
+    samesite: Literal["none", "lax", "strict"] = "lax"
 
 
 class Settings(BaseSettings):
@@ -147,4 +147,4 @@ class Settings(BaseSettings):
     UPLOAD_DIR: str = "uploads/videos"
 
 
-settings = Settings()  # pyright: ignore [reportCallIssue]
+settings = Settings()

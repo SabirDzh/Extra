@@ -8,7 +8,7 @@ import pytest
 from httpx import AsyncClient
 
 
-# ─── Helpers ───────────────────────────────────────────────────────────────────
+
 
 
 async def _create_course(client: AsyncClient, headers: dict, **kwargs) -> dict:
@@ -26,7 +26,7 @@ async def _create_course(client: AsyncClient, headers: dict, **kwargs) -> dict:
     return resp
 
 
-# ─── Tests ─────────────────────────────────────────────────────────────────────
+
 
 
 @pytest.mark.anyio
@@ -73,7 +73,7 @@ async def test_create_course_default_audience_is_everyone(
     Стресс-тест 3: Если audience не указан при создании, должен быть дефолт
     "everyone" — а не null или ошибка. Проверяет что дефолт работает.
     """
-    # не передаём audience вовсе
+
     resp = await client.post(
         "/api/v1/courses/",
         json={"title": "Default Audience Course", "is_published": True},
@@ -100,7 +100,7 @@ async def test_invalid_audience_value_returns_422(
         "/api/v1/courses/",
         json={
             "title": "Bad Audience Course",
-            "audience": "superadmin",  # не существует в enum
+            "audience": "superadmin",
             "is_published": True,
         },
         headers=superuser_token_headers,
@@ -119,7 +119,7 @@ async def test_update_course_audience_from_everyone_to_installer(
     Стресс-тест 5: Обновление audience с "everyone" на "installer".
     Поле должно изменяться через PUT /courses/{id}.
     """
-    # Создаём курс с audience=everyone
+
     create_resp = await _create_course(
         client,
         superuser_token_headers,
@@ -129,7 +129,7 @@ async def test_update_course_audience_from_everyone_to_installer(
     assert create_resp.status_code == 201
     course_id = create_resp.json()["id"]
 
-    # Обновляем на installer
+
     update_resp = await client.put(
         f"/api/v1/courses/{course_id}",
         json={"audience": "installer"},
@@ -157,7 +157,7 @@ async def test_audience_persists_after_other_field_update(
     assert create_resp.status_code == 201
     course_id = create_resp.json()["id"]
 
-    # Обновляем только description — audience не трогаем
+
     update_resp = await client.put(
         f"/api/v1/courses/{course_id}",
         json={"description": "Updated description only"},

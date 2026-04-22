@@ -15,7 +15,7 @@ from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
 
-# ─── Helpers ───────────────────────────────────────────────────────────────────
+
 
 
 async def _create_course(session: AsyncSession, title: str = "Status Test Course") -> Course:
@@ -38,7 +38,7 @@ async def _add_block(session: AsyncSession, course_id: uuid.UUID, title: str = "
         course_id=course_id,
         order_index=0,
         title=title,
-        block_type=BlockType.auto_test,  # progress counts only test blocks
+        block_type=BlockType.auto_test,
     )
     session.add(block)
     await session.flush()
@@ -61,7 +61,7 @@ async def _complete_block(session: AsyncSession, user_id: uuid.UUID, block: Bloc
     await session.commit()
 
 
-# ─── Tests ─────────────────────────────────────────────────────────────────────
+
 
 
 @pytest.mark.anyio
@@ -124,7 +124,7 @@ async def test_status_in_progress_when_partial_blocks_done(
         b = await _add_block(session, course.id, f"Block {i}")
         blocks.append(b)
     await _enroll(session, user.id, course.id)
-    await _complete_block(session, user.id, blocks[0])  # только первый
+    await _complete_block(session, user.id, blocks[0])
 
     resp = await client.post(
         "/api/v1/auth/login",
@@ -165,7 +165,7 @@ async def test_status_completed_when_all_blocks_done(
     for block in blocks:
         await _complete_block(session, user.id, block)
 
-    # Trigger automatic status update via the CRUD function
+
     from crud.course import update_course_completion_status
     await update_course_completion_status(session, user.id, course.id)
 
@@ -221,7 +221,7 @@ async def test_course_without_blocks_status_is_not_started(
     """
     user = await create_user("no_blocks_enrolled@test.com")
     course = await _create_course(session, "No Blocks Enrolled Course")
-    # Without any blocks
+
     await _enroll(session, user.id, course.id)
 
     resp = await client.post(
@@ -236,7 +236,7 @@ async def test_course_without_blocks_status_is_not_started(
     )
     assert resp2.status_code == 200
     progress = resp2.json()["progress"]
-    # 0 блоков — считаем not_started, не completed
+
     assert progress["status"] in ("not_started", "in_progress")
     assert progress["total"] == 0
     assert progress["completed"] == 0

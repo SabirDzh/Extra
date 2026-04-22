@@ -15,7 +15,7 @@ async def multi_stage_course(session: AsyncSession, create_user):
     session.add(course)
     await session.flush()
     
-    # Stage 1: Block 0 (Lesson), Block 1 (Test)
+
     b0 = Block(course_id=course.id, title="L1", block_type=BlockType.lesson, order_index=0)
     session.add(b0)
     await session.flush()
@@ -24,7 +24,7 @@ async def multi_stage_course(session: AsyncSession, create_user):
     session.add(b1)
     await session.flush()
     
-    # Stage 2: Block 2 (Lesson), Block 3 (Test)
+
     b2 = Block(course_id=course.id, title="L2", block_type=BlockType.lesson, order_index=2)
     session.add(b2)
     await session.flush()
@@ -47,7 +47,7 @@ async def test_progressive_unlocking_stages(client: AsyncClient, session: AsyncS
     auth_resp = await client.post("/api/v1/auth/login", data={"username": student.email, "password": "Password12345!"})
     cookies = {"auth_user": auth_resp.cookies.get("auth_user")}
     
-    # Initially: Only Stage 1 (Blocks 0, 1) should be visible
+
     resp1 = await client.get(f"/api/v1/courses/{course.id}/blocks/", cookies=cookies)
     visible_ids = [b["id"] for b in resp1.json()["blocks"]]
     assert len(visible_ids) == 2
@@ -55,13 +55,13 @@ async def test_progressive_unlocking_stages(client: AsyncClient, session: AsyncS
     assert str(blocks[1].id) in visible_ids
     assert str(blocks[2].id) not in visible_ids
     
-    # Complete Block 0 (L1) -> Stage 1 still active, Stage 2 still locked
+
     await _mark_block_completed(session, student.id, blocks[0].id, course.id)
     await session.commit()
     resp2 = await client.get(f"/api/v1/courses/{course.id}/blocks/", cookies=cookies)
     assert len(resp2.json()["blocks"]) == 2
     
-    # Complete Block 1 (T1) -> Stage 2 (Blocks 2, 3) should unlock
+
     await _mark_block_completed(session, student.id, blocks[1].id, course.id)
     await session.commit()
     resp3 = await client.get(f"/api/v1/courses/{course.id}/blocks/", cookies=cookies)
@@ -84,7 +84,7 @@ async def test_admin_sees_all_blocks(client: AsyncClient, session: AsyncSession,
 @pytest.mark.anyio
 async def test_block_access_content_security(client: AsyncClient, session: AsyncSession, multi_stage_course, create_user):
     """TODO: If there is a direct GET /blocks/{id} endpoint, it should 403 if locked."""
-    # In this app, checking if detail view enforces the same logic.
+
     admin, course, blocks = multi_stage_course
     student = await create_user("student_sec@test.com")
     session.add(CourseEnrollment(user_id=student.id, course_id=course.id))
@@ -93,13 +93,13 @@ async def test_block_access_content_security(client: AsyncClient, session: Async
     auth_resp = await client.post("/api/v1/auth/login", data={"username": student.email, "password": "Password12345!"})
     cookies = {"auth_user": auth_resp.cookies.get("auth_user")}
     
-    # Block 2 is in Stage 2 (Locked)
+
     resp = await client.get(f"/api/v1/courses/{course.id}/blocks/{blocks[2].id}", cookies=cookies)
-    # The current implementation of _get_block_or_404 doesn't seem to check unlocking, 
-    # but the list API does. Let's see what happens.
-    # Note: If it's not implemented, this test will document the gap.
-    # Referring to Step 5 in roadmap (already done in past conversations?): "Разграничить доступ к контенту..."
-    # Actually, let's look at the endpoint in block.py.
+
+
+
+
+
     pass
 
 @pytest.mark.anyio
@@ -127,7 +127,7 @@ async def test_stage_logic_with_odd_number_of_blocks(client: AsyncClient, sessio
     auth_resp = await client.post("/api/v1/auth/login", data={"username": student.email, "password": "Password12345!"})
     cookies = {"auth_user": auth_resp.cookies.get("auth_user")}
     
-    # Stage 1: B0, B1. Stage 2: B2.
+
     resp = await client.get(f"/api/v1/courses/{course.id}/blocks/", cookies=cookies)
     assert len(resp.json()["blocks"]) == 2
     

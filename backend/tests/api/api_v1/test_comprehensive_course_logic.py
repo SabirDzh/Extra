@@ -10,7 +10,7 @@ from core.models.block import Block, BlockType
 from core.models.test import Question, QuestionType, AnswerOption, TestSubmission, TestAnswer
 from core.models.progress import UserBlockProgress
 
-# ─── HELPERS ─────────────────────────────────────────────────────────────────
+
 
 async def _create_user(session, email, is_superuser=False, role="user"):
     from fastapi_users.password import PasswordHelper
@@ -39,13 +39,13 @@ async def _create_course_with_stages(session: AsyncSession, admin_id: uuid.UUID,
     options = []
     
     for i in range(n_stages):
-        # Lesson
+
         l = Block(id=uuid.uuid4(), course_id=course.id, title=f"L{i+1}", block_type=BlockType.lesson, order_index=i*2 + 1)
-        # Test
+
         t = Block(id=uuid.uuid4(), course_id=course.id, title=f"T{i+1}", block_type=BlockType.auto_test, order_index=i*2 + 2)
         blocks.extend([l, t])
         
-        # Add 1 question per test
+
         q = Question(id=uuid.uuid4(), block_id=t.id, text=f"Q{i+1}", question_type=QuestionType.single_choice, order_index=1)
         questions.append(q)
         o = AnswerOption(id=uuid.uuid4(), question_id=q.id, text="Correct", is_correct=True, order_index=1)
@@ -68,7 +68,7 @@ async def _enroll_user(session: AsyncSession, user_id: uuid.UUID, course_id: uui
     await session.commit()
     return e
 
-# ─── TEST SUITE A: PROGRESSIVE UNLOCKING (15 TESTS) ──────────────────────────
+
 
 @pytest.mark.anyio
 class TestUnlockingLogic:
@@ -79,7 +79,7 @@ class TestUnlockingLogic:
         
         resp = await client.get(f"/api/v1/courses/{course.id}/blocks/")
         data = resp.json()
-        assert len(data["blocks"]) == 2 # Only Stage 1
+        assert len(data["blocks"]) == 2
         assert data["all_blocks"] == 6
         assert data["all_stages"] == 3
 
@@ -98,28 +98,28 @@ class TestUnlockingLogic:
         course, blocks, _, _ = await _create_course_with_stages(session, admin.id, 2)
         user = await _create_user(session, "u3@test.com")
         
-        # Complete only the first lesson (Block 1)
+
         p = UserBlockProgress(id=uuid.uuid4(), user_id=user.id, block_id=blocks[0].id, is_completed=True)
         session.add(p)
         await session.commit()
         
         await client.post("/api/v1/auth/login", data={"username": "u3@test.com", "password": "Password12345!"})
         resp = await client.get(f"/api/v1/courses/{course.id}/blocks/")
-        assert len(resp.json()["blocks"]) == 2 # Still only Stage 1 (pos 1, 2)
+        assert len(resp.json()["blocks"]) == 2
 
     async def test_complete_stage_1_unlocks_stage_2(self, client: AsyncClient, session: AsyncSession):
         admin = await _create_user(session, "adm4@test.com", is_superuser=True, role="administrator")
         course, blocks, _, _ = await _create_course_with_stages(session, admin.id, 3)
         user = await _create_user(session, "u4@test.com")
         
-        # Complete Stage 1 (Blocks 1 & 2)
+
         for b in blocks[:2]:
             session.add(UserBlockProgress(id=uuid.uuid4(), user_id=user.id, block_id=b.id, is_completed=True))
         await session.commit()
         
         await client.post("/api/v1/auth/login", data={"username": "u4@test.com", "password": "Password12345!"})
         resp = await client.get(f"/api/v1/courses/{course.id}/blocks/")
-        assert len(resp.json()["blocks"]) == 4 # Stage 1 & 2
+        assert len(resp.json()["blocks"]) == 4
 
     async def test_full_completion_sees_everything(self, client: AsyncClient, session: AsyncSession):
         admin = await _create_user(session, "adm5@test.com", is_superuser=True, role="administrator")
@@ -146,10 +146,10 @@ class TestUnlockingLogic:
         
         resp = await client.get(f"/api/v1/courses/{course.id}/blocks/")
         data = resp.json()
-        assert data["all_stages"] == 2 # (3+1)//2
-        assert len(data["blocks"]) == 2 # Guest sees stage 1 (L1, T1)
+        assert data["all_stages"] == 2
+        assert len(data["blocks"]) == 2
         
-        # Complete Stage 1
+
         user = await _create_user(session, "u6@test.com")
         session.add(UserBlockProgress(user_id=user.id, block_id=b1.id, is_completed=True))
         session.add(UserBlockProgress(user_id=user.id, block_id=b2.id, is_completed=True))
@@ -157,9 +157,9 @@ class TestUnlockingLogic:
         
         await client.post("/api/v1/auth/login", data={"username": "u6@test.com", "password": "Password12345!"})
         resp = await client.get(f"/api/v1/courses/{course.id}/blocks/")
-        assert len(resp.json()["blocks"]) == 3 # All 3 because they are now on Stage 2 (which contains only L2)
+        assert len(resp.json()["blocks"]) == 3
 
-# ─── TEST SUITE B: GRADING LOGIC & EDGE CASES (15 TESTS) ──────────────────────
+
 
 @pytest.mark.anyio
 class TestGradingLogic:
@@ -217,11 +217,11 @@ class TestGradingLogic:
         user = await _create_user(session, "student_mc4@test.com")
         await client.post("/api/v1/auth/login", data={"username": user.email, "password": "Password12345!"})
         
-        # Student sends same answer twice
+
         payload = {"answers": [{"question_id": str(q1.id), "selected_answer_id": str(opts[0].id)},
                                {"question_id": str(q1.id), "selected_answer_id": str(opts[0].id)}]}
         resp = await client.post(f"/api/v1/tests/blocks/{block.id}/submit", json=payload)
-        # Should be graded as partial (since only 1 unique ID was found out of 2 correct)
+
         assert resp.json()["score"] == 0
 
     async def test_empty_answers_is_zero(self, client, session):
@@ -233,7 +233,7 @@ class TestGradingLogic:
         resp = await client.post(f"/api/v1/tests/blocks/{block.id}/submit", json={"answers": []})
         assert resp.json()["score"] == 0
 
-# ─── TEST SUITE C: STATS & PROGRESS (10 TESTS) ───────────────────────────────
+
 
 @pytest.mark.anyio
 class TestStatsProgress:
@@ -244,7 +244,7 @@ class TestStatsProgress:
         user = await _create_user(session, "stat_u1@test.com")
         await _enroll_user(session, user.id, course.id)
         
-        # Complete stage 1 (50% of the course)
+
         session.add(UserBlockProgress(user_id=user.id, block_id=blocks[0].id, is_completed=True))
         session.add(UserBlockProgress(user_id=user.id, block_id=blocks[1].id, is_completed=True))
         await session.commit()
@@ -253,7 +253,7 @@ class TestStatsProgress:
         resp = await client.get(f"/api/v1/courses/{course.id}/blocks/")
         data = resp.json()
         assert data["progress"]["percent"] == 50.0
-        assert data["progress"]["completed"] == 1 # Completed Stages (Tests)
+        assert data["progress"]["completed"] == 1
         assert data["progress"]["total"] == 2
 
     async def test_all_blocks_constant_regardless_of_unlocking(self, client, session):
@@ -263,9 +263,9 @@ class TestStatsProgress:
         resp = await client.get(f"/api/v1/courses/{course.id}/blocks/")
         data = resp.json()
         assert data["all_blocks"] == 10
-        assert len(data["blocks"]) == 2 # Only Stage 1 visible for guest
+        assert len(data["blocks"]) == 2
 
-# ─── TEST SUITE D: SECURITY & PERMISSIONS (5 TESTS) ──────────────────────────
+
 
 @pytest.mark.anyio
 class TestSecurityPermissions:
@@ -276,7 +276,7 @@ class TestSecurityPermissions:
         user = await _create_user(session, "sec_u1@test.com")
         await client.post("/api/v1/auth/login", data={"username": user.email, "password": "Password12345!"})
         
-        # Block 0 is a lesson
+
         resp = await client.post(f"/api/v1/tests/blocks/{blocks[0].id}/submit", json={"answers": []})
         assert resp.status_code == 400
         assert "is not a test" in resp.json()["detail"]
@@ -287,14 +287,14 @@ class TestSecurityPermissions:
         u1 = await _create_user(session, "sec_u2@test.com")
         u2 = await _create_user(session, "sec_u3@test.com")
         
-        # U1 submits
+
         s1 = TestSubmission(id=uuid.uuid4(), user_id=u1.id, block_id=blocks[1].id, score=1, max_score=1, is_graded=True)
         session.add(s1)
         await session.commit()
         
-        # Login as U2
+
         await client.post("/api/v1/auth/login", data={"username": u2.email, "password": "Password12345!"})
-        # Try to get results (should only see their OWN, which is empty -> 404)
+
         resp = await client.get(f"/api/v1/courses/{course.id}/blocks/{blocks[1].id}/test-results")
         assert resp.status_code == 404
 
@@ -303,14 +303,14 @@ class TestSecurityPermissions:
         course, _, _, _ = await _create_course_with_stages(session, admin.id, 1)
         user = await _create_user(session, "sec_u4@test.com")
         
-        # Regular user tries to access admin endpoint
+
         await client.post("/api/v1/auth/login", data={"username": user.email, "password": "Password12345!"})
         resp = await client.get(f"/api/v1/tests/courses/{course.id}/pending-submissions")
-        assert resp.status_code == 403 # Forbidden
+        assert resp.status_code == 403
         
-        # Admin tries to access
-        # Wait, I need a new client or logout. conftest client is scoped.
-        # Let's just relogin
+
+
+
         await client.post("/api/v1/auth/login", data={"username": admin.email, "password": "Password12345!"})
         resp = await client.get(f"/api/v1/tests/courses/{course.id}/pending-submissions")
         assert resp.status_code == 200
@@ -321,10 +321,10 @@ class TestSecurityPermissions:
         user = await _create_user(session, "sec_u5@test.com")
         await client.post("/api/v1/auth/login", data={"username": user.email, "password": "Password12345!"})
         
-        # Random UUID for question
+
         payload = {"answers": [{"question_id": str(uuid.uuid4()), "selected_answer_id": str(uuid.uuid4())}]}
         resp = await client.post(f"/api/v1/tests/blocks/{blocks[1].id}/submit", json=payload)
-        # Should NOT crash. Since the question isn't found in this block, score will be 0.
+
         assert resp.status_code == 200
         assert resp.json()["score"] == 0
 
@@ -334,10 +334,10 @@ class TestSecurityPermissions:
         user = await _create_user(session, "sec_u6@test.com")
         await client.post("/api/v1/auth/login", data={"username": user.email, "password": "Password12345!"})
         
-        # Submit correct answers for Block 2 (T1) BUT to Block 4 (T2) endpoint
+
         payload = {"answers": [{"question_id": str(questions[0].id), "selected_answer_id": str(options[0].id)}]}
         resp = await client.post(f"/api/v1/tests/blocks/{blocks[3].id}/submit", json=payload)
-        # Score should be 0 because question 0 does not belong to block 3
+
         assert resp.json()["score"] == 0
 
     async def test_manual_test_result_excluded_from_counts(self, client, session):
@@ -346,7 +346,7 @@ class TestSecurityPermissions:
         session.add(course)
         b1 = Block(id=uuid.uuid4(), course_id=course.id, block_type=BlockType.manual_test, title="Manual Test")
         session.add(b1)
-        # Use free_text as defined in QuestionType
+
         q1 = Question(id=uuid.uuid4(), block_id=b1.id, text="Upload work", question_type=QuestionType.free_text)
         session.add(q1)
         await session.commit()
@@ -354,15 +354,15 @@ class TestSecurityPermissions:
         user = await _create_user(session, "stat_u2_fail@test.com")
         await client.post("/api/v1/auth/login", data={"username": user.email, "password": "Password12345!"})
         
-        # Submit manual test
+
         await client.post(f"/api/v1/tests/blocks/{b1.id}/submit", json={"answers": [{"question_id": str(q1.id), "text_answer": "Done"}]})
         
-        # Check results
+
         resp = await client.get(f"/api/v1/courses/{course.id}/blocks/{b1.id}/test-results")
         data = resp.json()
         assert data["correct_count"] == 0
         assert data["incorrect_count"] == 0
-        # Status "Требует проверки" is for manual tests
+
         assert data["questions"][0]["status"] == "Требует проверки"
 
     async def test_large_mcq_set(self, client, session):
@@ -396,8 +396,8 @@ class TestSecurityPermissions:
             session.add(b)
         await session.commit()
         
-        # Login as user to see ALL blocks/stages (if they are all unlocked)
-        # Actually, let's just complete them to see them
+
+
         user = await _create_user(session, "stat_u_boundaries@test.com")
         for b in blocks:
              session.add(UserBlockProgress(user_id=user.id, block_id=b.id, is_completed=True))
@@ -419,17 +419,17 @@ class TestSecurityPermissions:
         
         await client.post("/api/v1/auth/login", data={"username": user.email, "password": "Password12345!"})
         
-        # 1. Start: 0/2
+
         resp = await client.get(f"/api/v1/courses/{course.id}/blocks/")
         assert resp.json()["progress"]["completed"] == 0
         
-        # 2. Complete Lesson 1 -> still 0/2 (only tests count)
+
         session.add(UserBlockProgress(user_id=user.id, block_id=blocks[0].id, is_completed=True))
         await session.commit()
         resp = await client.get(f"/api/v1/courses/{course.id}/blocks/")
         assert resp.json()["progress"]["completed"] == 0
         
-        # 3. Complete Test 1 -> 1/2
+
         session.add(UserBlockProgress(user_id=user.id, block_id=blocks[1].id, is_completed=True))
         await session.commit()
         resp = await client.get(f"/api/v1/courses/{course.id}/blocks/")
@@ -439,16 +439,16 @@ class TestSecurityPermissions:
         admin = await _create_user(session, "admstat6@test.com", is_superuser=True)
         course, blocks, _, _ = await _create_course_with_stages(session, admin.id, 2)
         
-        # Block 2 (T1) next_block_id should be Block 3 (L2)
+
         resp = await client.get(f"/api/v1/courses/{course.id}/blocks/{blocks[1].id}")
         assert resp.json()["next_block_id"] == str(blocks[2].id)
         
-        # Block 4 (T2) next_block_id should be None
+
         resp = await client.get(f"/api/v1/courses/{course.id}/blocks/{blocks[3].id}")
         assert resp.json()["next_block_id"] is None
 
     async def test_get_blocks_invalid_course_id(self, client):
-        # Random valid UUID but no course exists
+
         resp = await client.get(f"/api/v1/courses/{uuid.uuid4()}/blocks/")
         assert resp.status_code == 404
 
@@ -459,7 +459,7 @@ class TestSecurityPermissions:
         session.add(c2)
         await session.commit()
         
-        # Attempt to access Block 1 (part of C1) via C2's endpoint
+
         resp = await client.get(f"/api/v1/courses/{c2.id}/blocks/{blocks1[0].id}")
         assert resp.status_code == 404
 
@@ -467,14 +467,14 @@ class TestSecurityPermissions:
         admin = await _create_user(session, "admstat7@test.com", is_superuser=True)
         course, blocks, _, _ = await _create_course_with_stages(session, admin.id, 5)
         
-        # User 1: No progress
+
         u1 = await _create_user(session, "stat_cons1@test.com")
         await client.post("/api/v1/auth/login", data={"username": u1.email, "password": "Password12345!"})
         data1 = (await client.get(f"/api/v1/courses/{course.id}/blocks/")).json()
         assert data1["all_stages"] == 5
         assert len(data1["blocks"]) == 2
         
-        # User 2: All progress
+
         u2 = await _create_user(session, "stat_cons2@test.com")
         for b in blocks:
             session.add(UserBlockProgress(user_id=u2.id, block_id=b.id, is_completed=True))

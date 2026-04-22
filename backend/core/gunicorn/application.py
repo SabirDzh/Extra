@@ -18,11 +18,11 @@ class Application(BaseApplication):
     @property
     def config_options(self) -> dict:
         return {
-            # pair
+
             k: v
-            # for each option
+
             for k, v in self.options.items()
-            # not empty key / value
+
             if k in self.cfg.settings and v is not None
         }
 

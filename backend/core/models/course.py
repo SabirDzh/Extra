@@ -17,8 +17,8 @@ class CourseLevel(str, enum.Enum):
     advanced = "advanced"
 
 
-# Human-readable labels for the frontend (e.g., to compose course titles).
-# Keys match enum values; update here if labels change.
+
+
 LEVEL_DISPLAY_NAMES: dict[str, str] = {
     CourseLevel.beginner: "Начинающий",
     CourseLevel.intermediate: "Продвинутый",
@@ -27,8 +27,8 @@ LEVEL_DISPLAY_NAMES: dict[str, str] = {
 
 
 class CourseAudience(str, enum.Enum):
-    everyone = "everyone"   # Для всех
-    installer = "installer"  # Монтажник
+    everyone = "everyone"
+    installer = "installer"
 
 
 AUDIENCE_DISPLAY_NAMES: dict[str, str] = {
@@ -38,9 +38,9 @@ AUDIENCE_DISPLAY_NAMES: dict[str, str] = {
 
 
 class CourseStatus(str, enum.Enum):
-    not_started = "not_started"   # Не начат
-    in_progress = "in_progress"   # В процессе
-    completed = "completed"       # Пройден
+    not_started = "not_started"
+    in_progress = "in_progress"
+    completed = "completed"
 
 
 class Course(IdUuidPkMixin, Base):

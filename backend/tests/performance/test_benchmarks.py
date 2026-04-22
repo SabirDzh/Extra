@@ -68,7 +68,7 @@ class TestPerformanceSearch:
 
         async def call_api():
             from httpx import ASGITransport
-            # We use a new client instance to avoid loop-binding issues with shared fixtures
+
             async with AsyncClient(
                 transport=ASGITransport(app=main_app), base_url="http://test"
             ) as ac:
@@ -76,7 +76,7 @@ class TestPerformanceSearch:
                 assert resp.status_code == 200
                 return resp
 
-        # Bridge async to sync for pytest-benchmark using a thread portal
+
         with start_blocking_portal() as portal:
             benchmark(portal.call, call_api)
 

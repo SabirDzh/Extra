@@ -12,7 +12,7 @@ class UserAdmin(ModelView, model=User):
     column_list = [
         User.id,
         User.email,
-        # User.hashed_password,
+
         User.is_active,
         User.is_superuser,
         User.is_verified,
@@ -38,7 +38,7 @@ class UserAdmin(ModelView, model=User):
         :param request:
         :return:
         """
-        # data may contain not hashed password
+
         raw_password = data.get("hashed_password") or password_helper.generate()
         if is_created or model.hashed_password != raw_password:
             data.update(

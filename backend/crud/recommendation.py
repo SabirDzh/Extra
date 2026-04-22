@@ -210,7 +210,7 @@ def parse_recommendation_csv_file(contents: bytes) -> list[dict]:
 
 def parse_recommendation_excel_file(contents: bytes) -> list[dict]:
     try:
-        # Сначала пробуем прочитать с заголовками
+
         df = pd.read_excel(io.BytesIO(contents))
     except Exception as e:
         raise HTTPException(
@@ -223,7 +223,7 @@ def parse_recommendation_excel_file(contents: bytes) -> list[dict]:
 
     actual_cols = {str(c).lower().strip() for c in df.columns}
 
-    # Возможные названия колонок
+
     title_candidates = {"title", "заголовок", "название", "вопрос"}
     desc_candidates = {"description", "описание", "ответ", "текст"}
 
@@ -234,7 +234,7 @@ def parse_recommendation_excel_file(contents: bytes) -> list[dict]:
         (c for c in df.columns if str(c).lower().strip() in desc_candidates), None
     )
 
-    # Если мы нашли нужные колонки по названиям
+
     if title_col and desc_col:
         for index, row in df.iterrows():
             title = str(row.get(title_col, "")).strip()
@@ -249,7 +249,7 @@ def parse_recommendation_excel_file(contents: bytes) -> list[dict]:
                 )
         return recommendations_data
 
-    # Если колонки не найдены, возможно файл без заголовков (header=None)
+
     try:
         df = pd.read_excel(io.BytesIO(contents), header=None)
         df = df.fillna("")
@@ -299,7 +299,7 @@ async def import_recommendations(
         if not items:
             return {"message": "Файл пуст или не содержит валидных данных для импорта"}
 
-        # Exclude duplicates
+
         incoming_titles = []
         valid_items = []
         for item in items:

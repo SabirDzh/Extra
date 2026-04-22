@@ -6,7 +6,7 @@ from datetime import datetime, timezone, timedelta
 
 @pytest.mark.anyio
 async def test_get_admin_summary_success(client: AsyncClient, superuser_token_headers: dict, session: AsyncSession):
-    # The endpoint should be accessible by admin
+
     resp = await client.get("/api/v1/users/summary", headers=superuser_token_headers)
     assert resp.status_code == 200
     data = resp.json()
@@ -20,7 +20,7 @@ async def test_get_admin_summary_success(client: AsyncClient, superuser_token_he
 @pytest.mark.anyio
 async def test_get_admin_summary_forbidden_for_regular_user(client: AsyncClient, create_user):
     await create_user("regular_stats@test.com", password="Password12345!")
-    # Get auth headers for regular user
+
     resp_login = await client.post("/api/v1/auth/login", data={"username": "regular_stats@test.com", "password": "Password12345!"})
     token = resp_login.cookies.get("fastapiusersauth", "")
     headers = {"cookie": f"fastapiusersauth={token}"}

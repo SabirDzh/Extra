@@ -65,7 +65,7 @@ def users_list_key_builder(
             continue
         cache_kw[name] = value
 
-    cache_key = hashlib.md5(  # noqa: S324
+    cache_key = hashlib.md5(
         f"{func.__module__}:{func.__name__}:{args}:{cache_kw}".encode()
     ).hexdigest()
     return f"{namespace}:{cache_key}"
@@ -81,20 +81,20 @@ async def get_admin_summary(
 ) -> AdminSummaryRead:
     session = users_db.session
 
-    # Total stats
+
     total_users = await session.scalar(select(func.count(User.id)))
     total_tests_passed = await session.scalar(
         select(func.count(UserBlockProgress.id))
         .join(Block)
         .where(
             and_(
-                UserBlockProgress.is_completed == True,  # noqa: E712
+                UserBlockProgress.is_completed == True,
                 Block.block_type.in_(TEST_BLOCK_TYPES),
             )
         )
     )
 
-    # Monthly stats calculation
+
     now = datetime.now(timezone.utc)
     current_month_start = datetime(now.year, now.month, 1, tzinfo=timezone.utc)
 
@@ -103,7 +103,7 @@ async def get_admin_summary(
     else:
         prev_month_start = datetime(now.year, now.month - 1, 1, tzinfo=timezone.utc)
 
-    # 1. New users
+
     new_users_current = await session.scalar(
         select(func.count(User.id)).where(User.created_at >= current_month_start)
     )
@@ -116,7 +116,7 @@ async def get_admin_summary(
         )
     )
 
-    # 2. Courses completed
+
     courses_current = await session.scalar(
         select(func.count(CourseEnrollment.id)).where(
             CourseEnrollment.completed_at >= current_month_start
@@ -162,7 +162,7 @@ async def get_admin_summary(
 async def get_users_list(
     users_db: UsersDB,
     admin: AdminUser,
-    # ) -> list["User"]:
+
 ) -> list[UserRead]:
     users = await users_db.get_users()
     return [UserRead.model_validate(user) for user in users]
@@ -193,8 +193,8 @@ async def upload_my_avatar(
     return UserRead.model_validate(user)
 
 
-# /me
-# /{id}
+
+
 router.include_router(
     router=fastapi_users.get_users_router(
         UserRead,

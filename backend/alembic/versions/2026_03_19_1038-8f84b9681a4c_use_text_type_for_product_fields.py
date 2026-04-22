@@ -12,7 +12,7 @@ from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
-# revision identifiers, used by Alembic.
+
 revision: str = "8f84b9681a4c"
 down_revision: Union[str, None] = "b5e8ad0a77b7"
 branch_labels: Union[str, Sequence[str], None] = None
@@ -20,11 +20,11 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    # 1. DROP dependent columns and indexes FIRST
+
     op.execute("DROP INDEX IF EXISTS idx_search_product")
     op.execute("ALTER TABLE products DROP COLUMN IF EXISTS search_product")
 
-    # 2. Now it's safe to alter types
+
     op.alter_column(
         "products",
         "schema_connect",
@@ -41,7 +41,7 @@ def upgrade() -> None:
     )
     op.execute("ALTER TABLE products ALTER COLUMN description TYPE TEXT")
 
-    # 3. Recreate search_product correctly (title + description)
+
     op.execute(
         """
         ALTER TABLE products ADD COLUMN search_product tsvector
@@ -51,7 +51,7 @@ def upgrade() -> None:
         """
     )
 
-    # 4. Recreate GIN index
+
     op.create_index(
         "idx_search_product",
         "products",

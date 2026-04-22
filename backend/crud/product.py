@@ -26,7 +26,6 @@ async def get_products(
     order: str = "asc",
     features: list[str] | None = None,
 ):
-    # Optimize query by loading only necessary fields for the list view
     stmt = select(Product).options(
         load_only(
             Product.id,
@@ -115,18 +114,15 @@ async def get_products_by_ids(
 
 
 async def get_product_attributes_list(session: AsyncSession) -> list[str]:
-    # Получаем все пары ключ-значение из атрибутов всех товаров
     stmt = select(func.jsonb_each(Product.attributes))
     result = await session.execute(stmt)
 
     boolean_keys = set()
     for row in result:
-        key, value = row[0]  # row[0] is a tuple (key, value) from jsonb_each
-        # Проверяем, является ли значение булевым
+        key, value = row[0]
         if isinstance(value, bool):
             boolean_keys.add(key)
 
-    # Исключаем системные или ненужные поля, если они попали в булевы
     filtered_keys = [k for k in boolean_keys if k != "Артикул"]
     return sorted(filtered_keys)
 
@@ -140,7 +136,6 @@ async def search_products(
     order: str = "asc",
     features: list[str] | None = None,
 ):
-    # Optimize query by loading only necessary fields for the list view
     stmt = select(Product).options(
         load_only(
             Product.id,
@@ -162,7 +157,6 @@ async def search_products(
             )
         else:
             ts_query = func.websearch_to_tsquery("russian", q)
-            # Filter first using indices (GIST/GIN for @@ and %)
             stmt = stmt.where(
                 or_(
                     Product.search_product.bool_op("@@")(ts_query),
@@ -171,10 +165,7 @@ async def search_products(
                 )
             )
 
-            # Apply relevance ranking only if not sorting by a specific column
             if sort_by == "title" and order == "asc":
-                # Only use similarity for title (cheaper) and ts_rank for everything else
-                # similarity on full description can be heavy
                 relevance = (
                     func.ts_rank(Product.search_product, ts_query)
                     + func.similarity(Product.title, q) * 2
@@ -263,15 +254,10 @@ def extract_images_using_loader(
 
     row_images = {}
 
-    # Iterate through rows where data exists
-    # row 1 is header, data starts from row 2
     for i in range(2, df_len + 2):
         cell_address = f"{target_col_letter}{i}"
 
-        # Check if cell has an image in the loader's internal storage
-        # SheetImageLoader stores images in a dictionary-like structure
         try:
-            # We try to get the image. If it doesn't exist, it usually raises a ValueError
             image = image_loader.get(cell_address)
 
             filename = f"{uuid.uuid4()}.webp"
@@ -282,10 +268,8 @@ def extract_images_using_loader(
                 image = image.convert("RGB")
             image.save(filepath, "WEBP", quality=85, optimize=True)
 
-            # pandas_idx = excel_row - 2
             row_images[i - 2] = f"/media/product_img/{filename}"
         except (ValueError, KeyError):
-            # No image in this cell
             continue
         except Exception as e:
             print(f"Error loading image at {cell_address}: {e}")
@@ -295,7 +279,6 @@ def extract_images_using_loader(
 
 
 def parse_product_excel_file(contents: bytes) -> list[dict]:
-    # 1. First, read headers to find the 'Изображение' column
     df_tmp = pd.read_excel(io.BytesIO(contents), nrows=0)
 
     image_col_idx = -1
@@ -304,18 +287,14 @@ def parse_product_excel_file(contents: bytes) -> list[dict]:
             image_col_idx = i
             break
 
-    # 2. Convert index to Excel column letter (0 -> A, 1 -> B, 2 -> C...)
     if image_col_idx != -1:
-        # Simple conversion for A-Z columns
         target_col_letter = chr(65 + image_col_idx)
     else:
         target_col_letter = None
 
-    # 3. Read data
     df = pd.read_excel(io.BytesIO(contents))
     df = df.fillna("")
 
-    # 4. Extract images if column found
     row_to_image = {}
     if target_col_letter:
         row_to_image = extract_images_using_loader(contents, target_col_letter, len(df))
@@ -344,7 +323,6 @@ def parse_product_excel_file(contents: bytes) -> list[dict]:
             "documentation": None,
         }
 
-        # Add embedded image if found
         if index in row_to_image:
             product_dict["image_url"].append(row_to_image[index])
 
