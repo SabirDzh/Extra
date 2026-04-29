@@ -2,8 +2,14 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from typing import List, Literal
 
-from core.models.block import Block, TEST_BLOCK_TYPES
-from core.models.course import Course, CourseAudience, CourseEnrollment, CourseLevel, CourseStatus
+from core.models.block import TEST_BLOCK_TYPES, Block
+from core.models.course import (
+    Course,
+    CourseAudience,
+    CourseEnrollment,
+    CourseLevel,
+    CourseStatus,
+)
 from core.models.progress import UserBlockProgress
 from core.models.test import TestSubmission
 from core.schemas.course import CourseCreate, CourseUpdate
@@ -62,6 +68,9 @@ async def update_course(
     course_update: CourseUpdate,
 ) -> Course:
     patch = course_update.model_dump(exclude_unset=True)
+    title_changed = (
+        "title" in patch and patch["title"] and patch["title"] != course.title
+    )
     if "title" in patch and patch["title"]:
         await ensure_unique_field(
             session,
@@ -73,6 +82,14 @@ async def update_course(
         )
     for field, value in patch.items():
         setattr(course, field, value)
+    if title_changed:
+        await session.execute(
+            (
+                Block.__table__.update()
+                .where(Block.course_id == course.id)
+                .values(title=course.title)
+            )
+        )
     await session.commit()
     await session.refresh(course)
     return course
@@ -124,6 +141,7 @@ async def get_completed_blocks_count(
     result = await session.execute(stmt)
     return result.scalar() or 0
 
+
 async def search_courses(
     session: AsyncSession,
     q: str | None = None,
@@ -150,7 +168,6 @@ async def search_courses(
             )
         )
     )
-
 
     if q:
         if len(q) < 2:
@@ -194,7 +211,9 @@ async def search_courses(
 
     elif filter_type == "not_started" and user_id:
 
-        subq = select(CourseEnrollment.course_id).where(CourseEnrollment.user_id == user_id)
+        subq = select(CourseEnrollment.course_id).where(
+            CourseEnrollment.user_id == user_id
+        )
         query = query.where(Course.id.not_in(subq))
 
     elif filter_type == "in_progress" and user_id:
@@ -325,7 +344,9 @@ async def attach_course_progress(
             .group_by(Block.course_id)
         )
         result_completed = await session.execute(stmt_completed)
-        completed_blocks_map = {row.course_id: row.completed for row in result_completed}
+        completed_blocks_map = {
+            row.course_id: row.completed for row in result_completed
+        }
 
         stmt_enroll = select(CourseEnrollment.course_id).where(
             CourseEnrollment.course_id.in_(course_ids),
@@ -379,7 +400,6 @@ async def reset_course_progress(
     if not enrollment:
         return False
 
-
     stmt_blocks = select(Block.id).where(Block.course_id == course_id)
     result_blocks = await session.execute(stmt_blocks)
     block_ids = [row[0] for row in result_blocks.all()]
@@ -393,7 +413,6 @@ async def reset_course_progress(
             )
         )
 
-
         await session.execute(
             delete(TestSubmission).where(
                 TestSubmission.user_id == user_id,
@@ -401,9 +420,7 @@ async def reset_course_progress(
             )
         )
 
-
     enrollment.completed_at = None
 
     await session.commit()
     return True
-

@@ -17,6 +17,7 @@ from crud import course as course_crud
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from utils.db import ensure_unique_field
 from utils.product import current_admin
 
 router = APIRouter(prefix="/courses/{course_id}/blocks", tags=["Blocks"])
@@ -253,7 +254,9 @@ async def create_block(
     admin: User = Depends(current_admin),
 ):
     course = await _get_course_or_404(db, course_id)
-    block = Block(**data.model_dump(), course_id=course_id)
+    payload = data.model_dump()
+    payload["title"] = course.title
+    block = Block(**payload, course_id=course_id)
     db.add(block)
     await db.commit()
     await db.refresh(block)
@@ -282,9 +285,27 @@ async def update_block(
 ):
     course = await _get_course_or_404(db, course_id)
     block = await _get_block_or_404(db, block_id, course_id)
-    for field, value in data.model_dump(exclude_unset=True).items():
+    patch = data.model_dump(exclude_unset=True)
+
+    if "title" in patch and patch["title"] and patch["title"] != course.title:
+        await ensure_unique_field(
+            db,
+            Course,
+            "title",
+            patch["title"],
+            exclude_id=course.id,
+            error_msg=f"Course with title '{patch['title']}' already exists",
+        )
+        course.title = patch["title"]
+        result = await db.execute(select(Block).where(Block.course_id == course_id))
+        for course_block in result.scalars().all():
+            course_block.title = patch["title"]
+
+    patch.pop("title", None)
+    for field, value in patch.items():
         setattr(block, field, value)
     await db.commit()
+    await db.refresh(course)
     await db.refresh(block)
     return await _format_block_read(db, block, course, admin.id)
 
