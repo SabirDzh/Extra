@@ -4,6 +4,7 @@ __all__ = (
     "User",
     "AccessToken",
     "Product",
+    "AdminRoleRequest",
     "Block",
     "Certificate",
     "Course",
@@ -20,6 +21,7 @@ __all__ = (
 )
 
 from .access_token import AccessToken
+from .admin_role_request import AdminRoleRequest
 from .base import Base
 from .block import Block
 from .certificates import Certificate

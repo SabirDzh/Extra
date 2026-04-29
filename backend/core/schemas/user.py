@@ -33,3 +33,18 @@ class UserUpdate(schemas.BaseUserUpdate):
 class UserRegisteredNotification(BaseModel):
     user: UserRead
     ts: int
+
+
+class AdminRoleRequestRead(BaseModel):
+    id: UuIDMixin
+    user_id: UuIDMixin
+    user_email: str
+    user_fullname: str
+    status: str
+    requested_at: str
+    reviewed_at: str | None = None
+    reviewed_by: UuIDMixin | None = None
+
+
+class AdminRoleRequestDecision(BaseModel):
+    approve: bool = Field(..., description="true -> approve admin role, false -> reject")

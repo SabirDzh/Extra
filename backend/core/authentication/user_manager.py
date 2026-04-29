@@ -16,7 +16,9 @@ from utils.webhooks.user import send_new_user_notification
 
 from core.config import settings
 from core.models import User
+from core.models.admin_role_request import AdminRoleRequest, AdminRoleRequestStatus
 from core.types.user_id import UuIDMixin
+from utils.role import UserRole
 
 if TYPE_CHECKING:
     from fastapi import BackgroundTasks, Request
@@ -117,3 +119,36 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
             user=user,
         )
 
+    async def create(
+        self,
+        user_create,
+        safe: bool = False,
+        request: Optional["Request"] = None,
+    ) -> User:
+        user_dict = user_create.create_update_dict()
+        requested_role = user_dict.get("role", UserRole.user)
+        if isinstance(requested_role, str):
+            requested_role = UserRole(requested_role)
+
+        user_dict["role"] = (
+            UserRole.user if requested_role == UserRole.admin else requested_role
+        )
+        user = await super().create(
+            user_create.__class__(**user_dict), safe=safe, request=request
+        )
+
+        if requested_role == UserRole.admin:
+            whitelist = {email.lower() for email in settings.security.admin_role_whitelist}
+            if user.email.lower() in whitelist:
+                user.role = UserRole.admin
+            else:
+                self.user_db.session.add(
+                    AdminRoleRequest(
+                        user_id=user.id,
+                        status=AdminRoleRequestStatus.pending,
+                    )
+                )
+            await self.user_db.session.commit()
+            await self.user_db.session.refresh(user)
+
+        return user

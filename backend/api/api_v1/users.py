@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+import uuid
 
 import hashlib
 from typing import (
@@ -28,14 +29,17 @@ from core.models.block import TEST_BLOCK_TYPES
 from core.models.user import SQLAlchemyUserDatabase
 from core.schemas.stats import AdminSummaryRead, StatMetric
 from core.schemas.user import (
+    AdminRoleRequestDecision,
+    AdminRoleRequestRead,
     UserRead,
     UserUpdate,
 )
-from fastapi import APIRouter, Depends, File, Request, Response, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Request, Response, UploadFile
 from fastapi_cache import FastAPICache
 from fastapi_cache.decorator import cache
 from sqlalchemy import and_, func, select
 from user_profile.main import save_user_avatar
+from crud import admin_role_request as admin_role_request_crud
 from utils.product import current_admin
 
 UsersDB = Annotated[SQLAlchemyUserDatabase, Depends(get_users_db)]
@@ -193,6 +197,36 @@ async def upload_my_avatar(
     return UserRead.model_validate(user)
 
 
+
+
+@router.get("/admin-role-requests", response_model=list[AdminRoleRequestRead])
+async def list_admin_role_requests(
+    users_db: UsersDB,
+    admin: AdminUser,
+):
+    return await admin_role_request_crud.list_pending_admin_role_requests(users_db.session)
+
+
+@router.patch("/admin-role-requests/{request_id}", response_model=AdminRoleRequestRead)
+async def review_admin_role_request(
+    request_id: uuid.UUID,
+    payload: AdminRoleRequestDecision,
+    users_db: UsersDB,
+    admin: AdminUser,
+):
+    result, error = await admin_role_request_crud.review_admin_role_request(
+        users_db.session, request_id, payload.approve, admin.id
+    )
+    if error == "not_found":
+        raise HTTPException(status_code=404, detail="Admin role request not found")
+    if error == "already_reviewed":
+        raise HTTPException(status_code=400, detail="Request already reviewed")
+    if error == "not_whitelisted":
+        raise HTTPException(
+            status_code=403,
+            detail="User is not in admin role whitelist",
+        )
+    return result
 
 
 router.include_router(

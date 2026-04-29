@@ -124,6 +124,10 @@ class CookieConfig(BaseModel):
     samesite: Literal["none", "lax", "strict"] = "lax"
 
 
+class SecurityConfig(BaseModel):
+    admin_role_whitelist: list[str] = []
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=(
@@ -143,6 +147,7 @@ class Settings(BaseSettings):
     redis: RedisConfig = RedisConfig()
     cache: CacheConfig = CacheConfig()
     cookie: CookieConfig = CookieConfig()
+    security: SecurityConfig = SecurityConfig()
 
     UPLOAD_DIR: str = "uploads/videos"
 
