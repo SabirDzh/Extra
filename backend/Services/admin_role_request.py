@@ -2,24 +2,14 @@ import uuid
 from datetime import datetime, timezone
 
 from core.config import settings
-from core.models import AdminRoleRequest, User
 from core.models.admin_role_request import AdminRoleRequestStatus
 from core.schemas.user import AdminRoleRequestRead
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
-from utils.role import UserRole
+from Repository import admin_role_request as repo
+from Domain.Enums.user_role import UserRole
 
 
-async def list_pending_admin_role_requests(
-    session: AsyncSession,
-) -> list[AdminRoleRequestRead]:
-    stmt = (
-        select(AdminRoleRequest, User)
-        .join(User, User.id == AdminRoleRequest.user_id)
-        .where(AdminRoleRequest.status == AdminRoleRequestStatus.pending)
-        .order_by(AdminRoleRequest.requested_at.asc())
-    )
-    rows = (await session.execute(stmt)).all()
+async def list_pending_admin_role_requests(session):
+    rows = await repo.list_pending_requests(session)
     return [
         AdminRoleRequestRead(
             id=request.id,
@@ -36,17 +26,12 @@ async def list_pending_admin_role_requests(
 
 
 async def review_admin_role_request(
-    session: AsyncSession,
+    session,
     request_id: uuid.UUID,
     approve: bool,
     reviewer_id: uuid.UUID,
-) -> tuple[AdminRoleRequestRead | None, str | None]:
-    stmt = (
-        select(AdminRoleRequest, User)
-        .join(User, User.id == AdminRoleRequest.user_id)
-        .where(AdminRoleRequest.id == request_id)
-    )
-    row = (await session.execute(stmt)).one_or_none()
+):
+    row = await repo.get_request_with_user(session, request_id)
     if not row:
         return None, "not_found"
 
@@ -86,3 +71,6 @@ async def review_admin_role_request(
         ),
         None,
     )
+
+
+__all__ = ["list_pending_admin_role_requests", "review_admin_role_request"]

@@ -106,7 +106,7 @@ async def test_lesson_block_status(client: AsyncClient, session: AsyncSession, s
     assert resp1.json()["blocks"][0]["progress"]["status"] == CourseStatus.not_started
     
 
-    from crud.test_grading import _mark_block_completed
+    from Services.test_grading import _mark_block_completed
     await _mark_block_completed(session, student.id, block.id, course.id)
     await session.commit()
     

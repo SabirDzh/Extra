@@ -3,7 +3,7 @@ from typing import Annotated
 from core.config import settings
 from core.models.db_helper import db_helper
 from core.schemas.search import GlobalSearchResponse
-from crud import search as search_crud
+from Services import search as search_crud
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 

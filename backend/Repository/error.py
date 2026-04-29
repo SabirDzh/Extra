@@ -10,7 +10,6 @@ from core.schemas.error import ErrorCreate, ErrorUpdate
 from fastapi import HTTPException, UploadFile, status
 from sqlalchemy import delete, insert, select, func
 from sqlalchemy.ext.asyncio import AsyncSession
-from utils.db import ensure_unique_field
 
 
 async def get_errors(
@@ -75,14 +74,6 @@ async def create_error(
     error_in: ErrorCreate,
     user_id: uuid.UUID,
 ) -> Error:
-    await ensure_unique_field(
-        session,
-        Error,
-        "title",
-        error_in.title,
-        error_msg=f"Error with title '{error_in.title}' already exists",
-    )
-
     error = Error(**error_in.model_dump(), created_by=user_id)
     session.add(error)
     await session.commit()
@@ -96,16 +87,6 @@ async def update_error(
     error_update: ErrorUpdate,
 ) -> Error:
     patch = error_update.model_dump(exclude_unset=True)
-
-    if "title" in patch and patch["title"]:
-        await ensure_unique_field(
-            session,
-            Error,
-            "title",
-            patch["title"],
-            exclude_id=error.id,
-            error_msg=f"Error with title '{patch['title']}' already exists",
-        )
 
     for field, value in patch.items():
         setattr(error, field, value)

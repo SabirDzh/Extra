@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from typing import List, Literal
 
 from core.models.block import TEST_BLOCK_TYPES, Block
@@ -12,11 +12,9 @@ from core.models.course import (
 )
 from core.models.progress import UserBlockProgress
 from core.models.test import TestSubmission
-from core.schemas.course import CourseCreate, CourseUpdate
-from sqlalchemy import delete, func, or_, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import load_only, selectinload
-from utils.db import ensure_unique_field
 
 
 async def get_courses(
@@ -43,53 +41,14 @@ async def get_course(
     return await session.get(Course, course_id, options=options)
 
 
-async def create_course(
-    session: AsyncSession,
-    course_in: CourseCreate,
-    creator_id: uuid.UUID,
-) -> Course:
-    await ensure_unique_field(
-        session,
-        Course,
-        "title",
-        course_in.title,
-        error_msg=f"Course with title '{course_in.title}' already exists",
-    )
-    course = Course(**course_in.model_dump(), created_by=creator_id)
+async def create_course(session: AsyncSession, course: Course) -> Course:
     session.add(course)
     await session.commit()
     await session.refresh(course)
     return course
 
 
-async def update_course(
-    session: AsyncSession,
-    course: Course,
-    course_update: CourseUpdate,
-) -> Course:
-    patch = course_update.model_dump(exclude_unset=True)
-    title_changed = (
-        "title" in patch and patch["title"] and patch["title"] != course.title
-    )
-    if "title" in patch and patch["title"]:
-        await ensure_unique_field(
-            session,
-            Course,
-            "title",
-            patch["title"],
-            exclude_id=course.id,
-            error_msg=f"Course with title '{patch['title']}' already exists",
-        )
-    for field, value in patch.items():
-        setattr(course, field, value)
-    if title_changed:
-        await session.execute(
-            (
-                Block.__table__.update()
-                .where(Block.course_id == course.id)
-                .values(title=course.title)
-            )
-        )
+async def update_course(session: AsyncSession, course: Course) -> Course:
     await session.commit()
     await session.refresh(course)
     return course
@@ -154,6 +113,8 @@ async def search_courses(
     level: CourseLevel | None = None,
     audience: CourseAudience | None = None,
 ):
+    from datetime import timedelta
+
     query = (
         select(Course)
         .where(Course.is_published)
@@ -249,6 +210,20 @@ async def delete_courses(session: AsyncSession, courses_id: list[uuid.UUID]):
     stmt = delete(Course).where(Course.id.in_(courses_id))
     await session.execute(stmt)
     await session.commit()
+
+
+async def sync_course_title_to_blocks(
+    session: AsyncSession,
+    course_id: uuid.UUID,
+    title: str,
+) -> None:
+    await session.execute(
+        (
+            Block.__table__.update()
+            .where(Block.course_id == course_id)
+            .values(title=title)
+        )
+    )
 
 
 async def update_course_completion_status(

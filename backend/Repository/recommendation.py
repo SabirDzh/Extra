@@ -13,7 +13,6 @@ from core.schemas.recommendation import (
 from fastapi import HTTPException, UploadFile, status
 from sqlalchemy import asc, delete, desc, func, insert, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from utils.db import ensure_unique_field
 
 
 async def get_recommendation_admin(session: AsyncSession, recommendation_id: uuid.UUID):
@@ -54,13 +53,6 @@ async def create_recommendation(
     recommendation_in: RecommendationCreate,
     admin_id: uuid.UUID,
 ):
-    await ensure_unique_field(
-        session,
-        Recommendation,
-        "title",
-        recommendation_in.title,
-        error_msg=f"Recomendation with title '{recommendation_in.title}' already exists",
-    )
     recomendation = Recommendation(
         **recommendation_in.model_dump(),
         created_by=admin_id,
@@ -76,16 +68,6 @@ async def update_recommendation(
     recommendation_id: uuid.UUID,
     recommendation_in: RecommendationUpdate,
 ):
-    patch = recommendation_in.model_dump(exclude_unset=True)
-    if "title" in patch and patch["title"]:
-        await ensure_unique_field(
-            session,
-            Recommendation,
-            "title",
-            patch["title"],
-            exclude_id=recommendation_id,
-            error_msg=f"Recomendation with title '{patch['title']}' already exists",
-        )
     recommendation = await session.get(Recommendation, recommendation_id)
     if not recommendation:
         return None

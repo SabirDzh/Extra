@@ -19,13 +19,13 @@ from core.schemas.test import (
     TestSubmissionRead,
     TestSubmit,
 )
-from crud.test_grading import auto_grade_submission, _mark_block_completed
+from Services.test_grading import auto_grade_submission, _mark_block_completed
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
-from utils.product import current_admin
-from utils.role import UserRole
+from api.dependencies.authorization import current_admin
+from Domain.Enums.user_role import UserRole
 from core.config import settings 
 
 router = APIRouter(prefix=settings.api.v1.tests, tags=["Tests"])

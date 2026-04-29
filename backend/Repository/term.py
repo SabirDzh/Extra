@@ -91,19 +91,6 @@ async def update_term(
     if not patch:
         return await get_term(session, term_id)
 
-    if "title" in patch and patch["title"]:
-        new_title = patch["title"]
-        existing = await session.execute(
-            select(Term).where(
-                func.lower(Term.title) == new_title.lower(), Term.id != term_id
-            )
-        )
-        if existing.scalar_one_or_none():
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="Term already exists",
-            )
-
     stmt = update(Term).values(**patch).where(Term.id == term_id).returning(Term)
     result = await session.execute(stmt)
     await session.commit()

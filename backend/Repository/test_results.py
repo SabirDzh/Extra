@@ -138,7 +138,7 @@ async def get_test_results_for_block(
 
 
     from core.models.course import Course
-    from crud import course as course_crud
+    from Services import course as course_crud
 
     course = await db.get(Course, block.course_id)
     await course_crud.attach_course_progress(db, [course], user_id)

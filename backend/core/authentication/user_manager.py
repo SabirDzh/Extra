@@ -12,13 +12,13 @@ from fastapi_users.db import BaseUserDatabase
 from mailing.send_email_confirmed import send_email_confirmed
 from mailing.send_verification_email import send_verification_email
 from mailing.send_password_reset_email import send_password_reset_email
-from utils.webhooks.user import send_new_user_notification
+from Services.notifications import send_new_user_notification
 
 from core.config import settings
 from core.models import User
 from core.models.admin_role_request import AdminRoleRequest, AdminRoleRequestStatus
 from core.types.user_id import UuIDMixin
-from utils.role import UserRole
+from Domain.Enums.user_role import UserRole
 
 if TYPE_CHECKING:
     from fastapi import BackgroundTasks, Request

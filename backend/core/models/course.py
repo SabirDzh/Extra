@@ -1,4 +1,3 @@
-import enum
 import uuid
 from datetime import datetime
 
@@ -6,15 +5,10 @@ from sqlalchemy import DateTime, ForeignKey, Index, String, Text, func
 from sqlalchemy import Enum as SaEnum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from Domain.Enums.course import CourseAudience, CourseLevel, CourseStatus
 from core.models.base import Base
 
 from .mixins.id_int_pk import IdUuidPkMixin
-
-
-class CourseLevel(str, enum.Enum):
-    beginner = "beginner"
-    intermediate = "intermediate"
-    advanced = "advanced"
 
 
 
@@ -26,9 +20,6 @@ LEVEL_DISPLAY_NAMES: dict[str, str] = {
 }
 
 
-class CourseAudience(str, enum.Enum):
-    everyone = "everyone"
-    installer = "installer"
 
 
 AUDIENCE_DISPLAY_NAMES: dict[str, str] = {
@@ -37,10 +28,6 @@ AUDIENCE_DISPLAY_NAMES: dict[str, str] = {
 }
 
 
-class CourseStatus(str, enum.Enum):
-    not_started = "not_started"
-    in_progress = "in_progress"
-    completed = "completed"
 
 
 class Course(IdUuidPkMixin, Base):

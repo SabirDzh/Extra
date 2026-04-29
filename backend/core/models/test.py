@@ -1,19 +1,13 @@
-import enum
 import uuid
 from datetime import datetime
 
 from sqlalchemy import DateTime, Enum, Float, ForeignKey, Integer, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from Domain.Enums.test import QuestionType
 from core.models.base import Base
 
 from .mixins.id_int_pk import IdUuidPkMixin
-
-
-class QuestionType(str, enum.Enum):
-    single_choice = "single_choice"
-    multiple_choice = "multiple_choice"
-    free_text = "free_text"
 
 
 class Question(IdUuidPkMixin, Base):

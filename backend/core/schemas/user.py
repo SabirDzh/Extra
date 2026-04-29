@@ -3,7 +3,7 @@ from pydantic import (
     BaseModel,
     Field,
 )
-from utils.role import UserRole
+from Domain.Enums.user_role import UserRole
 
 from core.types.user_id import UuIDMixin
 

@@ -6,10 +6,10 @@ from core.models.db_helper import db_helper
 from core.models.user import User
 from core.schemas.base import PaginationParams
 from core.schemas.faq import FAQCreate, FAQRead, FAQUpdate
-from crud import faq as faq_crud
+from Services import faq as faq_crud
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from utils.product import current_admin
+from api.dependencies.authorization import current_admin
 
 router = APIRouter(
     prefix=settings.api.v1.faq,

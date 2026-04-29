@@ -10,7 +10,7 @@ from core.models import (
 )
 from core.schemas.user import UserCreate, UserUsername
 from fastapi import BackgroundTasks
-from utils.role import UserRole
+from Domain.Enums.user_role import UserRole
 
 
 

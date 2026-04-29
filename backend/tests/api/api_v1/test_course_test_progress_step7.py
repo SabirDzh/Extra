@@ -185,7 +185,7 @@ async def test_full_test_progress_gives_100_percent(
     for block in [l1, l2, l3, t1, t2]:
         await _complete_block(session, user.id, block)
 
-    from crud.course import update_course_completion_status
+    from Services.course import update_course_completion_status
     await update_course_completion_status(session, user.id, course.id)
 
     resp = await client.post(

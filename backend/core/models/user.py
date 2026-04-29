@@ -10,7 +10,7 @@ from sqlalchemy.dialects.postgresql import (
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from utils.role import UserRole
+from Domain.Enums.user_role import UserRole
 
 from .base import Base
 from .mixins.id_int_pk import IdUuidPkMixin

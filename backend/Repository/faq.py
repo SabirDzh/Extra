@@ -10,7 +10,6 @@ from core.schemas.faq import FAQCreate, FAQUpdate
 from fastapi import HTTPException, UploadFile, status
 from sqlalchemy import delete, func, insert, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from utils.db import ensure_unique_field
 
 
 async def get_faqs(
@@ -34,15 +33,6 @@ async def create_faq(
     session: AsyncSession,
     faq_in: FAQCreate,
 ) -> FAQ:
-
-    await ensure_unique_field(
-        session,
-        FAQ,
-        "question",
-        faq_in.question,
-        error_msg=f"FAQ with question '{faq_in.question}' already exists",
-    )
-
     faq = FAQ(**faq_in.model_dump())
     session.add(faq)
     await session.commit()
@@ -56,16 +46,6 @@ async def update_faq(
     faq_update: FAQUpdate,
 ) -> FAQ:
     patch = faq_update.model_dump(exclude_unset=True)
-
-    if "question" in patch and patch["question"]:
-        await ensure_unique_field(
-            session,
-            FAQ,
-            "question",
-            patch["question"],
-            exclude_id=faq.id,
-            error_msg=f"FAQ with question '{patch['question']}' already exists",
-        )
 
     for field, value in patch.items():
         setattr(faq, field, value)

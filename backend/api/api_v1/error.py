@@ -1,7 +1,7 @@
 import uuid
 from typing import Annotated, List
 
-import crud.error as error_crud
+import Services.error as error_crud
 from core.authentication.fastapi_users import current_active_user
 from core.config import settings
 from core.models.db_helper import db_helper
@@ -19,7 +19,7 @@ from fastapi import (
     status,
 )
 from sqlalchemy.ext.asyncio import AsyncSession
-from utils.product import current_admin
+from api.dependencies.authorization import current_admin
 
 router = APIRouter(
     prefix=settings.api.v1.error,

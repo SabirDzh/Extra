@@ -11,7 +11,7 @@ from core.models.block import (
 )
 from core.models.progress import UserBlockProgress
 from core.models.test import Question, TestAnswer, TestSubmission
-from crud import course as course_crud
+from Services import course as course_crud
 
 
 async def auto_grade_submission(

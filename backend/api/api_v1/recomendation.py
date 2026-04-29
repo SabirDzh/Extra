@@ -1,7 +1,7 @@
 import uuid
 from typing import Annotated, Literal
 
-import crud.recommendation as recommendation_crud
+import Services.recommendation as recommendation_crud
 from core.authentication.fastapi_users import current_active_user, current_optional_user
 from core.config import settings
 from core.models.db_helper import db_helper
@@ -16,7 +16,7 @@ from core.schemas.recommendation import (
 )
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from utils.product import current_admin
+from api.dependencies.authorization import current_admin
 
 router = APIRouter(
     prefix=settings.api.v1.recommendations,

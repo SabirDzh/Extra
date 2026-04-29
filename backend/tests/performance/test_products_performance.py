@@ -3,7 +3,7 @@ import uuid
 import time
 from sqlalchemy import insert
 from core.models.product import Product
-from crud.product import search_products, get_products
+from Services.product import search_products, get_products
 from sqlalchemy.ext.asyncio import AsyncSession
 
 @pytest.mark.anyio

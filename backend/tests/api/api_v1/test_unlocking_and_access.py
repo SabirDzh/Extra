@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from core.models.course import Course, CourseEnrollment
 from core.models.block import Block, BlockType
 from core.models.progress import UserBlockProgress
-from crud.test_grading import _mark_block_completed
+from Services.test_grading import _mark_block_completed
 
 @pytest.fixture
 async def multi_stage_course(session: AsyncSession, create_user):

@@ -12,7 +12,7 @@ from core.schemas.product import (
     ProductSummaryInfo,
     ProductUpdate,
 )
-from crud import product as product_crud
+from Services import product as product_crud
 from fastapi import (
     APIRouter,
     Depends,
@@ -26,13 +26,13 @@ from fastapi import (
 from fastapi_cache.decorator import cache
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
-from utils.analytics import (
+from Services.product_analytics import (
     get_multiple_product_views,
     get_product_views,
     get_top_product_ids,
     track_product_view,
 )
-from utils.product import current_admin
+from api.dependencies.authorization import current_admin
 
 from api.dependencies.redis import get_redis
 

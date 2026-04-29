@@ -1,20 +1,13 @@
 import uuid
-import enum
 from datetime import datetime
 
 from sqlalchemy import DateTime, Enum, ForeignKey, Integer, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from Domain.Enums.block import BlockType
 from core.models.base import Base
 
 from .mixins.id_int_pk import IdUuidPkMixin
-
-
-class BlockType(str, enum.Enum):
-    lesson = "lesson"
-    auto_test = "auto_test"
-    manual_test = "manual_test"
-    mixed_test = "mixed_test"
 
 
 

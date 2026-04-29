@@ -8,10 +8,10 @@ from core.models.db_helper import db_helper
 from core.models.user import User
 from core.schemas.base import PaginationParams
 from core.schemas.course import CourseCreate, CourseListRead, CourseProgress, CourseRead, CourseUpdate
-from crud import course as course_crud
+from Services import course as course_crud
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from utils.product import current_admin
+from api.dependencies.authorization import current_admin
 
 router = APIRouter(
     prefix=settings.api.v1.courses,

@@ -92,7 +92,7 @@ async def test_course_progress_percentage_calculation(client: AsyncClient, sessi
     assert resp0.json()["progress"]["percent"] == 0.0
     
 
-    from crud.test_grading import _mark_block_completed
+    from Services.test_grading import _mark_block_completed
     await _mark_block_completed(session, student.id, tests[0].id, course.id)
     await session.commit()
     

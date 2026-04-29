@@ -166,7 +166,7 @@ async def test_status_completed_when_all_blocks_done(
         await _complete_block(session, user.id, block)
 
 
-    from crud.course import update_course_completion_status
+    from Services.course import update_course_completion_status
     await update_course_completion_status(session, user.id, course.id)
 
     resp = await client.post(

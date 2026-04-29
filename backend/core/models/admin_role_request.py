@@ -1,19 +1,13 @@
-import enum
 import uuid
 from datetime import datetime
 
 from sqlalchemy import DateTime, Enum, ForeignKey, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from Domain.Enums.admin_role_request import AdminRoleRequestStatus
 from core.models.base import Base
 
 from .mixins.id_int_pk import IdUuidPkMixin
-
-
-class AdminRoleRequestStatus(str, enum.Enum):
-    pending = "pending"
-    approved = "approved"
-    rejected = "rejected"
 
 
 class AdminRoleRequest(IdUuidPkMixin, Base):

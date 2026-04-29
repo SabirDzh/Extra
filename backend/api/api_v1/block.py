@@ -6,19 +6,22 @@ from typing import Annotated
 from core.authentication.fastapi_users import current_active_user, current_optional_user
 from core.config import settings
 from core.models.block import Block, BlockType
-from core.models.course import Course, AUDIENCE_DISPLAY_NAMES, LEVEL_DISPLAY_NAMES
+from core.models.course import AUDIENCE_DISPLAY_NAMES, LEVEL_DISPLAY_NAMES, Course
 from core.models.db_helper import db_helper
 from core.models.progress import UserBlockProgress
-from core.models.user import User
 from core.models.test import TestSubmission
+from core.models.user import User
 from core.schemas.block import BlockCreate, BlockRead, BlockUpdate, CourseBlocksResponse
-from crud.test_grading import _mark_block_completed
-from crud import course as course_crud
+from core.schemas.test import BlockTestResults
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, status
+from Services import course as course_crud
+from Services.test_grading import _mark_block_completed
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from utils.db import ensure_unique_field
-from utils.product import current_admin
+from Repository.common import ensure_unique_field
+from api.dependencies.authorization import current_admin
+
+from Services.test_results import get_test_results_for_block
 
 router = APIRouter(prefix="/courses/{course_id}/blocks", tags=["Blocks"])
 
@@ -43,39 +46,39 @@ async def _get_block_or_404(db, block_id: uuid.UUID, course_id: uuid.UUID) -> Bl
 
 
 async def _format_block_read(
-    db: AsyncSession, 
-    block: Block, 
-    course: Course, 
-    user_id: uuid.UUID | None = None
+    db: AsyncSession, block: Block, course: Course, user_id: uuid.UUID | None = None
 ) -> BlockRead:
     from core.schemas.course import CourseProgress, CourseStatus
-    
+
     aud_label = AUDIENCE_DISPLAY_NAMES.get(course.audience, str(course.audience))
     lvl_label = LEVEL_DISPLAY_NAMES.get(course.level, str(course.level))
-    
+
     is_done = False
     is_attempted = False
     if user_id:
         stmt_done = select(UserBlockProgress.is_completed).where(
             UserBlockProgress.user_id == user_id,
             UserBlockProgress.block_id == block.id,
-            UserBlockProgress.is_completed == True,
+            UserBlockProgress.is_completed,
         )
         is_done = (await db.execute(stmt_done)).scalar() or False
-        
+
         if not is_done:
-            stmt_attempt = select(TestSubmission.id).where(
-                TestSubmission.user_id == user_id,
-                TestSubmission.block_id == block.id,
-            ).limit(1)
+            stmt_attempt = (
+                select(TestSubmission.id)
+                .where(
+                    TestSubmission.user_id == user_id,
+                    TestSubmission.block_id == block.id,
+                )
+                .limit(1)
+            )
             is_attempted = (await db.execute(stmt_attempt)).scalar() is not None
-        
 
     from core.models.test import Question
     from sqlalchemy import func
+
     stmt_count = select(func.count(Question.id)).where(Question.block_id == block.id)
     n_questions = (await db.execute(stmt_count)).scalar() or 0
-
 
     stmt_pos = select(func.count(Block.id)).where(
         Block.course_id == block.course_id,
@@ -83,17 +86,19 @@ async def _format_block_read(
     )
     pos_index = (await db.execute(stmt_pos)).scalar() or 1
 
-
-    stmt_next = select(Block.id).where(
-        Block.course_id == block.course_id,
-        Block.order_index > block.order_index,
-    ).order_by(Block.order_index).limit(1)
+    stmt_next = (
+        select(Block.id)
+        .where(
+            Block.course_id == block.course_id,
+            Block.order_index > block.order_index,
+        )
+        .order_by(Block.order_index)
+        .limit(1)
+    )
     next_id = (await db.execute(stmt_next)).scalar()
-
 
     stmt_all = select(func.count(Block.id)).where(Block.course_id == block.course_id)
     all_blocks_count = (await db.execute(stmt_all)).scalar() or 0
-    
 
     pos_stage = (pos_index - 1) // 2 + 1
 
@@ -109,7 +114,7 @@ async def _format_block_read(
         percent=100.0 if is_done else 0.0,
         status=status,
     )
-    
+
     return BlockRead(
         id=block.id,
         course_id=block.course_id,
@@ -131,23 +136,21 @@ async def _format_block_read(
 @router.get("/", response_model=CourseBlocksResponse)
 async def list_blocks(course_id: uuid.UUID, db: Session, user: OptionalUser):
     from core.schemas.course import CourseProgress, CourseStatus
-    
+
     course = await _get_course_or_404(db, course_id)
     result = await db.execute(
         select(Block).where(Block.course_id == course_id).order_by(Block.order_index)
     )
     blocks = result.scalars().all()
 
-
     completed_block_ids = set()
     if user:
         stmt_progress = select(UserBlockProgress.block_id).where(
             UserBlockProgress.user_id == user.id,
             UserBlockProgress.block_id.in_([b.id for b in blocks]),
-            UserBlockProgress.is_completed == True,
+            UserBlockProgress.is_completed,
         )
         completed_block_ids = set((await db.execute(stmt_progress)).scalars().all())
-
 
         stmt_submissions = select(TestSubmission.block_id).where(
             TestSubmission.user_id == user.id,
@@ -157,12 +160,14 @@ async def list_blocks(course_id: uuid.UUID, db: Session, user: OptionalUser):
     else:
         submitted_block_ids = set()
 
-
     from core.models.test import Question
     from sqlalchemy import func
-    stmt_counts = select(Question.block_id, func.count(Question.id)).where(
-        Question.block_id.in_([b.id for b in blocks])
-    ).group_by(Question.block_id)
+
+    stmt_counts = (
+        select(Question.block_id, func.count(Question.id))
+        .where(Question.block_id.in_([b.id for b in blocks]))
+        .group_by(Question.block_id)
+    )
     counts_res = await db.execute(stmt_counts)
     question_counts = {row[0]: row[1] for row in counts_res.all()}
 
@@ -174,7 +179,6 @@ async def list_blocks(course_id: uuid.UUID, db: Session, user: OptionalUser):
     block_reads = []
     all_blocks_count = len(blocks)
     all_stages_count = (all_blocks_count + 1) // 2
-    
 
     found_active = False
     for i, b in enumerate(blocks):
@@ -182,7 +186,6 @@ async def list_blocks(course_id: uuid.UUID, db: Session, user: OptionalUser):
             active_stage = (i // 2) + 1
             current_block_id = b.id
             found_active = True
-            
 
     if user and (user.role == "administrator" or user.is_superuser):
         active_stage = all_stages_count
@@ -190,17 +193,15 @@ async def list_blocks(course_id: uuid.UUID, db: Session, user: OptionalUser):
     elif not found_active and blocks:
         active_stage = all_stages_count
 
-
     for i, b in enumerate(blocks):
         pos_index = i + 1
         pos_stage = (i // 2) + 1
-        
 
         if pos_stage > active_stage:
             continue
-            
+
         next_id = blocks[i + 1].id if i + 1 < len(blocks) else None
-        
+
         block_reads.append(
             BlockRead(
                 id=b.id,
@@ -221,9 +222,13 @@ async def list_blocks(course_id: uuid.UUID, db: Session, user: OptionalUser):
                     total=question_counts.get(b.id, 0),
                     percent=100.0 if b.id in completed_block_ids else 0.0,
                     status=(
-                        CourseStatus.completed if b.id in completed_block_ids 
-                        else CourseStatus.in_progress if b.id in submitted_block_ids 
-                        else CourseStatus.not_started
+                        CourseStatus.completed
+                        if b.id in completed_block_ids
+                        else (
+                            CourseStatus.in_progress
+                            if b.id in submitted_block_ids
+                            else CourseStatus.not_started
+                        )
                     ),
                 ),
             )
@@ -240,8 +245,9 @@ async def list_blocks(course_id: uuid.UUID, db: Session, user: OptionalUser):
     )
 
 
-async def _get_course_progress(db: AsyncSession, course: Course, user_id: uuid.UUID | None):
-    from crud import course as course_crud
+async def _get_course_progress(
+    db: AsyncSession, course: Course, user_id: uuid.UUID | None
+):
     await course_crud.attach_course_progress(db, [course], user_id)
     return course.progress
 
@@ -265,8 +271,8 @@ async def create_block(
 
 @router.get("/{block_id}", response_model=BlockRead)
 async def get_block(
-    course_id: uuid.UUID, 
-    block_id: uuid.UUID, 
+    course_id: uuid.UUID,
+    block_id: uuid.UUID,
     db: Session,
     user: OptionalUser,
 ):
@@ -357,12 +363,8 @@ async def mark_complete(
 
     await db.commit()
 
-
     return {"detail": "Block marked as completed"}
 
-
-from core.schemas.test import BlockTestResults
-from crud.test_results import get_test_results_for_block
 
 @router.get("/{block_id}/test-results", response_model=BlockTestResults)
 async def get_block_test_results(
@@ -372,13 +374,18 @@ async def get_block_test_results(
     user: User = Depends(current_active_user),
 ):
     block = await _get_block_or_404(db, block_id, course_id)
-    
 
-    if block.block_type not in (BlockType.auto_test, BlockType.manual_test, BlockType.mixed_test):
+    if block.block_type not in (
+        BlockType.auto_test,
+        BlockType.manual_test,
+        BlockType.mixed_test,
+    ):
         raise HTTPException(status_code=400, detail="Block is not a test block")
 
     results = await get_test_results_for_block(db, user.id, block_id)
     if not results:
-        raise HTTPException(status_code=404, detail="Test results not found or no submissions")
-        
+        raise HTTPException(
+            status_code=404, detail="Test results not found or no submissions"
+        )
+
     return results

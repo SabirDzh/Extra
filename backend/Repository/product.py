@@ -15,7 +15,6 @@ from PIL import Image as PILImage
 from sqlalchemy import delete, func, insert, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import load_only
-from utils.db import ensure_unique_field
 
 
 async def get_products(
@@ -62,13 +61,6 @@ async def get_product(session: AsyncSession, product_id: uuid.UUID) -> Product |
 
 
 async def create_product(session: AsyncSession, product_in: ProductCreate) -> Product:
-    await ensure_unique_field(
-        session,
-        Product,
-        "title",
-        product_in.title,
-        error_msg=f"Product with title '{product_in.title}' already exists",
-    )
     product = Product(**product_in.model_dump())
     session.add(product)
     await session.commit()
@@ -80,15 +72,6 @@ async def update_product(
     session: AsyncSession, product: Product, product_update: ProductUpdate
 ) -> Product:
     patch = product_update.model_dump(exclude_unset=True)
-    if "title" in patch and patch["title"]:
-        await ensure_unique_field(
-            session,
-            Product,
-            "title",
-            patch["title"],
-            exclude_id=product.id,
-            error_msg=f"Product with title '{patch['title']}' already exists",
-        )
     for field, value in patch.items():
         setattr(product, field, value)
     await session.commit()

@@ -38,9 +38,9 @@ from fastapi import APIRouter, Depends, File, HTTPException, Request, Response, 
 from fastapi_cache import FastAPICache
 from fastapi_cache.decorator import cache
 from sqlalchemy import and_, func, select
-from user_profile.main import save_user_avatar
-from crud import admin_role_request as admin_role_request_crud
-from utils.product import current_admin
+from Services.avatar_storage import save_user_avatar
+from Services import admin_role_request as admin_role_request_crud
+from api.dependencies.authorization import current_admin
 
 UsersDB = Annotated[SQLAlchemyUserDatabase, Depends(get_users_db)]
 CurrentUser = Annotated[User, Depends(current_active_user)]

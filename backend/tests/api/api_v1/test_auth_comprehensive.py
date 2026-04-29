@@ -163,7 +163,7 @@ async def test_register_case_insensitivity(client: AsyncClient):
 @pytest.mark.anyio
 @pytest.mark.parametrize("role_value", ["administrator", "manager", "client", "user"])
 async def test_register_valid_roles(client: AsyncClient, role_value):
-    """Test that all defined roles are accepted."""
+    """Public registration accepts role field, but administrator is downgraded to user."""
     payload = {
         "email": f"role_{role_value}@example.com",
         "password": "Password12345!",
@@ -172,7 +172,8 @@ async def test_register_valid_roles(client: AsyncClient, role_value):
     }
     response = await client.post("/api/v1/auth/register", json=payload)
     assert response.status_code == 201
-    assert response.json()["role"] == role_value
+    expected_role = "user" if role_value == "administrator" else role_value
+    assert response.json()["role"] == expected_role
 
 
 

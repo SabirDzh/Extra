@@ -5,7 +5,7 @@ from sqlalchemy import insert, delete, text, select, func
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from core.config import settings
 from core.models.product import Product
-from crud.product import search_products, get_products
+from Services.product import search_products, get_products
 
 async def run_benchmark():
     print(f"--- Начинаю тестирование производительности (PostgreSQL) ---")
