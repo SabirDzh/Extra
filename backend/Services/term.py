@@ -1,4 +1,5 @@
 import uuid
+from typing import Literal
 
 from core.models.term import Term
 from core.schemas.base import PaginationParams
@@ -9,8 +10,12 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 
-async def get_terms(session: AsyncSession, pagination: PaginationParams):
-    return await repo.get_terms(session, pagination)
+async def get_terms(
+    session: AsyncSession,
+    pagination: PaginationParams,
+    sorted: Literal["asc", "desc"] = "asc",
+):
+    return await repo.get_terms(session, pagination, sorted)
 
 
 async def get_term(session: AsyncSession, term_id: uuid.UUID):

@@ -19,7 +19,7 @@ async def get_recommendation(session: AsyncSession, recommendation_id: uuid.UUID
 
 async def get_recommendations(
     session: AsyncSession,
-    limit: int,
+    limit: int | None,
     offset: int,
     sorted: Literal["asc", "desc"],
     sorted_by: Literal["title", "created_at", "description"],
@@ -77,7 +77,7 @@ async def delete_all_recommendations(session: AsyncSession):
 async def search_recommendations(
     session: AsyncSession,
     q: str | None = None,
-    limit: int = 20,
+    limit: int | None = None,
     offset: int = 0,
 ):
     return await repo.search_recommendations(session, q, limit, offset)

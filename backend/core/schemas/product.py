@@ -22,6 +22,7 @@ class ProductRead(ProductBase):
     description: str
     documentation: str | None
     schema_connect: str | None
+    article: str | None = None
     views: int = 0
     attributes: dict[str, Any]
 

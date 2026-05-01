@@ -103,3 +103,39 @@ async def test_delete_product_as_admin(client: AsyncClient, superuser_token_head
 
     get_resp = await client.get(f"/api/v1/products/{product_id}")
     assert get_resp.status_code == 404
+
+
+@pytest.mark.anyio
+async def test_get_product_detail_filters_attributes_and_extracts_article(
+    client: AsyncClient, superuser_token_headers
+):
+    payload = {
+        "title": "Product With Attributes",
+        "description": "Desc",
+        "attributes": {
+            "article": "A-100",
+            "wifi": True,
+            "wifi_min": 2.4,
+            "wifi_max": 5.0,
+            "bluetooth": False,
+            "voltage_min": 110,
+            "voltage_max": 220,
+        },
+        "image_url": [],
+    }
+    create_resp = await client.post(
+        "/api/v1/products/", json=payload, headers=superuser_token_headers
+    )
+    assert create_resp.status_code == 201
+    product_id = create_resp.json()["id"]
+
+    detail_resp = await client.get(f"/api/v1/products/{product_id}")
+    assert detail_resp.status_code == 200
+    body = detail_resp.json()
+
+    assert body["article"] == "A-100"
+    assert body["attributes"] == {
+        "wifi": True,
+        "wifi_min": 2.4,
+        "wifi_max": 5.0,
+    }

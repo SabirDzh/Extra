@@ -6,7 +6,6 @@ from core.authentication.fastapi_users import current_active_user, current_optio
 from core.config import settings
 from core.models.db_helper import db_helper
 from core.models.user import User
-from core.schemas.base import ListParams
 from core.schemas.recommendation import (
     RecommendationCreate,
     RecommendationListRead,
@@ -33,14 +32,16 @@ OptionalUser = Annotated[User | None, Depends(current_optional_user)]
 @router.get("", response_model=list[RecommendationListRead])
 async def get_recomendations(
     session: Session,
-    query_param: Annotated[ListParams, Depends()],
+    limit: int | None = Query(None, ge=1),
+    offset: int = Query(0, ge=0),
+    sorted: Literal["asc", "desc"] = "asc",
     sorted_by: Literal["title", "created_at", "description"] = "title",
 ):
     return await recommendation_crud.get_recommendations(
         session,
-        query_param.limit,
-        query_param.offset,
-        query_param.sorted,
+        limit,
+        offset,
+        sorted,
         sorted_by,
     )
 
@@ -48,11 +49,12 @@ async def get_recomendations(
 @router.get("/search", response_model=list[RecommendationListRead])
 async def search_recomendations(
     session: Session,
-    query_param: Annotated[ListParams, Depends()],
+    limit: int | None = Query(None, ge=1),
+    offset: int = Query(0, ge=0),
     q: str | None = None,
 ):
     return await recommendation_crud.search_recommendations(
-        session, q=q, limit=query_param.limit, offset=query_param.offset
+        session, q=q, limit=limit, offset=offset
     )
 
 

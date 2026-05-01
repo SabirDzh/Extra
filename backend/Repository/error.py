@@ -14,13 +14,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 async def get_errors(
     session: AsyncSession,
-    limit: int = 20,
+    limit: int | None = None,
     offset: int = 0,
     sorted: Literal["asc", "desc"] = "asc",
 ) -> List[Error]:
-    stmt = select(Error).offset(offset).limit(limit).order_by(
+    stmt = select(Error).offset(offset).order_by(
         Error.order_index.asc() if sorted == "asc" else Error.order_index.desc()
     )
+    if limit is not None:
+        stmt = stmt.limit(limit)
     result = await session.execute(stmt)
     return result.scalars().all()
 
@@ -35,7 +37,7 @@ async def get_error(
 async def search_errors(
     session: AsyncSession,
     q: str | None = None,
-    limit: int = 20,
+    limit: int | None = None,
     offset: int = 0,
 ) -> List[Error]:
     query = select(Error)
@@ -64,7 +66,9 @@ async def search_errors(
     else:
         query = query.order_by(Error.order_index.asc())
 
-    query = query.offset(offset).limit(limit)
+    query = query.offset(offset)
+    if limit is not None:
+        query = query.limit(limit)
     result = await session.execute(query)
     return result.scalars().all()
 

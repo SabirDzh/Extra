@@ -1,5 +1,5 @@
 import uuid
-from typing import Annotated
+from typing import Annotated, Literal
 
 import Services.term as term_crud
 from core.authentication.fastapi_users import current_active_user
@@ -19,6 +19,7 @@ from fastapi import (
     status,
 )
 from sqlalchemy.ext.asyncio import AsyncSession
+
 from api.dependencies.authorization import current_admin
 
 router = APIRouter(
@@ -32,8 +33,12 @@ IsUser = Annotated[User, Depends(current_active_user)]
 
 
 @router.get("", response_model=list[TermResponse])
-async def get_terms(session: Session, pagination: Annotated[PaginationParams, Query()]):
-    return await term_crud.get_terms(session, pagination)
+async def get_terms(
+    session: Session,
+    pagination: Annotated[PaginationParams, Depends()],
+    sorted: Literal["asc", "desc"] = "asc",
+):
+    return await term_crud.get_terms(session, pagination, sorted)
 
 
 @router.get("/search", response_model=list[TermResponse])

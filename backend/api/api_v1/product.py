@@ -1,7 +1,8 @@
 import uuid
+from pathlib import Path
 from typing import Annotated, Literal
 
-from core.config import settings
+from core.config import BASE_DIR, settings
 from core.models.db_helper import db_helper
 from core.models.user import User
 from core.schemas.base import PaginationParams
@@ -44,6 +45,7 @@ router = APIRouter(
 Session = Annotated[AsyncSession, Depends(db_helper.session_getter)]
 AdminUser = Annotated[User, Depends(current_admin)]
 RedisDep = Annotated[Redis, Depends(get_redis)]
+SCHEMA_MEDIA_DIR = BASE_DIR / "media" / "product_schema_connect"
 
 
 def _get_client_identifier(request: Request) -> str:
@@ -55,6 +57,47 @@ def _get_client_identifier(request: Request) -> str:
     if forwarded_for:
         return forwarded_for.split(",")[0].strip()
     return request.client.host if request.client else "unknown"
+
+
+def _schema_url_to_file_path(schema_url: str) -> Path:
+    media_prefix = "/media/"
+    if not schema_url.startswith(media_prefix):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="schema_connect must point to /media",
+        )
+    relative_path = schema_url[len(media_prefix) :]
+    return (BASE_DIR / "media" / relative_path).resolve()
+
+
+def _extract_detail_attributes(
+    raw_attributes: dict | None,
+) -> tuple[dict[str, object], str | None]:
+    if not raw_attributes:
+        return {}, None
+
+    article = raw_attributes.get("article") or raw_attributes.get("Артикул")
+
+    active_keys = {
+        key
+        for key, value in raw_attributes.items()
+        if isinstance(value, bool) and value is True
+    }
+
+    filtered: dict[str, object] = {}
+    range_suffixes = ("_min", "_max", "_from", "_to")
+
+    for key in sorted(active_keys):
+        if key in {"article", "Артикул"}:
+            continue
+        filtered[key] = True
+
+        for suffix in range_suffixes:
+            range_key = f"{key}{suffix}"
+            if range_key in raw_attributes:
+                filtered[range_key] = raw_attributes[range_key]
+
+    return filtered, str(article) if article is not None else None
 
 
 @router.get("/", response_model=list[ProductListRead])
@@ -165,9 +208,15 @@ async def get_product(
 
 
     views = await get_product_views(redis, product_id)
-    product.views = views
+    product_data = ProductRead.model_validate(product).model_dump()
+    filtered_attributes, article = _extract_detail_attributes(
+        product_data.get("attributes")
+    )
+    product_data["views"] = views
+    product_data["attributes"] = filtered_attributes
+    product_data["article"] = article
 
-    return product
+    return product_data
 
 
 @router.patch("/{product_id}", response_model=ProductRead)
@@ -185,6 +234,54 @@ async def update_product(
         )
 
     updated_product = await product_crud.update_product(db, product, data)
+    updated_product.views = await get_product_views(redis, product_id)
+    return updated_product
+
+
+@router.post(
+    "/{product_id}/schema-connect/upload",
+    response_model=ProductRead,
+    status_code=status.HTTP_200_OK,
+)
+async def upload_product_schema_connect_file(
+    product_id: uuid.UUID,
+    db: Session,
+    admin: AdminUser,
+    redis: RedisDep,
+    file: UploadFile = File(...),
+):
+    product = await product_crud.get_product(db, product_id)
+    if not product:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Product not found"
+        )
+
+    if not file.filename:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Filename is required"
+        )
+
+    SCHEMA_MEDIA_DIR.mkdir(parents=True, exist_ok=True)
+    ext = Path(file.filename).suffix
+    stored_filename = f"{uuid.uuid4()}{ext}"
+    destination = SCHEMA_MEDIA_DIR / stored_filename
+
+    content = await file.read()
+    destination.write_bytes(content)
+    schema_url = f"/media/product_schema_connect/{stored_filename}"
+
+    if product.schema_connect:
+        try:
+            old_file_path = _schema_url_to_file_path(product.schema_connect)
+            old_media_root = (BASE_DIR / "media").resolve()
+            if old_media_root in old_file_path.parents and old_file_path.exists():
+                old_file_path.unlink()
+        except Exception:
+            pass
+
+    updated_product = await product_crud.update_product(
+        db, product, ProductUpdate(schema_connect=schema_url)
+    )
     updated_product.views = await get_product_views(redis, product_id)
     return updated_product
 

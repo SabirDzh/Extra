@@ -1,6 +1,7 @@
 import csv
 import io
 import uuid
+from typing import Literal
 
 import pandas as pd
 from core.models.term import Term
@@ -14,8 +15,17 @@ from sqlalchemy.ext.asyncio import AsyncSession
 async def get_terms(
     session: AsyncSession,
     pagination: PaginationParams,
+    sorted: Literal["asc", "desc"] = "asc",
 ):
-    stmt = select(Term).limit(pagination.limit).offset(pagination.offset)
+    order_by_title = (
+        func.lower(Term.title).desc() if sorted == "desc" else func.lower(Term.title).asc()
+    )
+    stmt = (
+        select(Term)
+        .order_by(order_by_title)
+        .limit(pagination.limit)
+        .offset(pagination.offset)
+    )
     result = await session.scalars(stmt)
     return result.all()
 

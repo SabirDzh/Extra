@@ -27,7 +27,7 @@ async def get_recommendation(session: AsyncSession, recommendation_id: uuid.UUID
 
 async def get_recommendations(
     session: AsyncSession,
-    limit: int,
+    limit: int | None,
     offset: int,
     sorted: Literal["asc", "desc"],
     sorted_by: Literal["title", "created_at", "description"],
@@ -40,10 +40,11 @@ async def get_recommendations(
             Recommendation.description,
             Recommendation.created_at,
         )
-        .limit(limit)
         .offset(offset)
         .order_by(order_func(getattr(Recommendation, sorted_by)))
     )
+    if limit is not None:
+        stmt = stmt.limit(limit)
     result = await session.execute(stmt)
     return result.mappings().all()
 
@@ -103,7 +104,7 @@ async def delete_all_recommendations(session: AsyncSession):
 async def search_recommendations(
     session: AsyncSession,
     q: str | None = None,
-    limit: int = 20,
+    limit: int | None = None,
     offset: int = 0,
 ):
     stmt = select(
@@ -140,7 +141,10 @@ async def search_recommendations(
     else:
         stmt = stmt.order_by(Recommendation.title.asc())
 
-    result = await session.execute(stmt.offset(offset).limit(limit))
+    stmt = stmt.offset(offset)
+    if limit is not None:
+        stmt = stmt.limit(limit)
+    result = await session.execute(stmt)
     return result.mappings().all()
 
 

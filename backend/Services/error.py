@@ -11,7 +11,7 @@ from Repository.common import ensure_unique_field
 
 async def get_errors(
     session: AsyncSession,
-    limit: int = 20,
+    limit: int | None = None,
     offset: int = 0,
     sorted: Literal["asc", "desc"] = "asc",
 ) -> List[Error]:
@@ -25,7 +25,7 @@ async def get_error(session: AsyncSession, error_id: uuid.UUID) -> Error | None:
 async def search_errors(
     session: AsyncSession,
     q: str | None = None,
-    limit: int = 20,
+    limit: int | None = None,
     offset: int = 0,
 ) -> List[Error]:
     return await repo.search_errors(session, q, limit, offset)

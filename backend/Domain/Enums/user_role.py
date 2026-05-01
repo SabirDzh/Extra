@@ -6,3 +6,7 @@ class UserRole(StrEnum):
     admin = "administrator"
     manager = "manager"
     client = "client"
+    installer = "Монтажник"
+    seller = "Продавец"
+    serviceman = "Сервесник"
+    buyer = "Покупатель"
