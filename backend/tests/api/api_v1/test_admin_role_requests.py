@@ -19,7 +19,7 @@ async def test_register_admin_role_creates_pending_request(client: AsyncClient, 
     response = await client.post("/api/v1/auth/register", json=payload)
     assert response.status_code == 201
     body = response.json()
-    assert body["role"] == "user"
+    assert body["role"] == "Покупатель"
 
     req = (await session.execute(
         select(AdminRoleRequest).where(AdminRoleRequest.user_id == uuid.UUID(body["id"]))
@@ -40,7 +40,7 @@ async def test_admin_can_approve_request_only_from_whitelist(client: AsyncClient
         )
         await client.post("/api/v1/auth/login", data={"username": admin.email, "password": "Password12345!"})
 
-        target = await create_user("whitelist_user@example.com", "Password12345!", role="user")
+        target = await create_user("whitelist_user@example.com", "Password12345!", role="buyer")
         request = AdminRoleRequest(user_id=target.id, status=AdminRoleRequestStatus.pending)
         session.add(request)
         await session.commit()

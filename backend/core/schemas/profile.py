@@ -24,15 +24,11 @@ class TestAttemptRead(BaseModel):
 
 class CourseProgressRead(BaseModel):
     course_id: uuid.UUID
-    course_title: str
-    total_blocks: int
-    completed_blocks: int
+    title: str
+    status: str
+    all_total: int
+    completed: int
     percent: float
-    total: int = 0
-    completed: int = 0
-    all_total: int = 0
-    current_stage: int = 0
-    progress: dict[str, int] | None = None
 
     model_config = ConfigDict(from_attributes=True)
 

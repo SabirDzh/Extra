@@ -2,8 +2,10 @@ from fastapi_users import schemas
 from pydantic import (
     BaseModel,
     Field,
+    field_validator,
+    field_serializer,
 )
-from Domain.Enums.user_role import UserRole
+from Domain.Enums.user_role import UserRole, normalize_user_role
 
 from core.types.user_id import UuIDMixin
 
@@ -12,6 +14,17 @@ class UserRead(schemas.BaseUser[UuIDMixin]):
     role: UserRole
     fullname: str
     image_url: str | None = None
+
+    @field_serializer("role")
+    def serialize_role(self, role: UserRole) -> str:
+        role_labels = {
+            UserRole.admin: "Администратор",
+            UserRole.installer: "Монтажник",
+            UserRole.seller: "Продавец",
+            UserRole.serviceman: "Сервисник",
+            UserRole.buyer: "Покупатель",
+        }
+        return role_labels.get(role, role.value)
 
 
 class UserCreate(schemas.BaseUserCreate):
@@ -23,11 +36,24 @@ class UserCreate(schemas.BaseUserCreate):
     fullname: str = Field(min_length=1, max_length=128)
     image_url: str | None = None
 
+    @field_validator("role", mode="before")
+    @classmethod
+    def normalize_role(cls, v):
+        return normalize_user_role(v)
+
 
 class UserUpdate(schemas.BaseUserUpdate):
     password: str | None = None
+    role: UserRole | None = None
     fullname: str | None = None
     image_url: str | None = None
+
+    @field_validator("role", mode="before")
+    @classmethod
+    def normalize_role(cls, v):
+        if v is None:
+            return v
+        return normalize_user_role(v)
 
 
 class UserRegisteredNotification(BaseModel):

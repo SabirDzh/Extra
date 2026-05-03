@@ -9,8 +9,8 @@ from sqlalchemy.dialects.postgresql import (
     ENUM as PgEnum,
 )
 from sqlalchemy.dialects.postgresql import JSONB
-from sqlalchemy.orm import Mapped, mapped_column, relationship
-from Domain.Enums.user_role import UserRole
+from sqlalchemy.orm import Mapped, mapped_column, relationship, validates
+from Domain.Enums.user_role import UserRole, normalize_user_role
 
 from .base import Base
 from .mixins.id_int_pk import IdUuidPkMixin
@@ -51,8 +51,11 @@ class User(IdUuidPkMixin, Base):
     )
 
     role: Mapped[UserRole] = mapped_column(
-        PgEnum(UserRole),
-        default=UserRole.user,
+        PgEnum(
+            UserRole,
+            values_callable=lambda enum_cls: [item.value for item in enum_cls],
+        ),
+        default=UserRole.buyer,
     )
 
     image_url: Mapped[str | None] = mapped_column(String, nullable=True)
@@ -87,3 +90,7 @@ class User(IdUuidPkMixin, Base):
 
     def __str__(self):
         return self.email
+
+    @validates("role")
+    def validate_role(self, key, value):
+        return normalize_user_role(value)

@@ -126,8 +126,10 @@ async def test_register_invalid_role(client: AsyncClient):
 
     assert response.status_code == 422
     data = response.json()
-
-    assert any("Input should be 'user', 'administrator', 'manager' or 'client'" in str(err["msg"]) for err in data.get("detail", []))
+    assert any(
+        "Unsupported role" in str(err.get("msg", "")) or "Input should be" in str(err.get("msg", ""))
+        for err in data.get("detail", [])
+    )
 
 @pytest.mark.anyio
 async def test_register_empty_first_name(client: AsyncClient):

@@ -104,7 +104,7 @@ async def delete_all_recommendations(session: AsyncSession):
 async def search_recommendations(
     session: AsyncSession,
     q: str | None = None,
-    limit: int | None = None,
+    limit: int = 35,
     offset: int = 0,
 ):
     stmt = select(
@@ -142,8 +142,7 @@ async def search_recommendations(
         stmt = stmt.order_by(Recommendation.title.asc())
 
     stmt = stmt.offset(offset)
-    if limit is not None:
-        stmt = stmt.limit(limit)
+    stmt = stmt.limit(limit)
     result = await session.execute(stmt)
     return result.mappings().all()
 

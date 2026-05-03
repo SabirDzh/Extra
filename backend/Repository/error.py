@@ -14,7 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 async def get_errors(
     session: AsyncSession,
-    limit: int | None = None,
+    limit: int | None = 35,
     offset: int = 0,
     sorted: Literal["asc", "desc"] = "asc",
 ) -> List[Error]:
@@ -37,7 +37,7 @@ async def get_error(
 async def search_errors(
     session: AsyncSession,
     q: str | None = None,
-    limit: int | None = None,
+    limit: int = 35,
     offset: int = 0,
 ) -> List[Error]:
     query = select(Error)
@@ -67,8 +67,7 @@ async def search_errors(
         query = query.order_by(Error.order_index.asc())
 
     query = query.offset(offset)
-    if limit is not None:
-        query = query.limit(limit)
+    query = query.limit(limit)
     result = await session.execute(query)
     return result.scalars().all()
 

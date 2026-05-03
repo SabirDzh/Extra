@@ -261,7 +261,8 @@ async def create_block(
 ):
     course = await _get_course_or_404(db, course_id)
     payload = data.model_dump()
-    payload["title"] = course.title
+    if data.block_type == BlockType.lesson:
+        payload["title"] = course.title
     block = Block(**payload, course_id=course_id)
     db.add(block)
     await db.commit()
@@ -293,7 +294,12 @@ async def update_block(
     block = await _get_block_or_404(db, block_id, course_id)
     patch = data.model_dump(exclude_unset=True)
 
-    if "title" in patch and patch["title"] and patch["title"] != course.title:
+    if (
+        block.block_type == BlockType.lesson
+        and "title" in patch
+        and patch["title"]
+        and patch["title"] != course.title
+    ):
         await ensure_unique_field(
             db,
             Course,
@@ -303,7 +309,12 @@ async def update_block(
             error_msg=f"Course with title '{patch['title']}' already exists",
         )
         course.title = patch["title"]
-        result = await db.execute(select(Block).where(Block.course_id == course_id))
+        result = await db.execute(
+            select(Block).where(
+                Block.course_id == course_id,
+                Block.block_type == BlockType.lesson,
+            )
+        )
         for course_block in result.scalars().all():
             course_block.title = patch["title"]
 

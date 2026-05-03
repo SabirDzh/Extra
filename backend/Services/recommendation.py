@@ -5,8 +5,8 @@ from core.models.recommendation import Recommendation
 from core.schemas.recommendation import RecommendationCreate, RecommendationUpdate
 from fastapi import UploadFile
 from Repository import recommendation as repo
-from sqlalchemy.ext.asyncio import AsyncSession
 from Repository.common import ensure_unique_field
+from sqlalchemy.ext.asyncio import AsyncSession
 
 
 async def get_recommendation_admin(session: AsyncSession, recommendation_id: uuid.UUID):
@@ -24,6 +24,7 @@ async def get_recommendations(
     sorted: Literal["asc", "desc"],
     sorted_by: Literal["title", "created_at", "description"],
 ):
+
     return await repo.get_recommendations(session, limit, offset, sorted, sorted_by)
 
 
@@ -57,7 +58,9 @@ async def update_recommendation(
             exclude_id=recommendation_id,
             error_msg=f"Recomendation with title '{patch['title']}' already exists",
         )
-    return await repo.update_recommendation(session, recommendation_id, recommendation_in)
+    return await repo.update_recommendation(
+        session, recommendation_id, recommendation_in
+    )
 
 
 async def delete_recommendation(session: AsyncSession, recommendation_id: uuid.UUID):
@@ -77,7 +80,7 @@ async def delete_all_recommendations(session: AsyncSession):
 async def search_recommendations(
     session: AsyncSession,
     q: str | None = None,
-    limit: int | None = None,
+    limit: int = 35,
     offset: int = 0,
 ):
     return await repo.search_recommendations(session, q, limit, offset)

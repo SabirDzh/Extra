@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import List, Literal
 
-from core.models.block import TEST_BLOCK_TYPES, Block
+from core.models.block import TEST_BLOCK_TYPES, Block, BlockType
 from core.models.course import (
     Course,
     CourseAudience,
@@ -220,7 +220,10 @@ async def sync_course_title_to_blocks(
     await session.execute(
         (
             Block.__table__.update()
-            .where(Block.course_id == course_id)
+            .where(
+                Block.course_id == course_id,
+                Block.block_type == BlockType.lesson,
+            )
             .values(title=title)
         )
     )

@@ -7,6 +7,7 @@ from core.authentication.fastapi_users import current_active_user
 from core.config import settings
 from core.models.db_helper import db_helper
 from core.models.user import User
+from core.schemas.base import PaginationParams
 from core.schemas.profile import (
     CertificateItemRead,
     CourseProgressRead,
@@ -32,20 +33,22 @@ Session = Annotated[AsyncSession, Depends(db_helper.session_getter)]
 async def list_test_attempts(
     db: Session,
     user: User = Depends(current_active_user),
-    offset: int = Query(0, ge=0),
-    limit: int = Query(20, ge=1, le=100),
+    pagination: PaginationParams = Depends(),
 ):
-    return await get_test_attempts(db, user.id, offset=offset, limit=limit)
+    return await get_test_attempts(
+        db, user.id, offset=pagination.offset, limit=pagination.limit
+    )
 
 
 @router.get("/courses-progress", response_model=list[CourseProgressRead])
 async def list_courses_progress(
     db: Session,
     user: User = Depends(current_active_user),
-    offset: int = Query(0, ge=0),
-    limit: int = Query(20, ge=1, le=100),
+    pagination: PaginationParams = Depends(),
 ):
-    return await get_courses_progress(db, user.id, offset=offset, limit=limit)
+    return await get_courses_progress(
+        db, user.id, offset=pagination.offset, limit=pagination.limit
+    )
 
 
 @router.get("/certificates", response_model=list[CertificateItemRead])
@@ -60,6 +63,8 @@ async def list_certificates(
 async def list_recent_courses(
     db: Session,
     user: User = Depends(current_active_user),
+    page: int = Query(1, ge=1),
     limit: int = Query(5, ge=1, le=20),
 ):
-    return await get_recent_courses(db, user.id, limit=limit)
+    offset = (page - 1) * limit
+    return await get_recent_courses(db, user.id, limit=limit, offset=offset)

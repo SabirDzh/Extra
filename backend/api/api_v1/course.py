@@ -66,13 +66,17 @@ async def search_courses(
         | None
     ) = Query(None, description="Filter type for courses"),
     level: CourseLevel | None = Query(None, description="Filter by course level"),
-    audience: CourseAudience | None = Query(None, description="Filter by audience"),
+    audience: Literal["installer", "seller", "serviceman", "buyer"] | None = Query(
+        None, description="Filter by audience role (without admin)"
+    ),
 ):
     if filter_type in ["in_progress", "completed", "not_started"] and not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="You must be logged in to use this filter",
         )
+
+    audience_filter = CourseAudience(audience) if audience else None
 
     courses = await course_crud.search_courses(
         db,
@@ -82,7 +86,7 @@ async def search_courses(
         user_id=user.id if user else None,
         filter_type=filter_type,
         level=level,
-        audience=audience,
+        audience=audience_filter,
     )
     await course_crud.attach_course_progress(db, courses, user.id if user else None)
     return courses

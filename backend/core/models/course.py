@@ -25,6 +25,9 @@ LEVEL_DISPLAY_NAMES: dict[str, str] = {
 AUDIENCE_DISPLAY_NAMES: dict[str, str] = {
     CourseAudience.everyone: "Для всех",
     CourseAudience.installer: "Монтажник",
+    CourseAudience.seller: "Продавец",
+    CourseAudience.serviceman: "Сервисник",
+    CourseAudience.buyer: "Покупатель",
 }
 
 

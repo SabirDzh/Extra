@@ -28,7 +28,7 @@ async def _create_course(session: AsyncSession, admin_id: uuid.UUID, title="Test
 
 @pytest.fixture
 async def admin_user(create_user):
-    return await create_user("superadmin@test.com", password="Password12345!", is_superuser=True, role="admin")
+    return await create_user("superadmin@test.com", password="Password12345!", is_superuser=True, role="administrator")
 
 async def _get_auth_headers(client: AsyncClient, user_data: dict) -> dict:
     resp = await client.post("/api/v1/auth/login", data={"username": user_data["email"], "password": user_data["password"]})
@@ -169,7 +169,7 @@ async def test_course_pagination_offset(client: AsyncClient, session: AsyncSessi
     await _create_course(session, admin_user.id, f"A Course2")
     resp_all = await client.get("/api/v1/courses/?limit=10")
     if len(resp_all.json()) >= 2:
-        resp_offset = await client.get("/api/v1/courses/?limit=1&offset=1")
+        resp_offset = await client.get("/api/v1/courses/?limit=1&page=2")
         assert len(resp_offset.json()) == 1
         assert resp_offset.json()[0]["id"] == resp_all.json()[1]["id"]
 

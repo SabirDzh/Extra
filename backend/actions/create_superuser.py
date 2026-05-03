@@ -1,70 +1,68 @@
 import asyncio
-import contextlib
+import sys
 from os import getenv
+from pathlib import Path
 
-from api.dependencies.authentication import get_user_manager, get_users_db
-from core.authentication.user_manager import UserManager
-from core.models import (
-    User,
-    db_helper,
-)
-from core.schemas.user import UserCreate, UserUsername
-from fastapi import BackgroundTasks
+# Allow direct script execution: `python actions/create_superuser.py`
+BACKEND_DIR = Path(__file__).resolve().parent.parent
+if str(BACKEND_DIR) not in sys.path:
+    sys.path.insert(0, str(BACKEND_DIR))
+
 from Domain.Enums.user_role import UserRole
+from core.models import User, db_helper
+from fastapi_users.password import PasswordHelper
+from sqlalchemy import select
 
 
-
-
-get_users_db_context = contextlib.asynccontextmanager(get_users_db)
-get_user_manager_context = contextlib.asynccontextmanager(get_user_manager)
-
-
-default_email = getenv("DEFAULT_EMAIL", "admin@admin.com")
-default_password = getenv("DEFAULT_PASSWORD", "Qwerty123456!")
+default_email = getenv("DEFAULT_EMAIL", "SabirDzh@gmail.com")
+default_password = getenv("DEFAULT_PASSWORD", "Sony.RichNariman111")
+default_fullname = getenv("DEFAULT_FULLNAME", "Sabir Dzh")
 default_is_active = True
 default_is_superuser = True
 default_is_verified = True
 role = UserRole.admin
-username = UserUsername(first_name="admin", last_name=None, middle_name=None)
-
-
-async def create_user(
-    user_manager: UserManager,
-    user_create: UserCreate,
-) -> User:
-    user = await user_manager.create(
-        user_create=user_create,
-        safe=False,
-    )
-    return user
 
 
 async def create_superuser(
     email: str = default_email,
     password: str = default_password,
+    fullname: str = default_fullname,
     is_active: bool = default_is_active,
     is_superuser: bool = default_is_superuser,
     is_verified: bool = default_is_verified,
 ):
-    user_create = UserCreate(
-        email=email,
-        password=password,
-        is_active=is_active,
-        is_superuser=is_superuser,
-        is_verified=is_verified,
-        role=role,
-        username=username,
-    )
-    bg = BackgroundTasks()
+    password_helper = PasswordHelper()
+
     async with db_helper.session_factory() as session:
-        async with get_users_db_context(session) as users_db:
-            async with get_user_manager_context(
-                users_db, background_tasks=bg
-            ) as user_manager:
-                return await create_user(
-                    user_manager=user_manager,
-                    user_create=user_create,
-                )
+        existing_user = await session.scalar(select(User).where(User.email == email))
+
+        if existing_user:
+            existing_user.role = role
+            existing_user.is_superuser = is_superuser
+            existing_user.is_active = is_active
+            existing_user.is_verified = is_verified
+            if fullname and not existing_user.fullname:
+                existing_user.fullname = fullname
+
+            await session.commit()
+            await session.refresh(existing_user)
+            print(f"Updated existing user '{email}' to admin role.")
+            return existing_user
+
+        new_user = User(
+            email=email,
+            hashed_password=password_helper.hash(password),
+            is_active=is_active,
+            is_superuser=is_superuser,
+            is_verified=is_verified,
+            role=role,
+            fullname=fullname,
+        )
+        session.add(new_user)
+        await session.commit()
+        await session.refresh(new_user)
+        print(f"Created new admin user '{email}'.")
+        return new_user
 
 
 if __name__ == "__main__":

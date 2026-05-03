@@ -126,12 +126,12 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
         request: Optional["Request"] = None,
     ) -> User:
         user_dict = user_create.create_update_dict()
-        requested_role = user_dict.get("role", UserRole.user)
+        requested_role = user_dict.get("role", UserRole.buyer)
         if isinstance(requested_role, str):
             requested_role = UserRole(requested_role)
 
         user_dict["role"] = (
-            UserRole.user if requested_role == UserRole.admin else requested_role
+            UserRole.buyer if requested_role == UserRole.admin else requested_role
         )
         user = await super().create(
             user_create.__class__(**user_dict), safe=safe, request=request

@@ -10,6 +10,9 @@ class CourseLevel(str, enum.Enum):
 class CourseAudience(str, enum.Enum):
     everyone = "everyone"
     installer = "installer"
+    seller = "seller"
+    serviceman = "serviceman"
+    buyer = "buyer"
 
 
 class CourseStatus(str, enum.Enum):

@@ -6,6 +6,7 @@ from core.authentication.fastapi_users import current_active_user
 from core.config import settings
 from core.models.db_helper import db_helper
 from core.models.user import User
+from core.schemas.base import ListParams
 from core.schemas.error import ErrorCreate, ErrorRead, ErrorReadAdmin, ErrorUpdate
 from fastapi import (
     APIRouter,
@@ -33,21 +34,31 @@ IsUser = Annotated[User, Depends(current_active_user)]
 @router.get("", response_model=List[ErrorRead])
 async def get_errors(
     db: Session,
-    limit: int | None = Query(None, ge=1),
-    offset: int = Query(0, ge=0),
-    sorted: Literal["asc", "desc"] = "asc",
+    limit: int | None = Query(None, ge=1, le=9000),
+    page: int | None = Query(None, ge=1),
+    sorted: Literal["asc", "desc"] = Query("asc"),
 ):
-    return await error_crud.get_errors(db, limit, offset, sorted)
+    # If client sends no pagination params, return all records.
+    if limit is None and page is None:
+        calculated_limit = None
+        offset = 0
+    else:
+        calculated_limit = limit or 9000
+        calculated_page = page or 1
+        offset = (calculated_page - 1) * calculated_limit
+
+    return await error_crud.get_errors(db, calculated_limit, offset, sorted)
 
 
 @router.get("/search", response_model=List[ErrorRead])
 async def search_errors(
     db: Session,
-    limit: int | None = Query(None, ge=1),
-    offset: int = Query(0, ge=0),
+    query: ListParams = Depends(),
     q: str | None = Query(None, description="Search query"),
 ):
-    return await error_crud.search_errors(db, q=q, limit=limit, offset=offset)
+    return await error_crud.search_errors(
+        db, q=q, limit=query.limit, offset=query.offset
+    )
 
 
 @router.get("/{error_id}", response_model=ErrorRead)
