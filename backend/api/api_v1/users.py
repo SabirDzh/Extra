@@ -31,6 +31,7 @@ from core.schemas.stats import AdminSummaryRead, StatMetric
 from core.schemas.user import (
     AdminRoleRequestDecision,
     AdminRoleRequestRead,
+    UserPermissionsUpdate,
     UserRead,
     UserUpdate,
 )
@@ -227,6 +228,31 @@ async def review_admin_role_request(
             detail="User is not in admin role whitelist",
         )
     return result
+
+
+@router.patch("/{user_id}/permissions", response_model=UserRead)
+async def update_user_permissions(
+    user_id: uuid.UUID,
+    payload: UserPermissionsUpdate,
+    users_db: UsersDB,
+    admin: AdminUser,
+):
+    target_user = await users_db.session.get(User, user_id)
+    if not target_user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    patch = payload.model_dump(exclude_unset=True)
+    if "role" in patch and patch["role"] is not None:
+        target_user.role = patch["role"]
+    if "is_superuser" in patch and patch["is_superuser"] is not None:
+        target_user.is_superuser = patch["is_superuser"]
+
+    users_db.session.add(target_user)
+    await users_db.session.commit()
+    await users_db.session.refresh(target_user)
+
+    await FastAPICache.clear(namespace=settings.cache.namespace.users_list)
+    return UserRead.model_validate(target_user)
 
 
 router.include_router(

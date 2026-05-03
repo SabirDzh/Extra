@@ -56,6 +56,18 @@ class UserUpdate(schemas.BaseUserUpdate):
         return normalize_user_role(v)
 
 
+class UserPermissionsUpdate(BaseModel):
+    role: UserRole | None = None
+    is_superuser: bool | None = None
+
+    @field_validator("role", mode="before")
+    @classmethod
+    def normalize_role(cls, v):
+        if v is None:
+            return v
+        return normalize_user_role(v)
+
+
 class UserRegisteredNotification(BaseModel):
     user: UserRead
     ts: int
