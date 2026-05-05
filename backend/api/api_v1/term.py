@@ -52,7 +52,7 @@ async def search_terms(
 
 @router.get("/{term_id}", response_model=TermResponse)
 async def get_term(
-    session: Session, term_id: Annotated[uuid.UUID, Path()], user: IsUser
+    session: Session, term_id: Annotated[uuid.UUID, Path()]
 ):
     term = await term_crud.get_term(session, term_id)
     if term is None:
