@@ -15,6 +15,7 @@ from PIL import Image as PILImage
 from sqlalchemy import delete, func, insert, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import load_only
+from Repository.common import sanitize_import_text
 
 
 async def get_products(
@@ -320,7 +321,7 @@ def parse_product_excel_file(contents: bytes) -> list[dict]:
                 target_field = mapping[col_str]
                 if target_field == "image_url":
                     if val:  # Handle text links
-                        val_str = str(val).strip()
+                        val_str = sanitize_import_text(val, normalize_slashes=True)
                         if val_str.startswith("[") and val_str.endswith("]"):
                             try:
                                 txt_imgs = json.loads(val_str)
@@ -330,9 +331,13 @@ def parse_product_excel_file(contents: bytes) -> list[dict]:
                         else:
                             product_dict["image_url"].append(val_str)
                 else:
-                    product_dict[target_field] = str(val).strip()
+                    normalize_slashes = target_field in {"schema_connect", "documentation"}
+                    product_dict[target_field] = sanitize_import_text(
+                        val,
+                        normalize_slashes=normalize_slashes,
+                    )
             else:
-                clean_col = " ".join(col_str.split())
+                clean_col = sanitize_import_text(col_str)
                 if val == "Есть":
                     attrs[clean_col] = True
                 elif val == "Нет":
@@ -342,7 +347,7 @@ def parse_product_excel_file(contents: bytes) -> list[dict]:
                         if isinstance(val, (int, float)):
                             attrs[clean_col] = val
                         else:
-                            val_str = str(val).strip()
+                            val_str = sanitize_import_text(val)
                             if val_str.isdigit():
                                 attrs[clean_col] = int(val_str)
                             else:
@@ -352,6 +357,8 @@ def parse_product_excel_file(contents: bytes) -> list[dict]:
 
         product_dict["attributes"] = attrs
         if product_dict["title"]:
+            product_dict["title"] = sanitize_import_text(product_dict["title"])
+            product_dict["description"] = sanitize_import_text(product_dict["description"])
             products_data.append(product_dict)
 
     return products_data

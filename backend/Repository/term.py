@@ -10,6 +10,7 @@ from core.schemas.term import TermRequest
 from fastapi import HTTPException, UploadFile, status
 from sqlalchemy import delete, func, insert, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
+from Repository.common import sanitize_import_text
 
 
 async def get_terms(
@@ -152,14 +153,14 @@ def parse_csv_file(contents: bytes) -> list[dict]:
     terms_data = []
     reader = csv.DictReader(io.StringIO(text))
     for row in reader:
-        title = row.get("title", "")
-        description = row.get("description", "")
+        title = sanitize_import_text(row.get("title", ""))
+        description = sanitize_import_text(row.get("description", ""))
 
-        if title and title.strip():
+        if title:
             terms_data.append(
                 {
-                    "title": title.strip(),
-                    "description": description.strip() if description else "",
+                    "title": title,
+                    "description": description,
                 }
             )
     return terms_data
@@ -178,8 +179,8 @@ def parse_excel_file(contents: bytes) -> list[dict]:
     terms_data = []
 
     for index, row in df.iterrows():
-        title = str(row.get("title", "")).strip()
-        description = str(row.get("description", "")).strip()
+        title = sanitize_import_text(row.get("title", ""))
+        description = sanitize_import_text(row.get("description", ""))
 
         if title:
             terms_data.append({"title": title, "description": description})

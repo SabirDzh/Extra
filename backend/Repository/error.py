@@ -10,6 +10,7 @@ from core.schemas.error import ErrorCreate, ErrorUpdate
 from fastapi import HTTPException, UploadFile, status
 from sqlalchemy import delete, insert, select, func
 from sqlalchemy.ext.asyncio import AsyncSession
+from Repository.common import sanitize_import_text
 
 
 async def get_errors(
@@ -154,8 +155,8 @@ def parse_error_csv_file(contents: bytes) -> list[dict]:
     errors_data = []
     reader = csv.DictReader(io.StringIO(text))
     for row in reader:
-        title = row.get("title", "").strip()
-        description = row.get("description", "").strip()
+        title = sanitize_import_text(row.get("title", ""))
+        description = sanitize_import_text(row.get("description", ""))
 
         if title and description:
             order_index = 0
@@ -217,8 +218,8 @@ def parse_error_excel_file(contents: bytes) -> list[dict]:
     errors_data = []
 
     for index, row in df.iterrows():
-        title = str(row.get(title_col, "")).strip()
-        description = str(row.get(desc_col, "")).strip()
+        title = sanitize_import_text(row.get(title_col, ""))
+        description = sanitize_import_text(row.get(desc_col, ""))
 
         if title and description:
             is_published = True
@@ -300,10 +301,19 @@ async def import_errors(
         valid_items = []
         for item in items:
             if "title" in item and "description" in item:
-                t = item["title"].strip()
+                t = sanitize_import_text(item["title"])
+                d = sanitize_import_text(item["description"])
                 if t:
                     incoming_titles.append(t)
-                    valid_items.append(item)
+                    valid_items.append(
+                        {
+                            "title": t,
+                            "description": d,
+                            "order_index": item.get("order_index", 0),
+                            "is_published": item.get("is_published", True),
+                            "image": item.get("image"),
+                        }
+                    )
 
         if not valid_items:
             return {"message": "Не найдено валидных заголовков в файле."}
@@ -333,16 +343,21 @@ async def import_errors(
                 
                 img_obj = item.get("image")
                 if img_obj:
-                    try:
-                        filename_webp = f"{uuid.uuid4()}.webp"
-                        filepath = os.path.join(media_dir, filename_webp)
-                        if img_obj.mode not in ('RGB', 'RGBA'):
-                            img_obj = img_obj.convert('RGBA')
-                        img_obj.save(filepath, "WEBP")
-                        
-                        new_error_data["image"] = f"/{media_dir}/{filename_webp}"
-                    except Exception as e:
-                        print(f"Error saving image for {item['title']}: {e}")
+                    if isinstance(img_obj, str):
+                        new_error_data["image"] = sanitize_import_text(
+                            img_obj, normalize_slashes=True
+                        )
+                    else:
+                        try:
+                            filename_webp = f"{uuid.uuid4()}.webp"
+                            filepath = os.path.join(media_dir, filename_webp)
+                            if img_obj.mode not in ('RGB', 'RGBA'):
+                                img_obj = img_obj.convert('RGBA')
+                            img_obj.save(filepath, "WEBP")
+                            
+                            new_error_data["image"] = f"/{media_dir}/{filename_webp}"
+                        except Exception as e:
+                            print(f"Error saving image for {item['title']}: {e}")
                 
                 new_errors.append(new_error_data)
 

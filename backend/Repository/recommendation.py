@@ -13,6 +13,7 @@ from core.schemas.recommendation import (
 from fastapi import HTTPException, UploadFile, status
 from sqlalchemy import asc, delete, desc, func, insert, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from Repository.common import sanitize_import_text
 
 
 async def get_recommendation_admin(session: AsyncSession, recommendation_id: uuid.UUID):
@@ -179,8 +180,8 @@ def parse_recommendation_csv_file(contents: bytes) -> list[dict]:
     recommendations_data = []
     reader = csv.DictReader(io.StringIO(text))
     for row in reader:
-        title = row.get("title", "").strip()
-        description = row.get("description", "").strip()
+        title = sanitize_import_text(row.get("title", ""))
+        description = sanitize_import_text(row.get("description", ""))
 
         if title and description:
             recommendations_data.append(
@@ -222,8 +223,8 @@ def parse_recommendation_excel_file(contents: bytes) -> list[dict]:
 
     if title_col and desc_col:
         for index, row in df.iterrows():
-            title = str(row.get(title_col, "")).strip()
-            description = str(row.get(desc_col, "")).strip()
+            title = sanitize_import_text(row.get(title_col, ""))
+            description = sanitize_import_text(row.get(desc_col, ""))
 
             if title and description:
                 recommendations_data.append(
@@ -246,8 +247,8 @@ def parse_recommendation_excel_file(contents: bytes) -> list[dict]:
 
     if len(df.columns) >= 2:
         for index, row in df.iterrows():
-            title = str(row.iloc[0]).strip()
-            description = str(row.iloc[1]).strip()
+            title = sanitize_import_text(row.iloc[0])
+            description = sanitize_import_text(row.iloc[1])
 
             if title and description:
                 recommendations_data.append(
@@ -289,10 +290,16 @@ async def import_recommendations(
         valid_items = []
         for item in items:
             if "title" in item and "description" in item:
-                t = item["title"].strip()
+                t = sanitize_import_text(item["title"])
+                d = sanitize_import_text(item["description"])
                 if t:
                     incoming_titles.append(t)
-                    valid_items.append(item)
+                    valid_items.append(
+                        {
+                            "title": t,
+                            "description": d,
+                        }
+                    )
 
         if not valid_items:
             return {"message": "Не найдено валидных заголовков в файле."}

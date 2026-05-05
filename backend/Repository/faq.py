@@ -10,6 +10,7 @@ from core.schemas.faq import FAQCreate, FAQUpdate
 from fastapi import HTTPException, UploadFile, status
 from sqlalchemy import delete, func, insert, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from Repository.common import sanitize_import_text
 
 
 async def get_faqs(
@@ -146,17 +147,19 @@ def parse_faq_csv_file(contents: bytes) -> list[dict]:
     faqs_data = []
     reader = csv.DictReader(io.StringIO(text))
     for row in reader:
-        question = row.get("question", "").strip()
-        answer = row.get("answer", "").strip()
+        question = sanitize_import_text(row.get("question", ""))
+        answer = sanitize_import_text(row.get("answer", ""))
 
         if question and answer:
             order_index = 0
-            if "order_index" in row and row["order_index"].isdigit():
-                order_index = int(row["order_index"])
+            raw_order_index = row.get("order_index")
+            if raw_order_index is not None and str(raw_order_index).isdigit():
+                order_index = int(raw_order_index)
 
             is_published = True
-            if "is_published" in row:
-                val = row["is_published"].strip().lower()
+            raw_is_published = row.get("is_published")
+            if raw_is_published is not None:
+                val = str(raw_is_published).strip().lower()
                 if val in ["false", "0", "no"]:
                     is_published = False
 
@@ -184,8 +187,8 @@ def parse_faq_excel_file(contents: bytes) -> list[dict]:
     faqs_data = []
 
     for index, row in df.iterrows():
-        question = str(row.get("question", "")).strip()
-        answer = str(row.get("answer", "")).strip()
+        question = sanitize_import_text(row.get("question", ""))
+        answer = sanitize_import_text(row.get("answer", ""))
 
         if question and answer:
             order_index = 0
@@ -239,10 +242,18 @@ async def import_faqs(
         valid_items = []
         for item in items:
             if "question" in item and "answer" in item:
-                q = item["question"].strip()
+                q = sanitize_import_text(item["question"])
+                a = sanitize_import_text(item["answer"])
                 if q:
                     incoming_questions.append(q)
-                    valid_items.append(item)
+                    valid_items.append(
+                        {
+                            "question": q,
+                            "answer": a,
+                            "order_index": item.get("order_index", 0),
+                            "is_published": item.get("is_published", True),
+                        }
+                    )
 
         if not valid_items:
             return {"message": "Не найдено валидных вопросов в файле."}
