@@ -105,17 +105,26 @@ def _extract_detail_attributes(
 async def list_products(
     db: Session,
     redis: RedisDep,
-    pagination: PaginationParams = Depends(),
+    limit: int | None = Query(None, ge=1, le=9000),
+    page: int | None = Query(None, ge=1),
     sort_by: Literal["title", "created_at", "description"] = Query("title"),
     order: Literal["asc", "desc"] = Query("asc"),
     features: list[str] | None = Query(
         None, description="Filter by product attributes (e.g. 'Модуль Wi-Fi')"
     ),
 ):
+    if limit is None and page is None:
+        calculated_limit = None
+        offset = 0
+    else:
+        calculated_limit = limit or 9000
+        calculated_page = page or 1
+        offset = (calculated_page - 1) * calculated_limit
+
     products = await product_crud.get_products(
         db,
-        offset=pagination.offset,
-        limit=pagination.limit,
+        offset=offset,
+        limit=calculated_limit,
         sort_by=sort_by,
         order=order,
         features=features,
@@ -129,7 +138,8 @@ async def list_products(
 async def search_products(
     db: Session,
     redis: RedisDep,
-    pagination: PaginationParams = Depends(),
+    limit: int | None = Query(None, ge=1, le=9000),
+    page: int | None = Query(None, ge=1),
     q: str | None = Query(None, description="Search query"),
     sort_by: Literal["title", "created_at", "description"] = Query("title"),
     order: Literal["asc", "desc"] = Query("asc"),
@@ -137,11 +147,19 @@ async def search_products(
         None, description="Filter by product attributes"
     ),
 ):
+    if limit is None and page is None:
+        calculated_limit = None
+        offset = 0
+    else:
+        calculated_limit = limit or 9000
+        calculated_page = page or 1
+        offset = (calculated_page - 1) * calculated_limit
+
     products = await product_crud.search_products(
         db,
         q=q,
-        offset=pagination.offset,
-        limit=pagination.limit,
+        offset=offset,
+        limit=calculated_limit,
         sort_by=sort_by,
         order=order,
         features=features,

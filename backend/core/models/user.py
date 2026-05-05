@@ -91,11 +91,6 @@ class User(IdUuidPkMixin, Base):
         back_populates="user",
         cascade="all, delete-orphan",
     )
-    progress: Mapped[list["UserBlockProgress"]] = relationship(
-        back_populates="user",
-        overlaps="block_progress",
-    )
-
     @property
     def full_name(self) -> str:
         return self.fullname or "Unknown User"
