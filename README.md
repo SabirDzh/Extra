@@ -227,3 +227,52 @@ docker compose down
 ```bash
 docker build -f backend/Dockerfile -t extra_backend:test .
 ```
+
+## PostgreSQL Backups (Server)
+
+В проект добавлена готовая система full backup для PostgreSQL в Docker:
+
+- `ops/backup/pg_backup.sh` — делает полный backup (`pg_dump -Fc`) + ротация
+- `ops/backup/pg_restore.sh` — восстанавливает backup
+- `ops/backup/backup.env.example` — переменные окружения
+- `ops/backup/cron.example` — пример cron-задачи
+
+### Установка на Ubuntu сервере
+
+```bash
+# 1) Скопировать проект (или обновить)
+cd /opt/extra_backend
+
+# 2) Подготовить env
+sudo mkdir -p /etc/extra_backend
+sudo cp ops/backup/backup.env.example /etc/extra_backend/backup.env
+sudo nano /etc/extra_backend/backup.env
+
+# 3) Права на запуск
+chmod +x ops/backup/pg_backup.sh ops/backup/pg_restore.sh
+
+# 4) Первый ручной backup
+source /etc/extra_backend/backup.env
+./ops/backup/pg_backup.sh
+```
+
+### Планировщик (cron)
+
+Открыть cron:
+
+```bash
+crontab -e
+```
+
+Добавить строку (ежедневно в 02:30):
+
+```cron
+30 2 * * * source /etc/extra_backend/backup.env && /opt/extra_backend/ops/backup/pg_backup.sh >> /var/log/extra_pg_backup.log 2>&1
+```
+
+### Восстановление
+
+```bash
+source /etc/extra_backend/backup.env
+./ops/backup/pg_restore.sh /var/backups/extra_backend/postgres/daily/shop_YYYY-MM-DD_HH-MM-SS.dump shop
+```

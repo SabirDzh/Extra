@@ -1,6 +1,7 @@
 import logging
 import uuid
 import secrets
+from urllib.parse import urlsplit, urlunsplit
 from typing import TYPE_CHECKING, Optional
 
 from fastapi_cache import FastAPICache
@@ -25,6 +26,15 @@ if TYPE_CHECKING:
     from fastapi_users.password import PasswordHelperProtocol
 
 log = logging.getLogger(__name__)
+
+
+def _force_https(url: str) -> str:
+    if not url:
+        return url
+    parts = urlsplit(url)
+    if not parts.scheme:
+        return url
+    return urlunsplit(("https", parts.netloc, parts.path, parts.query, parts.fragment))
 
 
 class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
@@ -59,6 +69,16 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
 
 
         await send_new_user_notification(user)
+
+        # Send verification email right after registration (best-effort).
+        if not user.is_verified:
+            try:
+                await self.request_verify(user, request)
+            except Exception:
+                log.exception(
+                    "Failed to trigger verify email right after registration for user %r",
+                    user.id,
+                )
 
 
 
@@ -95,14 +115,24 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
             user.id,
             token,
         )
-        verification_link = request.url_for("verify_email").replace_query_params(
-            token=token
-        )
-        self.background_tasks.add_task(
-            send_verification_email,
-            user=user,
-            verification_link=str(verification_link),
-        )
+        verification_link = ""
+        if request is not None:
+            verification_link = str(
+                request.url_for("verify_email").replace_query_params(token=token)
+            )
+            verification_link = _force_https(verification_link)
+
+        if self.background_tasks:
+            self.background_tasks.add_task(
+                send_verification_email,
+                user=user,
+                verification_link=verification_link,
+            )
+        else:
+            await send_verification_email(
+                user=user,
+                verification_link=verification_link,
+            )
 
     async def on_after_verify(
         self,

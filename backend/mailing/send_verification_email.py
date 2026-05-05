@@ -1,7 +1,17 @@
 from textwrap import dedent
+from urllib.parse import urlsplit, urlunsplit
 from core.models import User
 from core.config import settings
 from mailing.send_email import send_email
+
+
+def _force_https(url: str) -> str:
+    if not url:
+        return url
+    parts = urlsplit(url)
+    if not parts.scheme:
+        return url
+    return urlunsplit(("https", parts.netloc, parts.path, parts.query, parts.fragment))
 
 
 async def send_verification_email(
@@ -12,6 +22,7 @@ async def send_verification_email(
     subject = "Verify your identity"
 
     confirm_url = verification_link or f"{settings.run.base_url}/confirm/{recipient}"
+    confirm_url = _force_https(confirm_url)
 
     plain_content = dedent(
         f"""\

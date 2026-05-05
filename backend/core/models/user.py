@@ -48,6 +48,8 @@ class User(IdUuidPkMixin, Base):
 
     access_tokens: Mapped[list["AccessToken"]] = relationship(
         back_populates="user",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
     )
 
     role: Mapped[UserRole] = mapped_column(
@@ -64,17 +66,31 @@ class User(IdUuidPkMixin, Base):
         DateTime(timezone=True), server_default=func.now()
     )
 
-    enrollments: Mapped[list["CourseEnrollment"]] = relationship(back_populates="user")
-    created_courses: Mapped[list["Course"]] = relationship(back_populates="creator")
+    enrollments: Mapped[list["CourseEnrollment"]] = relationship(
+        back_populates="user",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+    created_courses: Mapped[list["Course"]] = relationship(
+        back_populates="creator",
+        cascade="all, delete-orphan",
+    )
     submissions: Mapped[list["TestSubmission"]] = relationship(
         back_populates="user",
         foreign_keys="TestSubmission.user_id",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
     )
     block_progress: Mapped[list["UserBlockProgress"]] = relationship(
-        back_populates="user"
+        back_populates="user",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
     )
 
-    certificates: Mapped[list["Certificate"]] = relationship(back_populates="user")
+    certificates: Mapped[list["Certificate"]] = relationship(
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
     progress: Mapped[list["UserBlockProgress"]] = relationship(
         back_populates="user",
         overlaps="block_progress",

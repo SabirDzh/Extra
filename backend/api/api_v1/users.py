@@ -1,16 +1,8 @@
 from datetime import datetime, timezone
 import uuid
 
-import hashlib
 from typing import (
     Annotated,
-    Any,
-    Awaitable,
-    Callable,
-    Dict,
-    Optional,
-    Tuple,
-    Union,
 )
 
 from api.dependencies.authentication import get_users_db
@@ -36,8 +28,6 @@ from core.schemas.user import (
     UserUpdate,
 )
 from fastapi import APIRouter, Depends, File, HTTPException, Request, Response, UploadFile
-from fastapi_cache import FastAPICache
-from fastapi_cache.decorator import cache
 from sqlalchemy import and_, func, select
 from Services.avatar_storage import save_user_avatar
 from Services import admin_role_request as admin_role_request_crud
@@ -52,28 +42,6 @@ router = APIRouter(
     prefix=settings.api.v1.users,
     tags=["Users"],
 )
-
-
-def users_list_key_builder(
-    func: Callable[..., Any],
-    namespace: str = "",
-    *,
-    request: Optional[Request] = None,
-    response: Optional[Response] = None,
-    args: Tuple[Any, ...],
-    kwargs: Dict[str, Any],
-) -> Union[str, Awaitable[str]]:
-    exclude_types = (SQLAlchemyUserDatabase,)
-    cache_kw = {}
-    for name, value in kwargs.items():
-        if isinstance(value, exclude_types):
-            continue
-        cache_kw[name] = value
-
-    cache_key = hashlib.md5(
-        f"{func.__module__}:{func.__name__}:{args}:{cache_kw}".encode()
-    ).hexdigest()
-    return f"{namespace}:{cache_key}"
 
 
 @router.get(
@@ -159,11 +127,6 @@ async def get_admin_summary(
     "",
     response_model=list[UserRead],
 )
-@cache(
-    expire=60,
-    key_builder=users_list_key_builder,
-    namespace=settings.cache.namespace.users_list,
-)
 async def get_users_list(
     users_db: UsersDB,
     admin: AdminUser,
@@ -191,10 +154,6 @@ async def upload_my_avatar(
     users_db.session.add(user)
     await users_db.session.commit()
     await users_db.session.refresh(user)
-
-    await FastAPICache.clear(
-        namespace=settings.cache.namespace.users_list,
-    )
     return UserRead.model_validate(user)
 
 
@@ -250,8 +209,6 @@ async def update_user_permissions(
     users_db.session.add(target_user)
     await users_db.session.commit()
     await users_db.session.refresh(target_user)
-
-    await FastAPICache.clear(namespace=settings.cache.namespace.users_list)
     return UserRead.model_validate(target_user)
 
 
