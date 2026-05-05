@@ -19,6 +19,7 @@ class RunConfig(BaseModel):
     host: str = "0.0.0.0"
     port: int = 8000
     base_url: str = "http://127.0.0.1:8000"
+    frontend_url: str = "https://extra-rho-six.vercel.app/"
 
 
 class GunicornConfig(BaseModel):
