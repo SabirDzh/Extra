@@ -15,7 +15,6 @@ from core.schemas.product import (
     ProductUpdate,
 )
 from Services import product as product_crud
-from Repository.search_engine import SearchIn
 from fastapi import (
     APIRouter,
     Depends,
@@ -173,7 +172,7 @@ async def search_products(
     page: int | None = Query(None, ge=1),
     q: str | None = Query(None, description="Search query"),
     order: Literal["asc", "desc"] = Query("asc"),
-    sort_by: SearchIn = Query("all"),
+    sort_by: Literal["title", "description", "filters"] = Query("title"),
     features: list[str] | None = Query(
         None, description="Filter by product attributes"
     ),

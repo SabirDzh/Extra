@@ -21,6 +21,9 @@ from Repository.search_engine import (
     sort_items,
 )
 
+VERY_CLOSE_SCORE = 85.0
+SIMILAR_SCORE = 55.0
+
 
 async def global_search_entities(
     session: AsyncSession,
@@ -115,22 +118,36 @@ async def global_search_entities(
             for key, value in category_results.items()
         }
 
-    exact_categories = [
+    exact_categories = {
         key for key, value in category_results.items() if value["has_exact"]
-    ]
-    if exact_categories:
-        result = empty_result.copy()
-        for key in exact_categories:
-            result[key] = category_results[key]["items"]
-        return result
+    }
+    very_close_categories = {
+        key for key, value in category_results.items() if value["top_score"] >= VERY_CLOSE_SCORE
+    }
+    similar_categories = {
+        key for key, value in category_results.items() if value["top_score"] >= SIMILAR_SCORE
+    }
 
-    best_category = max(
-        category_results.items(),
-        key=lambda item: item[1]["top_score"],
-    )[0]
-    if category_results[best_category]["top_score"] <= 0:
-        return empty_result
+    chosen_categories: set[str] = set()
+
+    if exact_categories:
+        chosen_categories |= exact_categories
+        chosen_categories |= similar_categories
+    elif very_close_categories:
+        chosen_categories |= very_close_categories
+        chosen_categories |= similar_categories
+    else:
+        chosen_categories |= similar_categories
+        if not chosen_categories:
+            best_category = max(
+                category_results.items(),
+                key=lambda item: item[1]["top_score"],
+            )[0]
+            if category_results[best_category]["top_score"] <= 0:
+                return empty_result
+            chosen_categories.add(best_category)
 
     result = empty_result.copy()
-    result[best_category] = category_results[best_category]["items"]
+    for key in chosen_categories:
+        result[key] = category_results[key]["items"]
     return result

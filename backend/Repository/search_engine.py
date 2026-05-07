@@ -12,6 +12,9 @@ T = TypeVar("T")
 
 MIN_RELEVANCE_SCORE = 35.0
 MAX_SEARCH_CANDIDATES = 2000
+TITLE_WEIGHT = 2.8
+DESCRIPTION_WEIGHT = 0.4
+FILTERS_WEIGHT = 1.2
 
 
 def normalize_text(value: str | None) -> str:
@@ -42,13 +45,17 @@ def compute_relevance(
     filters_score = _score_text(query, filter_text)
 
     if search_in == "title":
-        return title_score
+        return title_score * TITLE_WEIGHT
     if search_in == "description":
         return description_score
     if search_in == "filters":
-        return max(filters_score, title_score * 0.85)
+        return max(filters_score * FILTERS_WEIGHT, title_score * 1.1)
 
-    return max(title_score * 1.2, description_score, filters_score)
+    return max(
+        title_score * TITLE_WEIGHT,
+        description_score * DESCRIPTION_WEIGHT,
+        filters_score * FILTERS_WEIGHT,
+    )
 
 
 def exact_title_matches(

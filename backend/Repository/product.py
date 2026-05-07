@@ -191,12 +191,17 @@ async def search_products(
         description_getter=lambda item: item.description,
         filter_text_getter=lambda item: attributes_to_search_text(item.attributes),
     )
-    sorted_items = sort_items(
-        ranked,
-        sort=sort,
-        title_getter=lambda item: item.title,
-        date_getter=lambda item: item.created_at,
-    )
+    if q and q.strip():
+        # For non-empty query keep relevance ordering from ranking.
+        # Otherwise users see alphabetic list instead of best matches.
+        sorted_items = ranked
+    else:
+        sorted_items = sort_items(
+            ranked,
+            sort=sort,
+            title_getter=lambda item: item.title,
+            date_getter=lambda item: item.created_at,
+        )
     return paginate_items(sorted_items, offset=offset, limit=limit)
 
 
