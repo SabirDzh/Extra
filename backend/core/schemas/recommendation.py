@@ -12,6 +12,7 @@ class RecommendationBase(BaseModel):
 
 class RecommendationRead(RecommendationBase):
     id: uuid.UUID
+    model_config = ConfigDict(from_attributes=True)
 
 
 class RecommendationListRead(BaseModel):
@@ -19,6 +20,7 @@ class RecommendationListRead(BaseModel):
     title: str
     description: str | None = None
     created_at: datetime.datetime
+    model_config = ConfigDict(from_attributes=True)
 
 
 class RecommendationCreate(BaseModel):
@@ -42,3 +44,4 @@ class RecommendationReadAdmin(RecommendationBase):
     is_published: bool = True
     updated_at: datetime.datetime
     created_by: uuid.UUID
+    model_config = ConfigDict(from_attributes=True)

@@ -1,5 +1,5 @@
 import uuid
-from typing import Annotated, List
+from typing import Annotated, List, Literal
 
 from core.config import settings
 from core.models.db_helper import db_helper
@@ -7,6 +7,7 @@ from core.models.user import User
 from core.schemas.base import PaginationParams
 from core.schemas.faq import FAQCreate, FAQRead, FAQUpdate
 from Services import faq as faq_crud
+from Repository.search_engine import SearchSort
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from api.dependencies.authorization import current_admin
@@ -33,9 +34,16 @@ async def search_faqs(
     db: Session,
     pagination: PaginationParams = Depends(),
     q: str | None = Query(None, description="Search query"),
+    search_in: Annotated[Literal["title", "description", "all"], Query()] = "all",
+    sort: SearchSort = Query("alphabet_asc"),
 ):
     return await faq_crud.search_faqs(
-        db, q=q, offset=pagination.offset, limit=pagination.limit
+        db,
+        q=q,
+        offset=pagination.offset,
+        limit=pagination.limit,
+        search_in=search_in,
+        sort=sort,
     )
 
 

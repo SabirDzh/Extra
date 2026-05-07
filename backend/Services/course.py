@@ -5,6 +5,7 @@ from typing import Literal
 from core.models.course import Course, CourseAudience, CourseEnrollment, CourseLevel, CourseStatus
 from core.schemas.course import CourseCreate, CourseUpdate
 from Repository import course as repo
+from Repository.search_engine import SearchIn, SearchSort
 from sqlalchemy.ext.asyncio import AsyncSession
 from Repository.common import ensure_unique_field
 
@@ -101,6 +102,8 @@ async def search_courses(
     q: str | None = None,
     offset: int = 0,
     limit: int = 20,
+    sort: SearchSort = "alphabet_asc",
+    search_in: SearchIn = "all",
     user_id: uuid.UUID | None = None,
     filter_type: (
         Literal["in_progress", "completed", "not_started", "new", "popular"] | None
@@ -113,6 +116,8 @@ async def search_courses(
         q=q,
         offset=offset,
         limit=limit,
+        sort=sort,
+        search_in=search_in,
         user_id=user_id,
         filter_type=filter_type,
         level=level,

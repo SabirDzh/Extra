@@ -8,9 +8,17 @@ import pandas as pd
 from core.models.faq import FAQ
 from core.schemas.faq import FAQCreate, FAQUpdate
 from fastapi import HTTPException, UploadFile, status
-from sqlalchemy import delete, func, insert, or_, select
+from sqlalchemy import delete, insert, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from Repository.common import sanitize_import_text
+from Repository.search_engine import (
+    MAX_SEARCH_CANDIDATES,
+    SearchIn,
+    SearchSort,
+    filter_and_rank_items,
+    paginate_items,
+    sort_items,
+)
 
 
 async def get_faqs(
@@ -69,35 +77,26 @@ async def search_faqs(
     q: str | None = None,
     offset: int = 0,
     limit: int = 20,
+    search_in: SearchIn = "all",
+    sort: SearchSort = "alphabet_asc",
 ) -> List[FAQ]:
-    stmt = select(FAQ)
-
-    if q:
-        if len(q) < 2:
-            search_pattern = f"%{q}%"
-            stmt = stmt.where(
-                or_(
-                    FAQ.question.ilike(search_pattern),
-                    FAQ.answer.ilike(search_pattern),
-                )
-            ).order_by(FAQ.question.asc())
-        else:
-            relevance = (
-                func.similarity(FAQ.question, q) * 2
-                + func.similarity(FAQ.answer, q) * 0.5
-            )
-            search_pattern = f"%{q}%"
-            stmt = stmt.where(
-                or_(
-                    FAQ.question.bool_op("%")(q),
-                    FAQ.answer.bool_op("%")(q),
-                    FAQ.question.ilike(search_pattern),
-                    FAQ.answer.ilike(search_pattern),
-                )
-            ).order_by(relevance.desc())
-
-    result = await session.execute(stmt.offset(offset).limit(limit))
-    return result.scalars().all()
+    stmt = select(FAQ).limit(MAX_SEARCH_CANDIDATES)
+    result = await session.execute(stmt)
+    faqs = list(result.scalars().all())
+    ranked = filter_and_rank_items(
+        faqs,
+        q=q,
+        search_in=search_in,
+        title_getter=lambda item: item.question,
+        description_getter=lambda item: item.answer,
+    )
+    sorted_items = sort_items(
+        ranked,
+        sort=sort,
+        title_getter=lambda item: item.question,
+        date_getter=lambda item: getattr(item, "created_at", None),
+    )
+    return paginate_items(sorted_items, offset=offset, limit=limit)
 
 
 async def bulk_delete_faqs(

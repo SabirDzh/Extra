@@ -5,6 +5,7 @@ from core.models.recommendation import Recommendation
 from core.schemas.recommendation import RecommendationCreate, RecommendationUpdate
 from fastapi import UploadFile
 from Repository import recommendation as repo
+from Repository.search_engine import SearchIn, SearchSort
 from Repository.common import ensure_unique_field
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -82,8 +83,12 @@ async def search_recommendations(
     q: str | None = None,
     limit: int = 35,
     offset: int = 0,
+    search_in: SearchIn = "all",
+    sort: SearchSort = "alphabet_asc",
 ):
-    return await repo.search_recommendations(session, q, limit, offset)
+    return await repo.search_recommendations(
+        session, q, limit, offset, search_in, sort
+    )
 
 
 async def import_recommendations(

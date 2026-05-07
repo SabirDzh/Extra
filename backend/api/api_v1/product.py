@@ -1,4 +1,5 @@
 import uuid
+import re
 from pathlib import Path
 from typing import Annotated, Literal
 
@@ -14,6 +15,7 @@ from core.schemas.product import (
     ProductUpdate,
 )
 from Services import product as product_crud
+from Repository.search_engine import SearchIn
 from fastapi import (
     APIRouter,
     Depends,
@@ -78,24 +80,64 @@ def _extract_detail_attributes(
 
     article = raw_attributes.get("article") or raw_attributes.get("Артикул")
 
-    active_keys = {
+    active_keys = sorted(
         key
         for key, value in raw_attributes.items()
         if isinstance(value, bool) and value is True
-    }
+    )
 
     filtered: dict[str, object] = {}
     range_suffixes = ("_min", "_max", "_from", "_to")
+    grouped_numeric: dict[tuple[str, str], list[float]] = {}
 
-    for key in sorted(active_keys):
+    # Example we collapse:
+    # "Максимальное давление в системе 10 бар"
+    # "Максимальное давление в системе 6 бар"
+    # -> "Максимальное давление в системе", + _min/_max
+    numeric_tail_pattern = re.compile(
+        r"^(?P<base>.*?\D)\s*(?P<value>\d+(?:[.,]\d+)?)\s*(?P<unit>[A-Za-zА-Яа-я%°/]+)$"
+    )
+
+    for key in active_keys:
         if key in {"article", "Артикул"}:
             continue
-        filtered[key] = True
 
+        match = numeric_tail_pattern.match(key)
+        if match:
+            base = match.group("base").strip()
+            unit = match.group("unit").strip()
+            raw_num = match.group("value").replace(",", ".")
+            try:
+                num = float(raw_num)
+            except ValueError:
+                num = None
+
+            if num is not None and base:
+                grouped_numeric.setdefault((base, unit), []).append(num)
+                continue
+
+        filtered[key] = True
         for suffix in range_suffixes:
             range_key = f"{key}{suffix}"
             if range_key in raw_attributes:
                 filtered[range_key] = raw_attributes[range_key]
+
+    for (base, unit), values in grouped_numeric.items():
+        if not values:
+            continue
+        if len(values) == 1:
+            value_text = str(values[0]).rstrip("0").rstrip(".")
+            filtered[f"{base} {value_text} {unit}"] = True
+            continue
+        filtered[base] = True
+        min_val = min(values)
+        max_val = max(values)
+        filtered[f"{base}_min"] = min_val
+        filtered[f"{base}_max"] = max_val
+        filtered[f"{base}_unit"] = unit
+        min_text = str(min_val).rstrip("0").rstrip(".")
+        max_text = str(max_val).rstrip("0").rstrip(".")
+        filtered[f"{base}_range"] = f"{min_text}-{max_text} {unit}"
 
     return filtered, str(article) if article is not None else None
 
@@ -141,8 +183,8 @@ async def search_products(
     limit: int | None = Query(None, ge=1, le=9000),
     page: int | None = Query(None, ge=1),
     q: str | None = Query(None, description="Search query"),
-    sort_by: Literal["title", "created_at", "description"] = Query("title"),
     order: Literal["asc", "desc"] = Query("asc"),
+    sort_by: SearchIn = Query("all"),
     features: list[str] | None = Query(
         None, description="Filter by product attributes"
     ),
@@ -160,8 +202,8 @@ async def search_products(
         q=q,
         offset=offset,
         limit=calculated_limit,
-        sort_by=sort_by,
-        order=order,
+        sort="alphabet_desc" if order == "desc" else "alphabet_asc",
+        search_in=sort_by,
         features=features,
     )
 

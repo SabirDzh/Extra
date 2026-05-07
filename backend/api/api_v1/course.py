@@ -8,6 +8,7 @@ from core.models.db_helper import db_helper
 from core.models.user import User
 from core.schemas.base import PaginationParams
 from core.schemas.course import CourseCreate, CourseListRead, CourseProgress, CourseRead, CourseUpdate
+from Repository.search_engine import SearchIn, SearchSort
 from Services import course as course_crud
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -35,6 +36,7 @@ async def list_courses(
     ) = Query(None, description="Filter type for courses"),
     level: CourseLevel | None = Query(None, description="Filter by course level"),
     audience: CourseAudience | None = Query(None, description="Filter by audience"),
+    sort: SearchSort = Query("alphabet_asc"),
 ):
     if filter_type in ["in_progress", "completed", "not_started"] and not user:
         raise HTTPException(
@@ -50,6 +52,7 @@ async def list_courses(
         filter_type=filter_type,
         level=level,
         audience=audience,
+        sort=sort,
     )
     await course_crud.attach_course_progress(db, courses, user.id if user else None)
     return courses
@@ -69,6 +72,8 @@ async def search_courses(
     audience: Literal["installer", "seller", "serviceman", "buyer"] | None = Query(
         None, description="Filter by audience role (without admin)"
     ),
+    search_in: Literal["title", "description", "all"] = Query("all"),
+    sort: SearchSort = Query("alphabet_asc"),
 ):
     if filter_type in ["in_progress", "completed", "not_started"] and not user:
         raise HTTPException(
@@ -87,6 +92,8 @@ async def search_courses(
         filter_type=filter_type,
         level=level,
         audience=audience_filter,
+        search_in=search_in,
+        sort=sort,
     )
     await course_crud.attach_course_progress(db, courses, user.id if user else None)
     return courses

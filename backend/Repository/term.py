@@ -11,6 +11,14 @@ from fastapi import HTTPException, UploadFile, status
 from sqlalchemy import delete, func, insert, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from Repository.common import sanitize_import_text
+from Repository.search_engine import (
+    MAX_SEARCH_CANDIDATES,
+    SearchIn,
+    SearchSort,
+    filter_and_rank_items,
+    paginate_items,
+    sort_items,
+)
 
 
 async def get_terms(
@@ -51,35 +59,28 @@ async def search_terms(
     session: AsyncSession,
     q: str | None,
     pagination: PaginationParams,
+    search_in: SearchIn = "all",
+    sort: SearchSort = "alphabet_asc",
 ):
-    query = select(Term)
-    if q:
-        if len(q) < 2:
-            search_pattern = f"%{q}%"
-            query = query.where(
-                (Term.title.ilike(search_pattern))
-                | (Term.description.ilike(search_pattern))
-            )
-            query = query.order_by(Term.title.asc())
-        else:
-            relevance = (
-                func.similarity(Term.title, q) * 2
-                + func.similarity(Term.description, q) * 0.5
-            )
-            search_pattern = f"%{q}%"
-            query = query.where(
-                (Term.title.bool_op("%")(q))
-                | (Term.description.bool_op("%")(q))
-                | (Term.title.ilike(search_pattern))
-                | (Term.description.ilike(search_pattern))
-            )
-            query = query.order_by(relevance.desc())
-    else:
-        query = query.order_by(Term.title.asc())
-
-    query = query.offset(pagination.offset).limit(pagination.limit)
+    query = select(Term).limit(MAX_SEARCH_CANDIDATES)
     result = await session.execute(query)
-    return result.scalars().all()
+    terms = list(result.scalars().all())
+    ranked = filter_and_rank_items(
+        terms,
+        q=q,
+        search_in=search_in,
+        title_getter=lambda item: item.title,
+        description_getter=lambda item: item.description,
+    )
+    sorted_items = sort_items(
+        ranked,
+        sort=sort,
+        title_getter=lambda item: item.title,
+        date_getter=lambda item: None,
+    )
+    return paginate_items(
+        sorted_items, offset=pagination.offset, limit=pagination.limit
+    )
 
 
 async def create_term(

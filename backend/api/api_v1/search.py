@@ -1,4 +1,4 @@
-from typing import Annotated
+from typing import Annotated, Literal
 
 from core.config import settings
 from core.models.db_helper import db_helper
@@ -20,8 +20,14 @@ async def global_search(
     db: Session,
     q: str | None = Query(None, description="Search query"),
     limit: int = Query(5, ge=1, le=50, description="Limit per category"),
+    sort_by: Annotated[Literal["title", "description", "all"], Query()] = "all",
+    order: Annotated[Literal["asc", "desc"], Query()] = "asc",
 ):
     results = await search_crud.global_search_entities(
-        db, q=q, limit_per_category=limit
+        db,
+        q=q,
+        limit_per_category=limit,
+        search_in=sort_by,
+        sort="alphabet_desc" if order == "desc" else "alphabet_asc",
     )
     return GlobalSearchResponse(**results)

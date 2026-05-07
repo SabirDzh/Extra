@@ -14,6 +14,7 @@ from core.schemas.recommendation import (
     RecommendationReadAdmin,
     RecommendationUpdate,
 )
+from Repository.search_engine import SearchSort
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -62,9 +63,16 @@ async def search_recomendations(
     session: Session,
     query_param: Annotated[ListParams, Depends()],
     q: str | None = None,
+    search_in: Literal["title", "description", "all"] = Query("all"),
+    sort: SearchSort = Query("alphabet_asc"),
 ):
     return await recommendation_crud.search_recommendations(
-        session, q=q, limit=query_param.limit, offset=query_param.offset
+        session,
+        q=q,
+        limit=query_param.limit,
+        offset=query_param.offset,
+        search_in=search_in,
+        sort=sort,
     )
 
 

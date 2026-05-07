@@ -8,6 +8,7 @@ from core.models.db_helper import db_helper
 from core.models.user import User
 from core.schemas.base import PaginationParams
 from core.schemas.term import TermRequest, TermResponse
+from Repository.search_engine import SearchIn, SearchSort
 from fastapi import (
     APIRouter,
     Depends,
@@ -46,8 +47,10 @@ async def search_terms(
     session: Session,
     pagination: Annotated[PaginationParams, Depends()],
     q: str | None = Query(None, description="Search query"),
+    search_in: Literal["title", "description", "all"] = Query("all"),
+    sort: SearchSort = Query("alphabet_asc"),
 ):
-    return await term_crud.search_terms(session, q, pagination)
+    return await term_crud.search_terms(session, q, pagination, search_in, sort)
 
 
 @router.get("/{term_id}", response_model=TermResponse)

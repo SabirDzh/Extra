@@ -11,9 +11,17 @@ from core.schemas.recommendation import (
     RecommendationUpdate,
 )
 from fastapi import HTTPException, UploadFile, status
-from sqlalchemy import asc, delete, desc, func, insert, or_, select
+from sqlalchemy import asc, delete, desc, insert, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from Repository.common import sanitize_import_text
+from Repository.search_engine import (
+    MAX_SEARCH_CANDIDATES,
+    SearchIn,
+    SearchSort,
+    filter_and_rank_items,
+    paginate_items,
+    sort_items,
+)
 
 
 async def get_recommendation_admin(session: AsyncSession, recommendation_id: uuid.UUID):
@@ -107,45 +115,34 @@ async def search_recommendations(
     q: str | None = None,
     limit: int = 35,
     offset: int = 0,
+    search_in: SearchIn = "all",
+    sort: SearchSort = "alphabet_asc",
 ):
-    stmt = select(
+    stmt = (
+        select(
         Recommendation.id,
         Recommendation.title,
         Recommendation.description,
         Recommendation.created_at,
     )
-
-    if q and q.strip():
-        q_str = q.strip()
-        if len(q_str) < 2:
-            search_pattern = f"%{q_str}%"
-            stmt = stmt.where(
-                or_(
-                    Recommendation.title.ilike(search_pattern),
-                    Recommendation.description.ilike(search_pattern),
-                )
-            ).order_by(Recommendation.title.asc())
-        else:
-            relevance = (
-                func.similarity(Recommendation.title, q_str) * 2
-                + func.similarity(Recommendation.description, q_str) * 0.5
-            )
-            search_pattern = f"%{q_str}%"
-            stmt = stmt.where(
-                or_(
-                    Recommendation.title.bool_op("%")(q_str),
-                    Recommendation.description.bool_op("%")(q_str),
-                    Recommendation.title.ilike(search_pattern),
-                    Recommendation.description.ilike(search_pattern),
-                )
-            ).order_by(relevance.desc())
-    else:
-        stmt = stmt.order_by(Recommendation.title.asc())
-
-    stmt = stmt.offset(offset)
-    stmt = stmt.limit(limit)
+        .limit(MAX_SEARCH_CANDIDATES)
+    )
     result = await session.execute(stmt)
-    return result.mappings().all()
+    recommendations = list(result.mappings().all())
+    ranked = filter_and_rank_items(
+        recommendations,
+        q=q,
+        search_in=search_in,
+        title_getter=lambda item: item["title"],
+        description_getter=lambda item: item["description"],
+    )
+    sorted_items = sort_items(
+        ranked,
+        sort=sort,
+        title_getter=lambda item: item["title"],
+        date_getter=lambda item: item["created_at"],
+    )
+    return paginate_items(sorted_items, offset=offset, limit=limit)
 
 
 def check_format(filename: str) -> str:

@@ -1,5 +1,6 @@
 import io
 import json
+import re
 import uuid
 from typing import List
 
@@ -12,10 +13,57 @@ from core.schemas.product import ProductCreate, ProductUpdate
 from fastapi import HTTPException, UploadFile, status
 from openpyxl_image_loader import SheetImageLoader
 from PIL import Image as PILImage
-from sqlalchemy import delete, func, insert, or_, select
+from sqlalchemy import delete, func, insert, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import load_only
 from Repository.common import sanitize_import_text
+from Repository.search_engine import (
+    MAX_SEARCH_CANDIDATES,
+    SearchIn,
+    SearchSort,
+    attributes_to_search_text,
+    filter_and_rank_items,
+    paginate_items,
+    sort_items,
+)
+
+
+def _normalize_feature_key(key: str) -> str:
+    pattern = re.compile(
+        r"^(?P<base>.*?\D)\s*(?P<value>\d+(?:[.,]\d+)?)\s*(?P<unit>[A-Za-zА-Яа-я%°/]+)$"
+    )
+    key_str = str(key).strip()
+    match = pattern.match(key_str)
+    if not match:
+        return key_str
+    base = match.group("base").strip()
+    return base or key_str
+
+
+def _has_feature(attributes: dict | None, feature: str) -> bool:
+    if not attributes:
+        return False
+    feature_norm = _normalize_feature_key(feature)
+    for key, value in attributes.items():
+        if value is not True:
+            continue
+        key_str = str(key).strip()
+        if key_str == feature or _normalize_feature_key(key_str) == feature_norm:
+            return True
+    return False
+
+
+def _apply_features_filter(
+    products: list[Product], features: list[str] | None
+) -> list[Product]:
+    if not features:
+        return products
+    filtered: list[Product] = []
+    for product in products:
+        attrs = product.attributes if isinstance(product.attributes, dict) else {}
+        if all(_has_feature(attrs, feature) for feature in features):
+            filtered.append(product)
+    return filtered
 
 
 async def get_products(
@@ -32,29 +80,26 @@ async def get_products(
             Product.title,
             Product.image_url,
             Product.created_at,
+            Product.description,
+            Product.attributes,
         )
     )
-    if features:
-        for feature in features:
-            stmt = stmt.where(Product.attributes[feature].as_boolean())
-
-    if sort_by == "title":
-        sort_column = Product.title
-    elif sort_by == "created_at":
-        sort_column = Product.created_at
-    elif sort_by == "description":
-        sort_column = Product.description
-    else:
-        sort_column = Product.title
-
-    if order == "desc":
-        stmt = stmt.order_by(sort_column.desc())
-    else:
-        stmt = stmt.order_by(sort_column.asc())
-
-    stmt = stmt.offset(offset).limit(limit)
     result = await session.execute(stmt)
-    return result.scalars().all()
+    products = list(result.scalars().all())
+    products = _apply_features_filter(products, features)
+
+    reverse = order == "desc"
+    if sort_by == "created_at":
+        products.sort(
+            key=lambda item: (item.created_at is None, item.created_at),
+            reverse=reverse,
+        )
+    elif sort_by == "description":
+        products.sort(key=lambda item: (item.description or "").lower(), reverse=reverse)
+    else:
+        products.sort(key=lambda item: (item.title or "").lower(), reverse=reverse)
+
+    return paginate_items(products, offset=offset, limit=limit)
 
 
 async def get_product(session: AsyncSession, product_id: uuid.UUID) -> Product | None:
@@ -105,7 +150,10 @@ async def get_product_attributes_list(session: AsyncSession) -> list[str]:
     for row in result:
         key, value = row[0]
         if isinstance(value, bool):
-            boolean_keys.add(key)
+            if not value:
+                continue
+            key_str = str(key).strip()
+            boolean_keys.add(_normalize_feature_key(key_str))
 
     filtered_keys = [k for k in boolean_keys if k != "Артикул"]
     return sorted(filtered_keys)
@@ -116,8 +164,8 @@ async def search_products(
     q: str | None = None,
     offset: int = 0,
     limit: int = 20,
-    sort_by: str = "title",
-    order: str = "asc",
+    sort: SearchSort = "alphabet_asc",
+    search_in: SearchIn = "all",
     features: list[str] | None = None,
 ):
     stmt = select(Product).options(
@@ -126,66 +174,30 @@ async def search_products(
             Product.title,
             Product.image_url,
             Product.created_at,
+            Product.description,
+            Product.attributes,
         )
     )
 
-    if q and len(q) >= 2:
-        is_sqlite = session.bind.url.drivername.startswith("sqlite")
-        if is_sqlite:
-            search_pattern = f"%{q}%"
-            stmt = stmt.where(
-                or_(
-                    Product.title.ilike(search_pattern),
-                    Product.description.ilike(search_pattern),
-                )
-            )
-        else:
-            ts_query = func.websearch_to_tsquery("russian", q)
-            stmt = stmt.where(
-                or_(
-                    Product.search_product.bool_op("@@")(ts_query),
-                    Product.title.bool_op("%")(q),
-                    Product.description.bool_op("%")(q),
-                )
-            )
-
-            if sort_by == "title" and order == "asc":
-                relevance = (
-                    func.ts_rank(Product.search_product, ts_query)
-                    + func.similarity(Product.title, q) * 2
-                )
-                stmt = stmt.order_by(relevance.desc())
-    elif q:
-        search_pattern = f"%{q}%"
-        stmt = stmt.where(
-            or_(
-                Product.title.ilike(search_pattern),
-                Product.description.ilike(search_pattern),
-            )
-        )
-
-    if features:
-        for feature in features:
-            stmt = stmt.where(Product.attributes[feature].as_boolean() == True)
-
-    if not q or sort_by != "title" or order != "asc":
-        if sort_by == "title":
-            sort_column = Product.title
-        elif sort_by == "created_at":
-            sort_column = Product.created_at
-        elif sort_by == "description":
-            sort_column = Product.description
-        else:
-            sort_column = Product.title
-
-        if order == "desc":
-            stmt = stmt.order_by(sort_column.desc())
-        else:
-            stmt = stmt.order_by(sort_column.asc())
-
-    stmt = stmt.offset(offset).limit(limit)
+    stmt = stmt.limit(MAX_SEARCH_CANDIDATES)
     result = await session.execute(stmt)
-    return result.scalars().all()
+    products = list(result.scalars().all())
+    products = _apply_features_filter(products, features)
+    ranked = filter_and_rank_items(
+        products,
+        q=q,
+        search_in=search_in,
+        title_getter=lambda item: item.title,
+        description_getter=lambda item: item.description,
+        filter_text_getter=lambda item: attributes_to_search_text(item.attributes),
+    )
+    sorted_items = sort_items(
+        ranked,
+        sort=sort,
+        title_getter=lambda item: item.title,
+        date_getter=lambda item: item.created_at,
+    )
+    return paginate_items(sorted_items, offset=offset, limit=limit)
 
 
 async def delete_products(session: AsyncSession, products_id: list[uuid.UUID]):

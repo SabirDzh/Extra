@@ -5,6 +5,7 @@ from core.models.faq import FAQ
 from core.schemas.faq import FAQCreate, FAQUpdate
 from fastapi import UploadFile
 from Repository import faq as repo
+from Repository.search_engine import SearchIn, SearchSort
 from sqlalchemy.ext.asyncio import AsyncSession
 from Repository.common import ensure_unique_field
 
@@ -46,8 +47,15 @@ async def delete_faq(session: AsyncSession, faq: FAQ) -> None:
     await repo.delete_faq(session, faq)
 
 
-async def search_faqs(session: AsyncSession, q: str | None = None, offset: int = 0, limit: int = 20):
-    return await repo.search_faqs(session, q, offset, limit)
+async def search_faqs(
+    session: AsyncSession,
+    q: str | None = None,
+    offset: int = 0,
+    limit: int = 20,
+    search_in: SearchIn = "all",
+    sort: SearchSort = "alphabet_asc",
+):
+    return await repo.search_faqs(session, q, offset, limit, search_in, sort)
 
 
 async def bulk_delete_faqs(session: AsyncSession, faq_ids: List[uuid.UUID]) -> None:

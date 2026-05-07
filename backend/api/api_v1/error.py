@@ -8,6 +8,7 @@ from core.models.db_helper import db_helper
 from core.models.user import User
 from core.schemas.base import ListParams
 from core.schemas.error import ErrorCreate, ErrorRead, ErrorReadAdmin, ErrorUpdate
+from Repository.search_engine import SearchSort
 from fastapi import (
     APIRouter,
     Body,
@@ -55,9 +56,16 @@ async def search_errors(
     db: Session,
     query: ListParams = Depends(),
     q: str | None = Query(None, description="Search query"),
+    search_in: Literal["title", "description", "all"] = Query("all"),
+    sort: SearchSort = Query("alphabet_asc"),
 ):
     return await error_crud.search_errors(
-        db, q=q, limit=query.limit, offset=query.offset
+        db,
+        q=q,
+        limit=query.limit,
+        offset=query.offset,
+        search_in=search_in,
+        sort=sort,
     )
 
 

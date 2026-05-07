@@ -8,9 +8,17 @@ import pandas as pd
 from core.models.error import Error
 from core.schemas.error import ErrorCreate, ErrorUpdate
 from fastapi import HTTPException, UploadFile, status
-from sqlalchemy import delete, insert, select, func
+from sqlalchemy import delete, insert, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from Repository.common import sanitize_import_text
+from Repository.search_engine import (
+    MAX_SEARCH_CANDIDATES,
+    SearchIn,
+    SearchSort,
+    filter_and_rank_items,
+    paginate_items,
+    sort_items,
+)
 
 
 async def get_errors(
@@ -40,37 +48,26 @@ async def search_errors(
     q: str | None = None,
     limit: int = 35,
     offset: int = 0,
+    search_in: SearchIn = "all",
+    sort: SearchSort = "alphabet_asc",
 ) -> List[Error]:
-    query = select(Error)
-    
-    if q:
-        if len(q) < 2:
-            search_pattern = f"%{q}%"
-            query = query.where(
-                (Error.title.ilike(search_pattern))
-                | (Error.description.ilike(search_pattern))
-            )
-            query = query.order_by(Error.order_index.asc())
-        else:
-            relevance = (
-                func.similarity(Error.title, q) * 2
-                + func.similarity(Error.description, q) * 0.5
-            )
-            search_pattern = f"%{q}%"
-            query = query.where(
-                (Error.title.bool_op("%")(q))
-                | (Error.description.bool_op("%")(q))
-                | (Error.title.ilike(search_pattern))
-                | (Error.description.ilike(search_pattern))
-            )
-            query = query.order_by(relevance.desc())
-    else:
-        query = query.order_by(Error.order_index.asc())
-
-    query = query.offset(offset)
-    query = query.limit(limit)
+    query = select(Error).limit(MAX_SEARCH_CANDIDATES)
     result = await session.execute(query)
-    return result.scalars().all()
+    errors = list(result.scalars().all())
+    ranked = filter_and_rank_items(
+        errors,
+        q=q,
+        search_in=search_in,
+        title_getter=lambda item: item.title,
+        description_getter=lambda item: item.description,
+    )
+    sorted_items = sort_items(
+        ranked,
+        sort=sort,
+        title_getter=lambda item: item.title,
+        date_getter=lambda item: getattr(item, "created_at", None),
+    )
+    return paginate_items(sorted_items, offset=offset, limit=limit)
 
 
 async def create_error(

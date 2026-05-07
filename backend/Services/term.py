@@ -6,6 +6,7 @@ from core.schemas.base import PaginationParams
 from core.schemas.term import TermRequest
 from fastapi import HTTPException, UploadFile, status
 from Repository import term as repo
+from Repository.search_engine import SearchIn, SearchSort
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -30,8 +31,10 @@ async def search_terms(
     session: AsyncSession,
     q: str | None,
     pagination: PaginationParams,
+    search_in: SearchIn = "all",
+    sort: SearchSort = "alphabet_asc",
 ):
-    return await repo.search_terms(session, q, pagination)
+    return await repo.search_terms(session, q, pagination, search_in, sort)
 
 
 async def create_term(session: AsyncSession, term: TermRequest):

@@ -15,6 +15,14 @@ from core.models.test import TestSubmission
 from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import load_only, selectinload
+from Repository.search_engine import (
+    MAX_SEARCH_CANDIDATES,
+    SearchIn,
+    SearchSort,
+    filter_and_rank_items,
+    paginate_items,
+    sort_items,
+)
 
 
 async def get_courses(
@@ -106,6 +114,8 @@ async def search_courses(
     q: str | None = None,
     offset: int = 0,
     limit: int = 20,
+    sort: SearchSort = "alphabet_asc",
+    search_in: SearchIn = "all",
     user_id: uuid.UUID | None = None,
     filter_type: (
         Literal["in_progress", "completed", "not_started", "new", "popular"] | None
@@ -129,22 +139,6 @@ async def search_courses(
             )
         )
     )
-
-    if q:
-        if len(q) < 2:
-            search_pattern = f"%{q}%"
-            query = query.where(
-                (Course.title.ilike(search_pattern))
-                | (Course.description.ilike(search_pattern))
-            )
-        else:
-            search_pattern = f"%{q}%"
-            query = query.where(
-                (Course.title.bool_op("%")(q))
-                | (Course.description.bool_op("%")(q))
-                | (Course.title.ilike(search_pattern))
-                | (Course.description.ilike(search_pattern))
-            )
 
     if level is not None:
         query = query.where(Course.level == level)
@@ -191,19 +185,23 @@ async def search_courses(
             CourseEnrollment.user_id == user_id,
             CourseEnrollment.completed_at.is_not(None),
         )
-    if filter_type != "popular":
-        if q and len(q) >= 2:
-            relevance = (
-                func.similarity(Course.title, q) * 2
-                + func.similarity(Course.description, q) * 0.5
-            )
-            query = query.order_by(relevance.desc())
-        else:
-            query = query.order_by(Course.title.asc())
-
-    query = query.offset(offset).limit(limit)
+    query = query.limit(MAX_SEARCH_CANDIDATES)
     result = await session.execute(query)
-    return result.scalars().all()
+    courses = list(result.scalars().all())
+    ranked = filter_and_rank_items(
+        courses,
+        q=q,
+        search_in=search_in,
+        title_getter=lambda item: item.title,
+        description_getter=lambda item: item.description,
+    )
+    sorted_items = sort_items(
+        ranked,
+        sort=sort,
+        title_getter=lambda item: item.title,
+        date_getter=lambda item: item.created_at,
+    )
+    return paginate_items(sorted_items, offset=offset, limit=limit)
 
 
 async def delete_courses(session: AsyncSession, courses_id: list[uuid.UUID]):

@@ -5,6 +5,7 @@ from core.models.error import Error
 from core.schemas.error import ErrorCreate, ErrorUpdate
 from fastapi import UploadFile
 from Repository import error as repo
+from Repository.search_engine import SearchIn, SearchSort
 from sqlalchemy.ext.asyncio import AsyncSession
 from Repository.common import ensure_unique_field
 
@@ -27,8 +28,10 @@ async def search_errors(
     q: str | None = None,
     limit: int = 35,
     offset: int = 0,
+    search_in: SearchIn = "all",
+    sort: SearchSort = "alphabet_asc",
 ) -> List[Error]:
-    return await repo.search_errors(session, q, limit, offset)
+    return await repo.search_errors(session, q, limit, offset, search_in, sort)
 
 
 async def create_error(
