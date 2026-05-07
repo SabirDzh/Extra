@@ -88,12 +88,12 @@ def _extract_detail_attributes(
 
     filtered: dict[str, object] = {}
     range_suffixes = ("_min", "_max", "_from", "_to")
-    grouped_numeric: dict[tuple[str, str], list[float]] = {}
+    grouped_numeric_max: dict[tuple[str, str], float] = {}
 
     # Example we collapse:
     # "Максимальное давление в системе 10 бар"
     # "Максимальное давление в системе 6 бар"
-    # -> "Максимальное давление в системе", + _min/_max
+    # -> keep only max: "Максимальное давление в системе 10 бар"
     numeric_tail_pattern = re.compile(
         r"^(?P<base>.*?\D)\s*(?P<value>\d+(?:[.,]\d+)?)\s*(?P<unit>[A-Za-zА-Яа-я%°/]+)$"
     )
@@ -113,7 +113,9 @@ def _extract_detail_attributes(
                 num = None
 
             if num is not None and base:
-                grouped_numeric.setdefault((base, unit), []).append(num)
+                prev = grouped_numeric_max.get((base, unit))
+                if prev is None or num > prev:
+                    grouped_numeric_max[(base, unit)] = num
                 continue
 
         filtered[key] = True
@@ -122,22 +124,9 @@ def _extract_detail_attributes(
             if range_key in raw_attributes:
                 filtered[range_key] = raw_attributes[range_key]
 
-    for (base, unit), values in grouped_numeric.items():
-        if not values:
-            continue
-        if len(values) == 1:
-            value_text = str(values[0]).rstrip("0").rstrip(".")
-            filtered[f"{base} {value_text} {unit}"] = True
-            continue
-        filtered[base] = True
-        min_val = min(values)
-        max_val = max(values)
-        filtered[f"{base}_min"] = min_val
-        filtered[f"{base}_max"] = max_val
-        filtered[f"{base}_unit"] = unit
-        min_text = str(min_val).rstrip("0").rstrip(".")
-        max_text = str(max_val).rstrip("0").rstrip(".")
-        filtered[f"{base}_range"] = f"{min_text}-{max_text} {unit}"
+    for (base, unit), max_value in grouped_numeric_max.items():
+        value_text = str(max_value).rstrip("0").rstrip(".")
+        filtered[f"{base} {value_text} {unit}"] = True
 
     return filtered, str(article) if article is not None else None
 
