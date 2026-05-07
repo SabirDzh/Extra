@@ -1,5 +1,5 @@
-import uuid
-from typing import Any, List
+import logging
+from typing import Any
 
 from core.models.course import Course
 from core.models.error import Error
@@ -11,18 +11,23 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from Repository.search_engine import (
     MAX_SEARCH_CANDIDATES,
+    MIN_RELEVANCE_SCORE,
     SearchIn,
     SearchSort,
-    compute_relevance,
-    exact_title_matches,
+    compute_relevance_breakdown,
     filter_and_rank_items,
     normalize_text,
     paginate_items,
+    prefix_title_matches,
     sort_items,
 )
 
-VERY_CLOSE_SCORE = 85.0
-SIMILAR_SCORE = 55.0
+logger = logging.getLogger(__name__)
+
+CATEGORY_ABS_MIN_SCORE = 45.0
+CATEGORY_NEAR_RATIO = 0.72
+CATEGORY_SIGNAL_ABS_MIN_SCORE = 60.0
+CATEGORY_SIGNAL_NEAR_RATIO = 0.84
 
 
 async def global_search_entities(
@@ -31,6 +36,7 @@ async def global_search_entities(
     limit_per_category: int = 5,
     search_in: SearchIn = "all",
     sort: SearchSort = "alphabet_asc",
+    debug: bool = False,
 ) -> dict:
     empty_result: dict[str, list[Any]] = {
         "courses": [],
@@ -43,7 +49,6 @@ async def global_search_entities(
 
     async def search_single_model(model):
         stmt = select(model).limit(MAX_SEARCH_CANDIDATES)
-
 
         if hasattr(model, "is_published"):
             stmt = stmt.where(model.is_published)
@@ -60,43 +65,57 @@ async def global_search_entities(
                 "items": paged,
                 "top_score": 0.0,
                 "has_exact": False,
+                "has_prefix": False,
             }
 
         title_getter = lambda item: getattr(item, title_field.key, "")
         desc_getter = lambda item: getattr(item, desc_field.key, "")
 
-        ranked = filter_and_rank_items(
+        query = normalize_text(q)
+        if not query:
+            # Browse mode: deterministic client-facing ordering.
+            sorted_items = sort_items(
+                items,
+                sort=sort,
+                title_getter=title_getter,
+                date_getter=lambda item: getattr(item, "created_at", None),
+            )
+            paged_items = paginate_items(sorted_items, 0, limit_per_category)
+            return {
+                "items": paged_items,
+                "top_score": 0.0,
+                "has_exact": False,
+                "has_prefix": False,
+            }
+
+        # Query mode: relevance order only. UI order must not affect ranking.
+        ranked_items = filter_and_rank_items(
             items,
-            q=q,
+            q=query,
             search_in=search_in,
             title_getter=title_getter,
             description_getter=desc_getter,
         )
-        sorted_items = sort_items(
-            ranked,
-            sort=sort,
-            title_getter=title_getter,
-            date_getter=lambda item: getattr(item, "created_at", None),
-        )
-        paged_items = paginate_items(sorted_items, 0, limit_per_category)
+        paged_items = paginate_items(ranked_items, 0, limit_per_category)
 
-        query = normalize_text(q)
-        exact_items = exact_title_matches(items, query, title_getter) if query else []
-        has_exact = len(exact_items) > 0
+        has_exact = any(normalize_text(title_getter(item)) == query for item in items)
+        has_prefix = len(prefix_title_matches(items, query, title_getter)) > 0
         top_score = 0.0
-        if query and sorted_items:
-            top = sorted_items[0]
-            top_score = compute_relevance(
+        if ranked_items:
+            top = ranked_items[0]
+            top_breakdown = compute_relevance_breakdown(
                 query=query,
                 title=normalize_text(title_getter(top)),
                 description=normalize_text(desc_getter(top)),
                 search_in=search_in,
             )
+            top_score = float(top_breakdown["score"])
 
         return {
             "items": paged_items,
             "top_score": top_score,
             "has_exact": has_exact,
+            "has_prefix": has_prefix,
         }
 
     category_models = {
@@ -118,34 +137,43 @@ async def global_search_entities(
             for key, value in category_results.items()
         }
 
-    exact_categories = {
-        key for key, value in category_results.items() if value["has_exact"]
-    }
-    very_close_categories = {
-        key for key, value in category_results.items() if value["top_score"] >= VERY_CLOSE_SCORE
-    }
-    similar_categories = {
-        key for key, value in category_results.items() if value["top_score"] >= SIMILAR_SCORE
-    }
+    exact_categories = {k for k, v in category_results.items() if v["has_exact"]}
+    prefix_categories = {k for k, v in category_results.items() if v["has_prefix"]}
+    category_scores = {k: float(v["top_score"]) for k, v in category_results.items()}
+    best_category, best_score = max(category_scores.items(), key=lambda item: item[1])
+
+    if debug or logger.isEnabledFor(logging.DEBUG):
+        logger.debug(
+            "global_search score map query=%r exact=%s prefix=%s scores=%s",
+            q,
+            sorted(exact_categories),
+            sorted(prefix_categories),
+            category_scores,
+        )
+
+    if best_score <= 0:
+        return empty_result
 
     chosen_categories: set[str] = set()
+    signal_categories = exact_categories | prefix_categories
 
-    if exact_categories:
-        chosen_categories |= exact_categories
-        chosen_categories |= similar_categories
-    elif very_close_categories:
-        chosen_categories |= very_close_categories
-        chosen_categories |= similar_categories
+    if signal_categories:
+        signal_best_score = max(category_scores[k] for k in signal_categories)
+        threshold = max(
+            CATEGORY_SIGNAL_ABS_MIN_SCORE,
+            signal_best_score * CATEGORY_SIGNAL_NEAR_RATIO,
+        )
+        chosen_categories = {
+            k for k, score in category_scores.items() if score >= threshold
+        }
+        chosen_categories |= signal_categories
     else:
-        chosen_categories |= similar_categories
-        if not chosen_categories:
-            best_category = max(
-                category_results.items(),
-                key=lambda item: item[1]["top_score"],
-            )[0]
-            if category_results[best_category]["top_score"] <= 0:
-                return empty_result
-            chosen_categories.add(best_category)
+        threshold = max(CATEGORY_ABS_MIN_SCORE, best_score * CATEGORY_NEAR_RATIO)
+        chosen_categories = {
+            k for k, score in category_scores.items() if score >= threshold
+        }
+        if not chosen_categories and best_score >= MIN_RELEVANCE_SCORE:
+            chosen_categories = {best_category}
 
     result = empty_result.copy()
     for key in chosen_categories:
