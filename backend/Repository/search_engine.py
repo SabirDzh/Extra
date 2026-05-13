@@ -131,6 +131,29 @@ def exact_title_matches(
     ]
 
 
+def is_title_substring_match(query: str, title: str) -> bool:
+    normalized_query = normalize_text(query)
+    normalized_title = normalize_text(title)
+    if not normalized_query or not normalized_title:
+        return False
+    return normalized_query in normalized_title
+
+
+def strict_title_matches(
+    items: Iterable[T],
+    query: str,
+    title_getter: Callable[[T], str | None],
+) -> list[T]:
+    normalized_query = normalize_text(query)
+    if not normalized_query:
+        return []
+    return [
+        item
+        for item in items
+        if is_title_substring_match(normalized_query, title_getter(item) or "")
+    ]
+
+
 def sort_items(
     items: list[T],
     sort: SearchSort,
@@ -187,6 +210,13 @@ def filter_and_rank_items(
 
     scored: list[tuple[tuple[float, ...], T]] = []
     for item in items:
+        if search_in in {"title", "filters"}:
+            if not is_title_substring_match(query, title_getter(item) or ""):
+                continue
+        elif search_in == "all":
+            title = normalize_text(title_getter(item) or "")
+            if not any(word in title for word in query.split()):
+                continue
         breakdown = compute_relevance_breakdown(
             query=query,
             title=normalize_text(title_getter(item)),
