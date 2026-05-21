@@ -18,6 +18,7 @@ __all__ = (
     "FAQ",
     "Error",
     "Recommendation",
+    "Notification",
 )
 
 from .access_token import AccessToken

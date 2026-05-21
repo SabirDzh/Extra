@@ -87,6 +87,13 @@ async def auto_grade_submission(
     else:
         submission.is_graded = not has_manual_questions
 
+    if not submission.is_graded:
+        from core.models.user import User
+        from Services.notifications import notify_manual_test_required
+        user = await db.get(User, submission.user_id)
+        user_name = user.full_name if user else "Неизвестный пользователь"
+        await notify_manual_test_required(db, submission, user_name)
+
     if block.block_type == BlockType.auto_test or (submission.is_graded and submission.score > 0):
 
 

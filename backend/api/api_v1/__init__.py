@@ -20,6 +20,7 @@ from .service import router as service_router
 from .term import router as term_router
 from .tests import router as tests_router
 from .users import router as users_router
+from .notifications import router as notifications_router
 
 http_bearer = HTTPBearer(auto_error=False)
 
@@ -42,3 +43,4 @@ router.include_router(term_router)
 router.include_router(search_router)
 router.include_router(error_router)
 router.include_router(recommendations_router)
+router.include_router(notifications_router)

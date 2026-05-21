@@ -23,6 +23,7 @@ if TYPE_CHECKING:
     from core.models.course import Course, CourseEnrollment
     from core.models.progress import UserBlockProgress
     from core.models.test import TestSubmission
+    from core.models.notification import Notification
 
 
 class SQLAlchemyUserDatabase(SQLAlchemyUserDatabaseGeneric):
@@ -90,6 +91,12 @@ class User(IdUuidPkMixin, Base):
     certificates: Mapped[list["Certificate"]] = relationship(
         back_populates="user",
         cascade="all, delete-orphan",
+    )
+
+    notifications: Mapped[list["Notification"]] = relationship(
+        back_populates="user",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
     )
     @property
     def full_name(self) -> str:

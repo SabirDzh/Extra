@@ -105,7 +105,11 @@ async def create_course(
     db: Session,
     admin: AdminUser,
 ):
-    return await course_crud.create_course(db, data, admin.id)
+    course = await course_crud.create_course(db, data, admin.id)
+    if course.is_published:
+        from Services.notifications import notify_new_course
+        await notify_new_course(db, course)
+    return course
 
 
 @router.get("/{course_id}", response_model=CourseRead)
@@ -166,7 +170,14 @@ async def update_course(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Course not found"
         )
-    return await course_crud.update_course(db, course, data)
+    was_published = course.is_published
+    updated_course = await course_crud.update_course(db, course, data)
+    
+    if not was_published and updated_course.is_published:
+        from Services.notifications import notify_new_course
+        await notify_new_course(db, updated_course)
+        
+    return updated_course
 
 
 @router.delete("/{course_id}", status_code=status.HTTP_204_NO_CONTENT)
