@@ -215,7 +215,8 @@ def filter_and_rank_items(
                 continue
         elif search_in == "all":
             title = normalize_text(title_getter(item) or "")
-            if not any(word in title for word in query.split()):
+            desc = normalize_text(description_getter(item) or "")
+            if not any(word in title for word in query.split()) and not any(word in desc for word in query.split()):
                 continue
         breakdown = compute_relevance_breakdown(
             query=query,
