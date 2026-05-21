@@ -35,6 +35,8 @@ async def send_new_user_notification(user: User) -> None:
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+import uuid_utils
+from datetime import datetime, timezone
 from core.models.notification import Notification
 from Domain.Enums.notification import NotificationType
 from Domain.Enums.user_role import UserRole
@@ -59,14 +61,17 @@ async def notify_new_course(db: AsyncSession, course) -> None:
     user_ids = result.scalars().all()
     
     notifications = []
+    now = datetime.now(timezone.utc)
     for uid in user_ids:
         notifications.append(
             Notification(
+                id=uuid_utils.uuid7(),
                 user_id=uid,
                 type=NotificationType.new_course,
                 title=f"Новый курс: {course.title}",
                 message=f"Доступен новый курс '{course.title}'. Приглашаем к изучению!",
-                reference_id=course.id
+                reference_id=course.id,
+                created_at=now
             )
         )
     
@@ -80,14 +85,17 @@ async def notify_manual_test_required(db: AsyncSession, submission, user_name: s
     admin_ids = result.scalars().all()
     
     notifications = []
+    now = datetime.now(timezone.utc)
     for aid in admin_ids:
         notifications.append(
             Notification(
+                id=uuid_utils.uuid7(),
                 user_id=aid,
                 type=NotificationType.manual_test_check,
                 title="Требуется проверка теста",
                 message=f"Пользователь {user_name} прошел тест, который требует ручной проверки.",
-                reference_id=submission.id
+                reference_id=submission.id,
+                created_at=now
             )
         )
         

@@ -36,3 +36,4 @@ from .recommendation import Recommendation
 from .term import Term
 from .test import AnswerOption, Question, TestAnswer, TestSubmission
 from .user import User
+from .notification import Notification
