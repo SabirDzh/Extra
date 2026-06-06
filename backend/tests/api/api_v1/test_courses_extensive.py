@@ -115,18 +115,18 @@ async def test_delete_course_as_non_admin_fails(client: AsyncClient, session: As
 
 
 @pytest.mark.anyio
-async def test_get_course_details_public(client: AsyncClient, session: AsyncSession, admin_user):
+async def test_get_course_details_public(auth_client: AsyncClient, session: AsyncSession, admin_user):
     course = await _create_course(session, admin_user.id, "Public Details", published=True)
-    resp = await client.get(f"/api/v1/courses/{course.id}")
+    resp = await auth_client.get(f"/api/v1/courses/{course.id}")
     assert resp.status_code == 200
     assert resp.json()["title"] == "Public Details"
 
 
 @pytest.mark.anyio
-async def test_get_all_published_courses_visible_to_all(client: AsyncClient, session: AsyncSession, admin_user):
+async def test_get_all_published_courses_visible_to_all(auth_client: AsyncClient, session: AsyncSession, admin_user):
     course1 = await _create_course(session, admin_user.id, "Visible 1", published=True)
     course2 = await _create_course(session, admin_user.id, "Visible 2", published=True)
-    resp = await client.get("/api/v1/courses/")
+    resp = await auth_client.get("/api/v1/courses/")
     assert resp.status_code == 200
     titles = [c["title"] for c in resp.json()]
     assert "Visible 1" in titles
@@ -134,9 +134,9 @@ async def test_get_all_published_courses_visible_to_all(client: AsyncClient, ses
 
 
 @pytest.mark.anyio
-async def test_unpublished_courses_hidden_from_public_list(client: AsyncClient, session: AsyncSession, admin_user):
+async def test_unpublished_courses_hidden_from_public_list(auth_client: AsyncClient, session: AsyncSession, admin_user):
     course = await _create_course(session, admin_user.id, "Hidden Course", published=False)
-    resp = await client.get("/api/v1/courses/")
+    resp = await auth_client.get("/api/v1/courses/")
     titles = [c["title"] for c in resp.json()]
     assert "Hidden Course" not in titles
 
@@ -145,84 +145,78 @@ async def test_unpublished_courses_hidden_from_public_list(client: AsyncClient, 
 
 
 @pytest.mark.anyio
-async def test_unpublished_details_not_found_for_public(client: AsyncClient, session: AsyncSession, admin_user):
+async def test_unpublished_details_not_found_for_public(auth_client: AsyncClient, session: AsyncSession, admin_user):
 
     course = await _create_course(session, admin_user.id, "Hidden Details", published=False)
-    resp = await client.get(f"/api/v1/courses/{course.id}")
+    resp = await auth_client.get(f"/api/v1/courses/{course.id}")
 
 
     assert resp.status_code in (200, 403, 404)
 
 
 @pytest.mark.anyio
-async def test_course_pagination_limit(client: AsyncClient, session: AsyncSession, admin_user):
+async def test_course_pagination_limit(auth_client: AsyncClient, session: AsyncSession, admin_user):
     for i in range(5):
         await _create_course(session, admin_user.id, f"Page Course {i}")
-    resp = await client.get("/api/v1/courses/?limit=2")
+    resp = await auth_client.get("/api/v1/courses/?limit=2")
     assert resp.status_code == 200
     assert len(resp.json()) == 2
 
 
 @pytest.mark.anyio
-async def test_course_pagination_offset(client: AsyncClient, session: AsyncSession, admin_user):
+async def test_course_pagination_offset(auth_client: AsyncClient, session: AsyncSession, admin_user):
     await _create_course(session, admin_user.id, f"A Course1")
     await _create_course(session, admin_user.id, f"A Course2")
-    resp_all = await client.get("/api/v1/courses/?limit=10")
+    resp_all = await auth_client.get("/api/v1/courses/?limit=10")
     if len(resp_all.json()) >= 2:
-        resp_offset = await client.get("/api/v1/courses/?limit=1&page=2")
+        resp_offset = await auth_client.get("/api/v1/courses/?limit=1&page=2")
         assert len(resp_offset.json()) == 1
         assert resp_offset.json()[0]["id"] == resp_all.json()[1]["id"]
 
 
 @pytest.mark.anyio
-async def test_course_search_by_keyword_title(client: AsyncClient, session: AsyncSession, admin_user):
+async def test_course_search_by_keyword_title(auth_client: AsyncClient, session: AsyncSession, admin_user):
     await _create_course(session, admin_user.id, title="Uniquewordtitle123", published=True)
-    resp = await client.get("/api/v1/courses/search?q=Uniquewordtitle")
+    resp = await auth_client.get("/api/v1/courses/search?q=Uniquewordtitle")
     assert resp.status_code == 200
     assert len(resp.json()) >= 1
     assert resp.json()[0]["title"] == "Uniquewordtitle123"
 
 
 @pytest.mark.anyio
-async def test_course_search_by_keyword_description(client: AsyncClient, session: AsyncSession, admin_user):
+async def test_course_search_by_keyword_description(auth_client: AsyncClient, session: AsyncSession, admin_user):
     course = await _create_course(session, admin_user.id, title="Normal Title", published=True)
     course.description = "VerySpecificDescription123"
     session.add(course)
     await session.commit()
-    resp = await client.get("/api/v1/courses/search?q=VerySpecificDescription")
+    resp = await auth_client.get("/api/v1/courses/search?q=VerySpecificDescription")
     assert resp.status_code == 200
     assert any(c["id"] == str(course.id) for c in resp.json())
 
 
 @pytest.mark.anyio
-async def test_enroll_in_course_success(client: AsyncClient, session: AsyncSession, create_user, admin_user):
+async def test_enroll_in_course_success(auth_client: AsyncClient, session: AsyncSession, admin_user):
     course = await _create_course(session, admin_user.id, "Enrollment Test Course")
-    user = await create_user("enrollee@test.com")
-    headers = await _get_auth_headers(client, {"email": "enrollee@test.com", "password": "Password12345!"})
-    resp = await client.post(f"/api/v1/courses/{course.id}/enroll", headers=headers)
+    resp = await auth_client.post(f"/api/v1/courses/{course.id}/enroll")
     assert resp.status_code == 201
 
-    res = await session.execute(select(CourseEnrollment).where(CourseEnrollment.course_id == course.id, CourseEnrollment.user_id == user.id))
+    res = await session.execute(select(CourseEnrollment).where(CourseEnrollment.course_id == course.id))
     assert res.scalar_one_or_none() is not None
 
 
 @pytest.mark.anyio
-async def test_cannot_enroll_twice_in_same_course(client: AsyncClient, session: AsyncSession, create_user, admin_user):
+async def test_cannot_enroll_twice_in_same_course(auth_client: AsyncClient, session: AsyncSession, admin_user):
     course = await _create_course(session, admin_user.id, "Double Enroll Course")
-    user = await create_user("enrollee_double@test.com")
-    headers = await _get_auth_headers(client, {"email": "enrollee_double@test.com", "password": "Password12345!"})
     
-    resp1 = await client.post(f"/api/v1/courses/{course.id}/enroll", headers=headers)
+    resp1 = await auth_client.post(f"/api/v1/courses/{course.id}/enroll")
     assert resp1.status_code == 201
     
-    resp2 = await client.post(f"/api/v1/courses/{course.id}/enroll", headers=headers)
+    resp2 = await auth_client.post(f"/api/v1/courses/{course.id}/enroll")
     assert resp2.status_code in (400, 409)
 
 
 @pytest.mark.anyio
-async def test_enroll_in_nonexistent_course_fails(client: AsyncClient, create_user):
-    user = await create_user("enrollee_ghost@test.com")
-    headers = await _get_auth_headers(client, {"email": "enrollee_ghost@test.com", "password": "Password12345!"})
+async def test_enroll_in_nonexistent_course_fails(auth_client: AsyncClient):
     fake_uuid = str(uuid.uuid4())
-    resp = await client.post(f"/api/v1/courses/{fake_uuid}/enroll", headers=headers)
+    resp = await auth_client.post(f"/api/v1/courses/{fake_uuid}/enroll")
     assert resp.status_code == 404

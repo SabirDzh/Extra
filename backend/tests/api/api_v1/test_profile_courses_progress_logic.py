@@ -40,7 +40,7 @@ async def _create_user(session: AsyncSession, email: str):
         is_active=True,
         is_superuser=False,
         is_verified=True,
-        role="buyer",
+        role="installer",
         fullname="User",
     )
     session.add(user)
@@ -137,7 +137,7 @@ SCENARIOS = [
 @pytest.mark.anyio
 @pytest.mark.parametrize("_name,block_types,expected_total_tests,expected_completed_tests", SCENARIOS)
 async def test_profile_courses_progress_matches_courses_logic(
-    client: AsyncClient,
+    auth_client: AsyncClient,
     session: AsyncSession,
     _name: str,
     block_types: list[BlockType],
@@ -152,13 +152,13 @@ async def test_profile_courses_progress_matches_courses_logic(
     await _enroll(session, user.id, course.id)
     await _complete_test_blocks(session, user.id, blocks)
 
-    login = await client.post(
+    login = await auth_client.post(
         "/api/v1/auth/login",
         data={"username": user.email, "password": "Password12345!"},
     )
     token = login.cookies.get("fastapiusersauth") or ""
 
-    resp = await client.get(
+    resp = await auth_client.get(
         "/api/v1/profile/courses-progress",
         cookies={"fastapiusersauth": token} if token else {},
     )
@@ -187,7 +187,7 @@ async def test_profile_courses_progress_matches_courses_logic(
     assert row["status"] == expected_status
 
     # Course-level percent endpoint uses test blocks only.
-    course_progress = await client.get(
+    course_progress = await auth_client.get(
         f"/api/v1/courses/{course.id}/progress",
         cookies={"fastapiusersauth": token} if token else {},
     )

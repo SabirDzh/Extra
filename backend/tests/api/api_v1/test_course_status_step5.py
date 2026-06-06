@@ -66,7 +66,7 @@ async def _complete_block(session: AsyncSession, user_id: uuid.UUID, block: Bloc
 
 @pytest.mark.anyio
 async def test_status_not_started_for_anonymous(
-    client: AsyncClient,
+    auth_client: AsyncClient,
     session: AsyncSession,
 ):
     """
@@ -75,14 +75,14 @@ async def test_status_not_started_for_anonymous(
     course = await _create_course(session, "Anon Status Course")
     await _add_block(session, course.id, "Block 1")
 
-    resp = await client.get(f"/api/v1/courses/{course.id}")
+    resp = await auth_client.get(f"/api/v1/courses/{course.id}")
     assert resp.status_code == 200
     assert resp.json()["progress"]["status"] == "not_started"
 
 
 @pytest.mark.anyio
 async def test_status_not_started_when_enrolled_but_no_blocks_done(
-    client: AsyncClient,
+    auth_client: AsyncClient,
     session: AsyncSession,
     create_user,
 ):
@@ -94,13 +94,13 @@ async def test_status_not_started_when_enrolled_but_no_blocks_done(
     await _add_block(session, course.id)
     await _enroll(session, user.id, course.id)
 
-    resp = await client.post(
+    resp = await auth_client.post(
         "/api/v1/auth/login",
         data={"username": "enrolled_noblock@test.com", "password": "Password12345!"},
     )
     token = resp.cookies.get("fastapiusersauth", "")
 
-    resp2 = await client.get(
+    resp2 = await auth_client.get(
         f"/api/v1/courses/{course.id}",
         cookies={"fastapiusersauth": token} if token else {},
     )
@@ -110,7 +110,7 @@ async def test_status_not_started_when_enrolled_but_no_blocks_done(
 
 @pytest.mark.anyio
 async def test_status_in_progress_when_partial_blocks_done(
-    client: AsyncClient,
+    auth_client: AsyncClient,
     session: AsyncSession,
     create_user,
 ):
@@ -126,13 +126,13 @@ async def test_status_in_progress_when_partial_blocks_done(
     await _enroll(session, user.id, course.id)
     await _complete_block(session, user.id, blocks[0])
 
-    resp = await client.post(
+    resp = await auth_client.post(
         "/api/v1/auth/login",
         data={"username": "partial_status@test.com", "password": "Password12345!"},
     )
     token = resp.cookies.get("fastapiusersauth", "")
 
-    resp2 = await client.get(
+    resp2 = await auth_client.get(
         f"/api/v1/courses/{course.id}",
         cookies={"fastapiusersauth": token} if token else {},
     )
@@ -147,7 +147,7 @@ async def test_status_in_progress_when_partial_blocks_done(
 
 @pytest.mark.anyio
 async def test_status_completed_when_all_blocks_done(
-    client: AsyncClient,
+    auth_client: AsyncClient,
     session: AsyncSession,
     create_user,
 ):
@@ -169,13 +169,13 @@ async def test_status_completed_when_all_blocks_done(
     from Services.course import update_course_completion_status
     await update_course_completion_status(session, user.id, course.id)
 
-    resp = await client.post(
+    resp = await auth_client.post(
         "/api/v1/auth/login",
         data={"username": "all_done@test.com", "password": "Password12345!"},
     )
     token = resp.cookies.get("fastapiusersauth", "")
 
-    resp2 = await client.get(
+    resp2 = await auth_client.get(
         f"/api/v1/courses/{course.id}",
         cookies={"fastapiusersauth": token} if token else {},
     )
@@ -190,7 +190,7 @@ async def test_status_completed_when_all_blocks_done(
 
 @pytest.mark.anyio
 async def test_status_in_list_endpoint(
-    client: AsyncClient,
+    auth_client: AsyncClient,
     session: AsyncSession,
 ):
     """
@@ -200,7 +200,7 @@ async def test_status_in_list_endpoint(
     for i in range(3):
         await _create_course(session, f"List Status Course {i}")
 
-    resp = await client.get("/api/v1/courses/")
+    resp = await auth_client.get("/api/v1/courses/")
     assert resp.status_code == 200
     courses = resp.json()
     assert len(courses) >= 3
@@ -211,7 +211,7 @@ async def test_status_in_list_endpoint(
 
 @pytest.mark.anyio
 async def test_course_without_blocks_status_is_not_started(
-    client: AsyncClient,
+    auth_client: AsyncClient,
     session: AsyncSession,
     create_user,
 ):
@@ -224,13 +224,13 @@ async def test_course_without_blocks_status_is_not_started(
 
     await _enroll(session, user.id, course.id)
 
-    resp = await client.post(
+    resp = await auth_client.post(
         "/api/v1/auth/login",
         data={"username": "no_blocks_enrolled@test.com", "password": "Password12345!"},
     )
     token = resp.cookies.get("fastapiusersauth", "")
 
-    resp2 = await client.get(
+    resp2 = await auth_client.get(
         f"/api/v1/courses/{course.id}",
         cookies={"fastapiusersauth": token} if token else {},
     )

@@ -76,7 +76,7 @@ async def _complete_blocks(
 
 @pytest.mark.anyio
 async def test_anonymous_user_gets_zero_progress_not_null(
-    client: AsyncClient,
+    auth_client: AsyncClient,
     session: AsyncSession,
     superuser_token_headers: dict,
 ):
@@ -87,7 +87,7 @@ async def test_anonymous_user_gets_zero_progress_not_null(
     course = await _create_course(session, "Anon Course")
     await _add_blocks(session, course.id, 5)
 
-    resp = await client.get("/api/v1/courses/")
+    resp = await auth_client.get("/api/v1/courses/")
     assert resp.status_code == 200
 
     courses = resp.json()
@@ -103,7 +103,7 @@ async def test_anonymous_user_gets_zero_progress_not_null(
 
 @pytest.mark.anyio
 async def test_enrolled_but_no_blocks_completed(
-    client: AsyncClient,
+    auth_client: AsyncClient,
     session: AsyncSession,
     create_user,
 ):
@@ -116,13 +116,13 @@ async def test_enrolled_but_no_blocks_completed(
     await _add_blocks(session, course.id, 3)
     await _enroll(session, user.id, course.id)
 
-    resp = await client.post(
+    resp = await auth_client.post(
         "/api/v1/auth/login",
         data={"username": "enrolled_zero@test.com", "password": "Password12345!"},
     )
     token = resp.cookies.get("fastapiusersauth") or ""
 
-    resp2 = await client.get(
+    resp2 = await auth_client.get(
         f"/api/v1/courses/{course.id}",
         cookies={"fastapiusersauth": token} if token else {},
     )
@@ -136,7 +136,7 @@ async def test_enrolled_but_no_blocks_completed(
 
 @pytest.mark.anyio
 async def test_course_with_zero_blocks_returns_zero_total(
-    client: AsyncClient,
+    auth_client: AsyncClient,
     session: AsyncSession,
 ):
     """
@@ -146,7 +146,7 @@ async def test_course_with_zero_blocks_returns_zero_total(
     course = await _create_course(session, "Empty Blocks Course")
 
 
-    resp = await client.get(f"/api/v1/courses/{course.id}")
+    resp = await auth_client.get(f"/api/v1/courses/{course.id}")
     assert resp.status_code == 200
 
     progress = resp.json()["progress"]
@@ -158,7 +158,7 @@ async def test_course_with_zero_blocks_returns_zero_total(
 
 @pytest.mark.anyio
 async def test_progress_total_reflects_actual_block_count(
-    client: AsyncClient,
+    auth_client: AsyncClient,
     session: AsyncSession,
 ):
     """
@@ -178,7 +178,7 @@ async def test_progress_total_reflects_actual_block_count(
         await _add_blocks(session, course.id, block_count)
         created.append((course.id, block_count))
 
-    resp = await client.get("/api/v1/courses/?limit=100")
+    resp = await auth_client.get("/api/v1/courses/?limit=100")
     assert resp.status_code == 200
 
     courses_map = {c["id"]: c for c in resp.json()}
@@ -196,7 +196,7 @@ async def test_progress_total_reflects_actual_block_count(
 
 @pytest.mark.anyio
 async def test_list_courses_all_have_progress_field(
-    client: AsyncClient,
+    auth_client: AsyncClient,
     session: AsyncSession,
 ):
     """
@@ -207,7 +207,7 @@ async def test_list_courses_all_have_progress_field(
         course = await _create_course(session, f"List Course {i}")
         await _add_blocks(session, course.id, i + 1)
 
-    resp = await client.get("/api/v1/courses/?limit=50")
+    resp = await auth_client.get("/api/v1/courses/?limit=50")
     assert resp.status_code == 200
 
     courses = resp.json()
@@ -227,7 +227,7 @@ async def test_list_courses_all_have_progress_field(
 
 @pytest.mark.anyio
 async def test_enrolled_user_sees_correct_partial_progress(
-    client: AsyncClient,
+    auth_client: AsyncClient,
     session: AsyncSession,
     create_user,
 ):
@@ -243,13 +243,13 @@ async def test_enrolled_user_sees_correct_partial_progress(
 
     await _complete_blocks(session, user.id, blocks[:4])
 
-    resp = await client.post(
+    resp = await auth_client.post(
         "/api/v1/auth/login",
         data={"username": "partial_progress@test.com", "password": "Password12345!"},
     )
     token = resp.cookies.get("fastapiusersauth") or ""
 
-    resp2 = await client.get(
+    resp2 = await auth_client.get(
         f"/api/v1/courses/{course.id}",
         cookies={"fastapiusersauth": token} if token else {},
     )

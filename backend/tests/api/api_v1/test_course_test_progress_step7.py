@@ -67,7 +67,7 @@ async def _complete_block(session: AsyncSession, user_id: uuid.UUID, block: Bloc
 
 @pytest.mark.anyio
 async def test_total_excludes_lesson_blocks(
-    client: AsyncClient,
+    auth_client: AsyncClient,
     session: AsyncSession,
 ):
     """
@@ -79,7 +79,7 @@ async def test_total_excludes_lesson_blocks(
     await _add_block(session, course.id, BlockType.lesson, "Lesson 2")
     await _add_block(session, course.id, BlockType.auto_test, "Test 1")
 
-    resp = await client.get(f"/api/v1/courses/{course.id}")
+    resp = await auth_client.get(f"/api/v1/courses/{course.id}")
     assert resp.status_code == 200
     progress = resp.json()["progress"]
     assert progress["total"] == 1, (
@@ -89,7 +89,7 @@ async def test_total_excludes_lesson_blocks(
 
 @pytest.mark.anyio
 async def test_total_counts_both_auto_and_manual_test(
-    client: AsyncClient,
+    auth_client: AsyncClient,
     session: AsyncSession,
 ):
     """
@@ -100,7 +100,7 @@ async def test_total_counts_both_auto_and_manual_test(
     await _add_block(session, course.id, BlockType.manual_test, "Manual Test")
     await _add_block(session, course.id, BlockType.lesson, "Intro Lesson")
 
-    resp = await client.get(f"/api/v1/courses/{course.id}")
+    resp = await auth_client.get(f"/api/v1/courses/{course.id}")
     assert resp.status_code == 200
     progress = resp.json()["progress"]
     assert progress["total"] == 2
@@ -108,7 +108,7 @@ async def test_total_counts_both_auto_and_manual_test(
 
 @pytest.mark.anyio
 async def test_completed_ignores_lesson_completion(
-    client: AsyncClient,
+    auth_client: AsyncClient,
     session: AsyncSession,
     create_user,
 ):
@@ -125,13 +125,13 @@ async def test_completed_ignores_lesson_completion(
 
     await _complete_block(session, user.id, lesson)
 
-    resp = await client.post(
+    resp = await auth_client.post(
         "/api/v1/auth/login",
         data={"username": "lesson_done@test.com", "password": "Password12345!"},
     )
     token = resp.cookies.get("fastapiusersauth", "")
 
-    resp2 = await client.get(
+    resp2 = await auth_client.get(
         f"/api/v1/courses/{course.id}",
         cookies={"fastapiusersauth": token} if token else {},
     )
@@ -143,7 +143,7 @@ async def test_completed_ignores_lesson_completion(
 
 @pytest.mark.anyio
 async def test_only_lesson_blocks_gives_zero_total(
-    client: AsyncClient,
+    auth_client: AsyncClient,
     session: AsyncSession,
 ):
     """
@@ -154,7 +154,7 @@ async def test_only_lesson_blocks_gives_zero_total(
     await _add_block(session, course.id, BlockType.lesson, "L2")
     await _add_block(session, course.id, BlockType.lesson, "L3")
 
-    resp = await client.get(f"/api/v1/courses/{course.id}")
+    resp = await auth_client.get(f"/api/v1/courses/{course.id}")
     assert resp.status_code == 200
     progress = resp.json()["progress"]
     assert progress["total"] == 0
@@ -164,7 +164,7 @@ async def test_only_lesson_blocks_gives_zero_total(
 
 @pytest.mark.anyio
 async def test_full_test_progress_gives_100_percent(
-    client: AsyncClient,
+    auth_client: AsyncClient,
     session: AsyncSession,
     create_user,
 ):
@@ -188,13 +188,13 @@ async def test_full_test_progress_gives_100_percent(
     from Services.course import update_course_completion_status
     await update_course_completion_status(session, user.id, course.id)
 
-    resp = await client.post(
+    resp = await auth_client.post(
         "/api/v1/auth/login",
         data={"username": "full_test_progress@test.com", "password": "Password12345!"},
     )
     token = resp.cookies.get("fastapiusersauth", "")
 
-    resp2 = await client.get(
+    resp2 = await auth_client.get(
         f"/api/v1/courses/{course.id}",
         cookies={"fastapiusersauth": token} if token else {},
     )
@@ -208,7 +208,7 @@ async def test_full_test_progress_gives_100_percent(
 
 @pytest.mark.anyio
 async def test_partial_test_completion_gives_correct_percent(
-    client: AsyncClient,
+    auth_client: AsyncClient,
     session: AsyncSession,
     create_user,
 ):
@@ -227,13 +227,13 @@ async def test_partial_test_completion_gives_correct_percent(
     await _enroll(session, user.id, course.id)
     await _complete_block(session, user.id, t1)
 
-    resp = await client.post(
+    resp = await auth_client.post(
         "/api/v1/auth/login",
         data={"username": "partial_test@test.com", "password": "Password12345!"},
     )
     token = resp.cookies.get("fastapiusersauth", "")
 
-    resp2 = await client.get(
+    resp2 = await auth_client.get(
         f"/api/v1/courses/{course.id}",
         cookies={"fastapiusersauth": token} if token else {},
     )

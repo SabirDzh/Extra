@@ -149,7 +149,7 @@ async def create_user(session):
         email: str,
         password: str = "Password12345!",
         is_superuser: bool = False,
-        role: str = "user",
+        role: str = "installer",
     ):
         password_helper = PasswordHelper()
         user_dict = {
@@ -168,6 +168,20 @@ async def create_user(session):
         return user
 
     return _create_user
+
+
+@pytest.fixture
+async def auth_client(client, create_user):
+    email = f"auth_{uuid.uuid4().hex}@test.com"
+    password = "Password12345!"
+    await create_user(email, password, role="installer")
+
+    resp = await client.post(
+        "/api/v1/auth/login", data={"username": email, "password": password}
+    )
+    token = resp.cookies.get("fastapiusersauth")
+    client.cookies.set("fastapiusersauth", token)
+    return client
 
 
 @pytest.fixture
