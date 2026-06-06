@@ -1,7 +1,6 @@
 import uuid
 from typing import Annotated, Literal
 
-from core.authentication.fastapi_users import current_active_user, current_optional_user
 from core.config import settings
 from core.models.course import CourseAudience, CourseLevel
 from core.models.db_helper import db_helper
@@ -12,24 +11,24 @@ from Repository.search_engine import SearchIn, SearchSort
 from Services import course as course_crud
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from api.dependencies.authorization import current_admin
+from api.dependencies.authorization import current_admin, current_non_buyer_user
 
 router = APIRouter(
     prefix=settings.api.v1.courses,
     tags=["Courses"],
+    dependencies=[Depends(current_non_buyer_user)],
 )
 
 Session = Annotated[AsyncSession, Depends(db_helper.session_getter)]
 AdminUser = Annotated[User, Depends(current_admin)]
-IsUser = Annotated[User, Depends(current_active_user)]
-OptionalUser = Annotated[User | None, Depends(current_optional_user)]
+NonBuyerUser = Annotated[User, Depends(current_non_buyer_user)]
 
 
 @router.get("/", response_model=list[CourseListRead])
 async def list_courses(
     db: Session,
     pagination: Annotated[PaginationParams, Depends()],
-    user: OptionalUser,
+    user: NonBuyerUser,
     filter_type: (
         Literal["in_progress", "completed", "not_started", "new", "popular"]
         | None
@@ -38,23 +37,17 @@ async def list_courses(
     audience: CourseAudience | None = Query(None, description="Filter by audience"),
     sort: SearchSort = Query("alphabet_asc"),
 ):
-    if filter_type in ["in_progress", "completed", "not_started"] and not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="You must be logged in to use this filter",
-        )
-
     courses = await course_crud.search_courses(
         db,
         offset=pagination.offset,
         limit=pagination.limit,
-        user_id=user.id if user else None,
+        user_id=user.id,
         filter_type=filter_type,
         level=level,
         audience=audience,
         sort=sort,
     )
-    await course_crud.attach_course_progress(db, courses, user.id if user else None)
+    await course_crud.attach_course_progress(db, courses, user.id)
     return courses
 
 
@@ -62,7 +55,7 @@ async def list_courses(
 async def search_courses(
     db: Session,
     pagination: Annotated[PaginationParams, Depends()],
-    user: OptionalUser,
+    user: NonBuyerUser,
     q: str | None = Query(None, description="Search query"),
     filter_type: (
         Literal["in_progress", "completed", "not_started", "new", "popular"]
@@ -75,12 +68,6 @@ async def search_courses(
     search_in: Literal["title", "description", "all"] = Query("all"),
     sort: SearchSort = Query("alphabet_asc"),
 ):
-    if filter_type in ["in_progress", "completed", "not_started"] and not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="You must be logged in to use this filter",
-        )
-
     audience_filter = CourseAudience(audience) if audience else None
 
     courses = await course_crud.search_courses(
@@ -88,14 +75,14 @@ async def search_courses(
         q=q,
         offset=pagination.offset,
         limit=pagination.limit,
-        user_id=user.id if user else None,
+        user_id=user.id,
         filter_type=filter_type,
         level=level,
         audience=audience_filter,
         search_in=search_in,
         sort=sort,
     )
-    await course_crud.attach_course_progress(db, courses, user.id if user else None)
+    await course_crud.attach_course_progress(db, courses, user.id)
     return courses
 
 
@@ -116,18 +103,12 @@ async def create_course(
 async def get_course(
     course_id: uuid.UUID,
     db: Session,
-    user: OptionalUser,
+    user: NonBuyerUser,
     filter_type: (
         Literal["in_progress", "completed", "not_started", "new", "popular"]
         | None
     ) = Query(None, description="Filter type for courses"),
 ):
-    if filter_type in ["in_progress", "completed", "not_started"] and not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="You must be logged in to use this filter",
-        )
-
     course = await course_crud.get_course(db, course_id)
     if not course:
         raise HTTPException(
@@ -135,7 +116,7 @@ async def get_course(
         )
 
 
-    if user and filter_type in ["in_progress", "completed", "not_started"]:
+    if filter_type in ["in_progress", "completed", "not_started"]:
         enrollment = await course_crud.get_enrollment(db, user.id, course_id)
         if filter_type == "not_started" and enrollment:
             raise HTTPException(
@@ -154,7 +135,7 @@ async def get_course(
                 status_code=status.HTTP_404_NOT_FOUND, detail="Course not found"
             )
 
-    await course_crud.attach_course_progress(db, [course], user.id if user else None)
+    await course_crud.attach_course_progress(db, [course], user.id)
     return course
 
 
@@ -198,7 +179,7 @@ async def delete_course(
 async def enroll(
     course_id: uuid.UUID,
     db: Session,
-    user: IsUser,
+    user: NonBuyerUser,
 ):
     course = await course_crud.get_course(db, course_id)
     if not course:
@@ -220,7 +201,7 @@ async def enroll(
 async def get_progress(
     course_id: uuid.UUID,
     db: Session,
-    user: IsUser,
+    user: NonBuyerUser,
 ):
     course = await course_crud.get_course(db, course_id, load_blocks=True)
     if not course:
