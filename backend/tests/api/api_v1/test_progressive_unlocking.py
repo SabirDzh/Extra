@@ -27,25 +27,17 @@ async def _create_multi_stage_env(session: AsyncSession, admin_id: uuid.UUID):
     await session.commit()
     return course, [b1, b2, b3, b4, b5, b6]
 
-
-
 @pytest.mark.anyio
 async def test_unlocking_anonymous(client: AsyncClient, session: AsyncSession, create_user):
     admin = await create_user("adm_up1@test.com", is_superuser=True, role="administrator")
     course, blocks = await _create_multi_stage_env(session, admin.id)
-    
-    resp = await client.get(f"/api/v1/courses/{course.id}/blocks/")
-    assert resp.status_code == 200
-    data = resp.json()
-    
 
-    assert len(data["blocks"]) == 2
-    assert data["blocks"][0]["title"] == "L1"
-    assert data["blocks"][1]["title"] == "T1"
-    assert data["all_blocks"] == 6
-    assert data["all_stages"] == 3
+    resp = await client.get(f"/api/v1/courses/{course.id}/blocks/")
+    assert resp.status_code == 401
+
 
 @pytest.mark.anyio
+
 async def test_unlocking_partial_progress(client: AsyncClient, session: AsyncSession, create_user):
     admin = await create_user("adm_up2@test.com", is_superuser=True, role="administrator")
     course, blocks = await _create_multi_stage_env(session, admin.id)

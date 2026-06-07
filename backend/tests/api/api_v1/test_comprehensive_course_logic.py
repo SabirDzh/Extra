@@ -12,7 +12,7 @@ from core.models.progress import UserBlockProgress
 
 
 
-async def _create_user(session, email, is_superuser=False, role="user"):
+async def _create_user(session, email, is_superuser=False, role="installer"):
     from fastapi_users.password import PasswordHelper
     ph = PasswordHelper()
     u = User(
@@ -78,20 +78,19 @@ class TestUnlockingLogic:
         course, blocks, _, _ = await _create_course_with_stages(session, admin.id, 3)
         
         resp = await client.get(f"/api/v1/courses/{course.id}/blocks/")
-        data = resp.json()
-        assert len(data["blocks"]) == 2
-        assert data["all_blocks"] == 6
-        assert data["all_stages"] == 3
+        assert resp.status_code == 401
 
     async def test_new_user_sees_only_stage_1(self, client: AsyncClient, session: AsyncSession, create_user):
         admin = await _create_user(session, "adm2@test.com", is_superuser=True, role="administrator")
         course, blocks, _, _ = await _create_course_with_stages(session, admin.id, 3)
         
-        user = await _create_user(session, "u2@test.com")
-        resp = await client.post("/api/v1/auth/login", data={"username": "u2@test.com", "password": "Password12345!"})
+        user = await _create_user(session, "u2@test.com", role="installer")
+        await client.post("/api/v1/auth/login", data={"username": "u2@test.com", "password": "Password12345!"})
         
         resp = await client.get(f"/api/v1/courses/{course.id}/blocks/")
-        assert len(resp.json()["blocks"]) == 2
+        assert resp.status_code == 200
+        data = resp.json()
+        assert len(data["blocks"]) == 2
 
     async def test_complete_lesson_only_unlocks_nothing(self, client: AsyncClient, session: AsyncSession):
         admin = await _create_user(session, "adm3@test.com", is_superuser=True, role="administrator")
@@ -143,10 +142,14 @@ class TestUnlockingLogic:
         b3 = Block(id=uuid.uuid4(), course_id=course.id, block_type=BlockType.lesson, order_index=3, title="L2")
         session.add_all([b1, b2, b3])
         await session.commit()
-        
+
+        user = await _create_user(session, "u_odd@test.com", role="installer")
+        await client.post("/api/v1/auth/login", data={"username": "u_odd@test.com", "password": "Password12345!"})
+
         resp = await client.get(f"/api/v1/courses/{course.id}/blocks/")
         data = resp.json()
         assert data["all_stages"] == 2
+
         assert len(data["blocks"]) == 2
         
 
@@ -259,10 +262,14 @@ class TestStatsProgress:
     async def test_all_blocks_constant_regardless_of_unlocking(self, client, session):
         admin = await _create_user(session, "admstat2@test.com", is_superuser=True)
         course, blocks, _, _ = await _create_course_with_stages(session, admin.id, 5)
-        
+
+        user = await _create_user(session, "u_stat2@test.com", role="installer")
+        await client.post("/api/v1/auth/login", data={"username": "u_stat2@test.com", "password": "Password12345!"})
+
         resp = await client.get(f"/api/v1/courses/{course.id}/blocks/")
         data = resp.json()
         assert data["all_blocks"] == 10
+
         assert len(data["blocks"]) == 2
 
 
@@ -438,16 +445,20 @@ class TestSecurityPermissions:
     async def test_next_block_id_navigation_across_stages(self, client, session):
         admin = await _create_user(session, "admstat6@test.com", is_superuser=True)
         course, blocks, _, _ = await _create_course_with_stages(session, admin.id, 2)
-        
+
+        user = await _create_user(session, "u_nav@test.com", role="installer")
+        await client.post("/api/v1/auth/login", data={"username": "u_nav@test.com", "password": "Password12345!"})
 
         resp = await client.get(f"/api/v1/courses/{course.id}/blocks/{blocks[1].id}")
+        assert resp.status_code == 200
         assert resp.json()["next_block_id"] == str(blocks[2].id)
-        
 
         resp = await client.get(f"/api/v1/courses/{course.id}/blocks/{blocks[3].id}")
         assert resp.json()["next_block_id"] is None
 
-    async def test_get_blocks_invalid_course_id(self, client):
+    async def test_get_blocks_invalid_course_id(self, client, session):
+        user = await _create_user(session, "u_inv_c@test.com", role="installer")
+        await client.post("/api/v1/auth/login", data={"username": "u_inv_c@test.com", "password": "Password12345!"})
 
         resp = await client.get(f"/api/v1/courses/{uuid.uuid4()}/blocks/")
         assert resp.status_code == 404
@@ -458,11 +469,12 @@ class TestSecurityPermissions:
         c2 = Course(id=uuid.uuid4(), title="Course 2", created_by=admin.id, is_published=True)
         session.add(c2)
         await session.commit()
-        
+
+        user = await _create_user(session, "u_wrong_c@test.com", role="installer")
+        await client.post("/api/v1/auth/login", data={"username": "u_wrong_c@test.com", "password": "Password12345!"})
 
         resp = await client.get(f"/api/v1/courses/{c2.id}/blocks/{blocks1[0].id}")
         assert resp.status_code == 404
-
     async def test_all_stages_all_blocks_consistency_for_different_users(self, client, session):
         admin = await _create_user(session, "admstat7@test.com", is_superuser=True)
         course, blocks, _, _ = await _create_course_with_stages(session, admin.id, 5)

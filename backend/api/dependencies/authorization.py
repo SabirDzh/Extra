@@ -16,10 +16,16 @@ async def current_admin(
     return current_user
 
 
-async def current_non_buyer_user(
+async def current_course_allowed_user(
     current_user: User = Depends(current_active_user),
 ):
-    if current_user.role == UserRole.buyer:
+    allowed_roles = {
+        UserRole.admin,
+        UserRole.seller,
+        UserRole.serviceman,
+        UserRole.installer,
+    }
+    if current_user.role not in allowed_roles:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Permission denied",

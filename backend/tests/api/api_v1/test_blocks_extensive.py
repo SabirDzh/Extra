@@ -189,12 +189,12 @@ async def test_delete_nonexistent_block(client: AsyncClient, session: AsyncSessi
 
 
 @pytest.mark.anyio
-async def test_get_blocks_for_course(client: AsyncClient, session: AsyncSession, admin_user):
+async def test_get_blocks_for_course(client: AsyncClient, session: AsyncSession, admin_user, superuser_token_headers):
     course = await _create_course(session, admin_user.id)
     await _create_block(session, course.id, title="1")
     await _create_block(session, course.id, title="2")
     
-    resp = await client.get(f"/api/v1/courses/{course.id}/blocks/")
+    resp = await client.get(f"/api/v1/courses/{course.id}/blocks/", headers=superuser_token_headers)
     assert resp.status_code == 200
     data = resp.json()
     assert len(data["blocks"]) == 2
@@ -217,17 +217,17 @@ async def test_get_blocks_for_course(client: AsyncClient, session: AsyncSession,
 
 
 @pytest.mark.anyio
-async def test_get_blocks_nonexistent_course(client: AsyncClient):
-    resp = await client.get(f"/api/v1/courses/{uuid.uuid4()}/blocks/")
+async def test_get_blocks_nonexistent_course(client: AsyncClient, superuser_token_headers):
+    resp = await client.get(f"/api/v1/courses/{uuid.uuid4()}/blocks/", headers=superuser_token_headers)
 
-    assert resp.status_code in (200, 404)
+    assert resp.status_code == 404
 
 
 @pytest.mark.anyio
-async def test_get_block_details(client: AsyncClient, session: AsyncSession, admin_user):
+async def test_get_block_details(client: AsyncClient, session: AsyncSession, admin_user, superuser_token_headers):
     course = await _create_course(session, admin_user.id)
     block = await _create_block(session, course.id, title="Specific")
-    resp = await client.get(f"/api/v1/courses/{course.id}/blocks/{block.id}")
+    resp = await client.get(f"/api/v1/courses/{course.id}/blocks/{block.id}", headers=superuser_token_headers)
     assert resp.status_code == 200
     assert resp.json()["title"] == "Specific"
 

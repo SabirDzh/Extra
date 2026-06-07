@@ -147,14 +147,15 @@ async def test_download_pdf(client: AsyncClient, session: AsyncSession, admin_us
     cert_num = gen_resp.json()["certificate_number"]
     
     client.cookies.clear()
-    resp = await client.get(f"/api/v1/api/certificates/{cert_num}/download")
+    headers = await _get_auth_headers(client, {"email": "block_admin@test.com", "password": "Password12345!"})
+    resp = await client.get(f"/api/v1/api/certificates/{cert_num}/download", headers=headers)
     assert resp.status_code == 200
     assert resp.headers["content-type"] == "application/pdf"
 
 
 @pytest.mark.anyio
-async def test_download_nonexistent_pdf(client: AsyncClient):
-    resp = await client.get("/api/v1/api/certificates/FAKE-1234/download")
+async def test_download_nonexistent_pdf(client: AsyncClient, superuser_token_headers):
+    resp = await client.get("/api/v1/api/certificates/FAKE-1234/download", headers=superuser_token_headers)
     assert resp.status_code == 404
 
 

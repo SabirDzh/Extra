@@ -11,24 +11,24 @@ from Repository.search_engine import SearchIn, SearchSort
 from Services import course as course_crud
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from api.dependencies.authorization import current_admin, current_non_buyer_user
+from api.dependencies.authorization import current_admin, current_course_allowed_user
 
 router = APIRouter(
     prefix=settings.api.v1.courses,
     tags=["Courses"],
-    dependencies=[Depends(current_non_buyer_user)],
+    dependencies=[Depends(current_course_allowed_user)],
 )
 
 Session = Annotated[AsyncSession, Depends(db_helper.session_getter)]
 AdminUser = Annotated[User, Depends(current_admin)]
-NonBuyerUser = Annotated[User, Depends(current_non_buyer_user)]
+CourseAllowedUser = Annotated[User, Depends(current_course_allowed_user)]
 
 
 @router.get("/", response_model=list[CourseListRead])
 async def list_courses(
     db: Session,
     pagination: Annotated[PaginationParams, Depends()],
-    user: NonBuyerUser,
+    user: CourseAllowedUser,
     filter_type: (
         Literal["in_progress", "completed", "not_started", "new", "popular"]
         | None
@@ -55,7 +55,7 @@ async def list_courses(
 async def search_courses(
     db: Session,
     pagination: Annotated[PaginationParams, Depends()],
-    user: NonBuyerUser,
+    user: CourseAllowedUser,
     q: str | None = Query(None, description="Search query"),
     filter_type: (
         Literal["in_progress", "completed", "not_started", "new", "popular"]
@@ -103,7 +103,7 @@ async def create_course(
 async def get_course(
     course_id: uuid.UUID,
     db: Session,
-    user: NonBuyerUser,
+    user: CourseAllowedUser,
     filter_type: (
         Literal["in_progress", "completed", "not_started", "new", "popular"]
         | None
@@ -179,7 +179,7 @@ async def delete_course(
 async def enroll(
     course_id: uuid.UUID,
     db: Session,
-    user: NonBuyerUser,
+    user: CourseAllowedUser,
 ):
     course = await course_crud.get_course(db, course_id)
     if not course:
@@ -201,7 +201,7 @@ async def enroll(
 async def get_progress(
     course_id: uuid.UUID,
     db: Session,
-    user: NonBuyerUser,
+    user: CourseAllowedUser,
 ):
     course = await course_crud.get_course(db, course_id, load_blocks=True)
     if not course:

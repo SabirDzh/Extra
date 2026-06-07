@@ -17,9 +17,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from core.config import settings
 
-router = APIRouter(prefix=f"/api{settings.api.v1.certificates}", tags=["Certificates"])
+from api.dependencies.authorization import current_course_allowed_user
+
+router = APIRouter(
+    prefix=f"/api{settings.api.v1.certificates}",
+    tags=["Certificates"],
+)
 
 Session = Annotated[AsyncSession, Depends(db_helper.session_getter)]
+CourseAllowedUser = Annotated[User, Depends(current_course_allowed_user)]
 
 
 @router.post(
@@ -28,7 +34,7 @@ Session = Annotated[AsyncSession, Depends(db_helper.session_getter)]
     status_code=status.HTTP_201_CREATED,
 )
 async def generate_certificate(
-    course_id: uuid.UUID, db: Session, user: User = Depends(current_active_user)
+    course_id: uuid.UUID, db: Session, user: CourseAllowedUser
 ):
     course = await db.get(Course, course_id, options=[selectinload(Course.blocks)])
     if not course:
@@ -74,7 +80,7 @@ async def generate_certificate(
 
 @router.get("/courses/{course_id}/certificate", response_model=CertificateRead)
 async def get_certificate(
-    course_id: uuid.UUID, db: Session, user: User = Depends(current_active_user)
+    course_id: uuid.UUID, db: Session, user: CourseAllowedUser
 ):
     cert = (
         await db.execute(

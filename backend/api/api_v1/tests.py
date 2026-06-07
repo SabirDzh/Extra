@@ -24,13 +24,18 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
-from api.dependencies.authorization import current_admin
+from api.dependencies.authorization import current_admin, current_course_allowed_user
 from Domain.Enums.user_role import UserRole
 from core.config import settings 
 
-router = APIRouter(prefix=settings.api.v1.tests, tags=["Tests"])
+router = APIRouter(
+    prefix=settings.api.v1.tests,
+    tags=["Tests"],
+    dependencies=[Depends(current_course_allowed_user)],
+)
 
 Session = Annotated[AsyncSession, Depends(db_helper.session_getter)]
+CourseAllowedUser = Annotated[User, Depends(current_course_allowed_user)]
 
 
 @router.post(
@@ -109,7 +114,7 @@ async def delete_question(
 
 @router.get("/blocks/{block_id}/questions")
 async def list_questions(
-    block_id: uuid.UUID, db: Session, user: User = Depends(current_active_user)
+    block_id: uuid.UUID, db: Session, user: CourseAllowedUser
 ):
     block = await db.get(Block, block_id)
     if not block:
@@ -137,7 +142,7 @@ async def submit_test(
     block_id: uuid.UUID,
     data: TestSubmit,
     db: Session,
-    user: User = Depends(current_active_user),
+    user: CourseAllowedUser,
 ):
     block = await db.get(Block, block_id)
     if not block:
@@ -179,7 +184,7 @@ async def submit_test(
 
 @router.get("/submissions/{submission_id}", response_model=TestSubmissionRead)
 async def get_submission(
-    submission_id: uuid.UUID, db: Session, user: User = Depends(current_active_user)
+    submission_id: uuid.UUID, db: Session, user: CourseAllowedUser
 ):
     submission = await _load_submission(db, submission_id)
     if not submission:

@@ -19,16 +19,19 @@ from Services.test_grading import _mark_block_completed
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from Repository.common import ensure_unique_field
-from api.dependencies.authorization import current_admin
+from api.dependencies.authorization import current_admin, current_course_allowed_user
 
 from Services.test_results import get_test_results_for_block
 
-router = APIRouter(prefix="/courses/{course_id}/blocks", tags=["Blocks"])
+router = APIRouter(
+    prefix="/courses/{course_id}/blocks",
+    tags=["Blocks"],
+    dependencies=[Depends(current_course_allowed_user)],
+)
 
 Session = Annotated[AsyncSession, Depends(db_helper.session_getter)]
 IsAdmin = Annotated[User, Depends(current_admin)]
-isUser = Annotated[User, Depends(current_active_user)]
-OptionalUser = Annotated[User | None, Depends(current_optional_user)]
+CourseAllowedUser = Annotated[User, Depends(current_course_allowed_user)]
 
 
 async def _get_course_or_404(db, course_id: uuid.UUID) -> Course:
@@ -134,7 +137,7 @@ async def _format_block_read(
 
 
 @router.get("/", response_model=CourseBlocksResponse)
-async def list_blocks(course_id: uuid.UUID, db: Session, user: OptionalUser):
+async def list_blocks(course_id: uuid.UUID, db: Session, user: CourseAllowedUser):
     from core.schemas.course import CourseProgress, CourseStatus
 
     course = await _get_course_or_404(db, course_id)
@@ -275,7 +278,7 @@ async def get_block(
     course_id: uuid.UUID,
     block_id: uuid.UUID,
     db: Session,
-    user: OptionalUser,
+    user: CourseAllowedUser,
 ):
     course = await _get_course_or_404(db, course_id)
     block = await _get_block_or_404(db, block_id, course_id)
@@ -366,7 +369,7 @@ async def mark_complete(
     course_id: uuid.UUID,
     block_id: uuid.UUID,
     db: Session,
-    user: User = Depends(current_active_user),
+    user: CourseAllowedUser,
 ):
     block = await _get_block_or_404(db, block_id, course_id)
 
@@ -382,7 +385,7 @@ async def get_block_test_results(
     course_id: uuid.UUID,
     block_id: uuid.UUID,
     db: Session,
-    user: User = Depends(current_active_user),
+    user: CourseAllowedUser,
 ):
     block = await _get_block_or_404(db, block_id, course_id)
 
