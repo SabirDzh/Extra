@@ -203,6 +203,11 @@ def filter_and_rank_items(
     if not query:
         return items
 
+    if search_in in {"title", "all", "filters"}:
+        exact = exact_title_matches(items, query, title_getter)
+        if exact:
+            return exact
+
     scored: list[tuple[tuple[float, ...], T]] = []
     for item in items:
         if search_in in {"title", "filters"}:
@@ -222,20 +227,16 @@ def filter_and_rank_items(
         )
         score = float(breakdown["score"])
         has_prefix = bool(breakdown["prefix_title"]) if search_in in {"title", "all", "filters"} else False
-        exact_title = bool(breakdown["exact_title"]) if search_in in {"title", "all", "filters"} else False
-        
-        if score >= MIN_RELEVANCE_SCORE or has_prefix or exact_title:
+        if score >= MIN_RELEVANCE_SCORE or has_prefix:
             if search_in == "description":
                 rank_key = (score,)
             elif search_in == "filters":
                 rank_key = (
-                    1.0 if exact_title else 0.0,
                     1.0 if has_prefix else 0.0,
                     score,
                 )
             else:
                 rank_key = (
-                    1.0 if exact_title else 0.0,
                     1.0 if has_prefix else 0.0,
                     1.0 if float(breakdown["title_score"]) > 0 else 0.0,
                     float(breakdown["title_score"]),
