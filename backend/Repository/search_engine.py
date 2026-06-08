@@ -255,6 +255,19 @@ def filter_and_rank_items(
             scored.append((rank_key, item))
 
     scored.sort(key=lambda row: row[0], reverse=True)
+    
+    # Logic for specific search: if we have an exact match and NO prefix matches 
+    # (other than the exact one itself), it means the search was very specific.
+    # In this case, we filter out everything else to avoid fuzzy match clutter.
+    if search_in in {"title", "all", "filters"}:
+        has_exact = any(row[0][0] > 0 for row in scored)
+        # Check if there are any prefix matches that are NOT exact matches
+        has_other_prefixes = any(row[0][1] > 0 and row[0][0] == 0 for row in scored)
+        
+        if has_exact and not has_other_prefixes:
+            # Return only the exact matches
+            return [item for rank_key, item in scored if rank_key[0] > 0]
+
     return [item for _, item in scored]
 
 
