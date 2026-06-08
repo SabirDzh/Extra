@@ -205,19 +205,26 @@ def filter_and_rank_items(
 
     if search_in in {"title", "all", "filters"}:
         exact = exact_title_matches(items, query, title_getter)
-        if exact:
-            return exact
+        # We'll handle exact matches within the main scoring loop to allow other matches to appear too.
+        pass
 
     scored: list[tuple[tuple[float, ...], T]] = []
+    exact_ids = {id(item) for item in exact} if 'exact' in locals() else set()
+    
     for item in items:
-        if search_in in {"title", "filters"}:
-            if not is_title_substring_match(query, title_getter(item) or ""):
-                continue
-        elif search_in == "all":
-            title = normalize_text(title_getter(item) or "")
-            desc = normalize_text(description_getter(item) or "")
-            if not any(word in title for word in query.split()) and not any(word in desc for word in query.split()):
-                continue
+        # Optimization: Check if it's an exact match first
+        is_exact = normalize_text(title_getter(item)) == query if search_in in {"title", "all", "filters"} else False
+        
+        if not is_exact:
+            if search_in in {"title", "filters"}:
+                if not is_title_substring_match(query, title_getter(item) or ""):
+                    continue
+            elif search_in == "all":
+                title = normalize_text(title_getter(item) or "")
+                desc = normalize_text(description_getter(item) or "")
+                if not any(word in title for word in query.split()) and not any(word in desc for word in query.split()):
+                    continue
+
         breakdown = compute_relevance_breakdown(
             query=query,
             title=normalize_text(title_getter(item)),
@@ -227,16 +234,19 @@ def filter_and_rank_items(
         )
         score = float(breakdown["score"])
         has_prefix = bool(breakdown["prefix_title"]) if search_in in {"title", "all", "filters"} else False
-        if score >= MIN_RELEVANCE_SCORE or has_prefix:
+        
+        if is_exact or score >= MIN_RELEVANCE_SCORE or has_prefix:
             if search_in == "description":
-                rank_key = (score,)
+                rank_key = (1.0 if is_exact else 0.0, score)
             elif search_in == "filters":
                 rank_key = (
+                    1.0 if is_exact else 0.0,
                     1.0 if has_prefix else 0.0,
                     score,
                 )
             else:
                 rank_key = (
+                    1.0 if is_exact else 0.0,
                     1.0 if has_prefix else 0.0,
                     1.0 if float(breakdown["title_score"]) > 0 else 0.0,
                     float(breakdown["title_score"]),
