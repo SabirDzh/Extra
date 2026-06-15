@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 from enum import Enum
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from core.models.test import QuestionType
 
@@ -132,4 +132,17 @@ class BlockTestResults(BaseModel):
     passed_stages: int | None = None
     progress: CourseProgress | None = None
     questions: list[QuestionResult]
+
+
+class CorrectTextAnswerCreate(BaseModel):
+    text: str = Field(min_length=1)
+
+
+class CorrectTextAnswer(BaseModel):
+    id: uuid.UUID
+    question_id: uuid.UUID
+    text: str
+
+    model_config = {"from_attributes": True}
+
 

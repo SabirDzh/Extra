@@ -18,6 +18,8 @@ from core.schemas.test import (
     QuestionUpdate,
     TestSubmissionRead,
     TestSubmit,
+    CorrectTextAnswer,
+    CorrectTextAnswerCreate,
 )
 from Services.test_grading import auto_grade_submission, _mark_block_completed
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -271,3 +273,135 @@ async def _load_submission(db, submission_id: uuid.UUID):
             .options(selectinload(TestSubmission.answers))
         )
     ).scalar_one_or_none()
+
+
+@router.get("/questions/{question_id}/correct-text-answer", response_model=CorrectTextAnswer)
+async def get_correct_text_answer(
+    question_id: uuid.UUID,
+    db: Session,
+    admin: User = Depends(current_admin),
+):
+    from core.models.test import Question, AnswerOption
+    from Domain.Enums.test import QuestionType
+    
+    question = await db.get(Question, question_id)
+    if not question:
+        raise HTTPException(status_code=404, detail="Question not found")
+    if question.question_type != QuestionType.free_text:
+        raise HTTPException(status_code=400, detail="Only free_text questions have text answers")
+        
+    correct_option = (
+        await db.execute(
+            select(AnswerOption)
+            .where(AnswerOption.question_id == question_id, AnswerOption.is_correct == True)
+            .limit(1)
+        )
+    ).scalar_one_or_none()
+    
+    if not correct_option:
+        raise HTTPException(status_code=404, detail="Correct text answer not found")
+        
+    return correct_option
+
+
+@router.post("/questions/{question_id}/correct-text-answer", response_model=CorrectTextAnswer, status_code=status.HTTP_201_CREATED)
+async def create_correct_text_answer(
+    question_id: uuid.UUID,
+    data: CorrectTextAnswerCreate,
+    db: Session,
+    admin: User = Depends(current_admin),
+):
+    from core.models.test import Question, AnswerOption
+    from Domain.Enums.test import QuestionType
+    
+    question = await db.get(Question, question_id)
+    if not question:
+        raise HTTPException(status_code=404, detail="Question not found")
+    if question.question_type != QuestionType.free_text:
+        raise HTTPException(status_code=400, detail="Only free_text questions have text answers")
+        
+    existing_option = (
+        await db.execute(
+            select(AnswerOption)
+            .where(AnswerOption.question_id == question_id, AnswerOption.is_correct == True)
+            .limit(1)
+        )
+    ).scalar_one_or_none()
+    
+    if existing_option:
+        raise HTTPException(status_code=400, detail="Correct text answer already exists. Use PATCH to update it.")
+        
+    new_option = AnswerOption(
+        question_id=question_id,
+        text=data.text,
+        is_correct=True,
+        order_index=0
+    )
+    db.add(new_option)
+    await db.commit()
+    await db.refresh(new_option)
+    return new_option
+
+
+@router.patch("/questions/{question_id}/correct-text-answer", response_model=CorrectTextAnswer)
+async def update_correct_text_answer(
+    question_id: uuid.UUID,
+    data: CorrectTextAnswerCreate,
+    db: Session,
+    admin: User = Depends(current_admin),
+):
+    from core.models.test import Question, AnswerOption
+    from Domain.Enums.test import QuestionType
+    
+    question = await db.get(Question, question_id)
+    if not question:
+        raise HTTPException(status_code=404, detail="Question not found")
+    if question.question_type != QuestionType.free_text:
+        raise HTTPException(status_code=400, detail="Only free_text questions have text answers")
+        
+    correct_option = (
+        await db.execute(
+            select(AnswerOption)
+            .where(AnswerOption.question_id == question_id, AnswerOption.is_correct == True)
+            .limit(1)
+        )
+    ).scalar_one_or_none()
+    
+    if not correct_option:
+        raise HTTPException(status_code=404, detail="Correct text answer not found. Use POST to create one.")
+        
+    correct_option.text = data.text
+    await db.commit()
+    await db.refresh(correct_option)
+    return correct_option
+
+
+@router.delete("/questions/{question_id}/correct-text-answer", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_correct_text_answer(
+    question_id: uuid.UUID,
+    db: Session,
+    admin: User = Depends(current_admin),
+):
+    from core.models.test import Question, AnswerOption
+    from Domain.Enums.test import QuestionType
+    
+    question = await db.get(Question, question_id)
+    if not question:
+        raise HTTPException(status_code=404, detail="Question not found")
+    if question.question_type != QuestionType.free_text:
+        raise HTTPException(status_code=400, detail="Only free_text questions have text answers")
+        
+    correct_option = (
+        await db.execute(
+            select(AnswerOption)
+            .where(AnswerOption.question_id == question_id, AnswerOption.is_correct == True)
+            .limit(1)
+        )
+    ).scalar_one_or_none()
+    
+    if not correct_option:
+        raise HTTPException(status_code=404, detail="Correct text answer not found")
+        
+    await db.delete(correct_option)
+    await db.commit()
+

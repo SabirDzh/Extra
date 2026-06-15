@@ -86,6 +86,49 @@ async def search_courses(
     return courses
 
 
+@router.get("/pending-review", response_model=list[CourseListRead])
+async def list_pending_review_courses(
+    db: Session,
+    admin: AdminUser,
+):
+    """
+    Returns all courses that have pending/ungraded manual/mixed test submissions.
+    """
+    from core.models.block import TEST_BLOCK_TYPES, Block
+    from core.models.test import TestSubmission
+    from core.models.course import Course
+    from sqlalchemy import select, func
+    
+    subq = (
+        select(
+            TestSubmission.id,
+            func.row_number().over(
+                partition_by=(TestSubmission.user_id, TestSubmission.block_id),
+                order_by=(TestSubmission.submitted_at.desc(), TestSubmission.id.desc())
+            ).label("rn")
+        )
+        .subquery()
+    )
+    
+    stmt = (
+        select(Course)
+        .join(Block, Block.course_id == Course.id)
+        .join(TestSubmission, TestSubmission.block_id == Block.id)
+        .join(subq, TestSubmission.id == subq.c.id)
+        .where(
+            subq.c.rn == 1,
+            TestSubmission.is_graded == False,
+            Block.block_type.in_(TEST_BLOCK_TYPES)
+        )
+        .distinct()
+    )
+    
+    result = await db.execute(stmt)
+    courses = list(result.scalars().all())
+    await course_crud.attach_course_progress(db, courses, admin.id)
+    return courses
+
+
 @router.post("/", response_model=CourseRead, status_code=status.HTTP_201_CREATED)
 async def create_course(
     data: CourseCreate,
