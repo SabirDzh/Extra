@@ -126,3 +126,121 @@ async def test_notify_manual_test_required_service(session: AsyncSession, create
 
     stmt = select(Notification).where(Notification.user_id == buyer.id)
     assert len((await session.execute(stmt)).scalars().all()) == 0
+
+
+@pytest.mark.anyio
+async def test_clear_notifications(client: AsyncClient, normal_user_token_headers, session: AsyncSession):
+    stmt = select(User).where(User.email == "normal@example.com")
+    result = await session.execute(stmt)
+    user = result.scalar_one()
+
+    import uuid_utils
+    from datetime import datetime, timezone
+    now = datetime.now(timezone.utc)
+    for i in range(3):
+        session.add(Notification(
+            id=uuid_utils.uuid7(),
+            user_id=user.id,
+            type=NotificationType.other,
+            title=f"Test {i}",
+            message="Msg",
+            created_at=now
+        ))
+    await session.commit()
+
+    # Verify we have unread count > 0
+    resp = await client.get("/api/v1/notifications/unread-count")
+    assert resp.status_code == 200
+    assert resp.json()["unread_count"] == 3
+
+    # Clear notifications
+    resp = await client.delete("/api/v1/notifications/clear")
+    assert resp.status_code == 200
+    assert resp.json()["status"] == "success"
+
+    # Verify they are gone
+    resp = await client.get("/api/v1/notifications/")
+    assert resp.status_code == 200
+    assert resp.json() == []
+
+    resp = await client.get("/api/v1/notifications/unread-count")
+    assert resp.status_code == 200
+    assert resp.json()["unread_count"] == 0
+
+
+@pytest.mark.anyio
+async def test_course_deletion_deletes_notifications(session: AsyncSession, create_user):
+    from core.models.course import Course
+    from core.models.block import Block, BlockType
+    from core.models.test import TestSubmission
+    from Repository.course import delete_course
+    import uuid_utils
+    from datetime import datetime, timezone
+    
+    admin = await create_user("adm_del@example.com", role=UserRole.admin.value, is_superuser=True)
+    user = await create_user("usr_del@example.com")
+    
+    course = Course(
+        title="Course to delete",
+        description="Desc",
+        level="beginner",
+        audience="everyone",
+        is_published=True,
+        created_by=admin.id
+    )
+    session.add(course)
+    await session.commit()
+    await session.refresh(course)
+    
+    block = Block(
+        course_id=course.id,
+        order_index=1,
+        title="Block test",
+        block_type=BlockType.manual_test
+    )
+    session.add(block)
+    await session.commit()
+    await session.refresh(block)
+    
+    submission = TestSubmission(
+        user_id=user.id,
+        block_id=block.id,
+        is_graded=False
+    )
+    session.add(submission)
+    await session.commit()
+    await session.refresh(submission)
+    
+    # Now create notifications
+    now = datetime.now(timezone.utc)
+    notif1 = Notification(
+        id=uuid_utils.uuid7(),
+        user_id=user.id,
+        type=NotificationType.new_course,
+        title="New Course",
+        message="Msg",
+        reference_id=course.id,
+        created_at=now
+    )
+    notif2 = Notification(
+        id=uuid_utils.uuid7(),
+        user_id=admin.id,
+        type=NotificationType.manual_test_check,
+        title="Check Test",
+        message="Msg",
+        reference_id=submission.id,
+        created_at=now
+    )
+    session.add_all([notif1, notif2])
+    await session.commit()
+    
+    # Verify notifications exist
+    res = await session.execute(select(Notification).where(Notification.id.in_([notif1.id, notif2.id])))
+    assert len(res.scalars().all()) == 2
+    
+    # Delete the course
+    await delete_course(session, course)
+    
+    # Verify notifications are deleted
+    res = await session.execute(select(Notification).where(Notification.id.in_([notif1.id, notif2.id])))
+    assert len(res.scalars().all()) == 0

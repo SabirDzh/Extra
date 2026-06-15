@@ -2,7 +2,7 @@ import uuid
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import select, update, func
+from sqlalchemy import select, update, func, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.models.db_helper import db_helper
@@ -73,3 +73,14 @@ async def mark_all_notifications_read(
     await session.execute(stmt)
     await session.commit()
     return {"status": "success"}
+
+
+@router.delete("/clear")
+async def clear_notifications(
+    user: Annotated[User, Depends(current_active_user)],
+    session: Annotated[AsyncSession, Depends(db_helper.session_getter)],
+):
+    stmt = delete(Notification).where(Notification.user_id == user.id)
+    await session.execute(stmt)
+    await session.commit()
+    return {"status": "success", "message": "All notifications cleared"}

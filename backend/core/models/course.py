@@ -15,8 +15,8 @@ from .mixins.id_int_pk import IdUuidPkMixin
 
 LEVEL_DISPLAY_NAMES: dict[str, str] = {
     CourseLevel.beginner: "Начинающий",
-    CourseLevel.intermediate: "Продвинутый",
-    CourseLevel.advanced: "Эксперт",
+    CourseLevel.intermediate: "Средний",
+    CourseLevel.advanced: "Продвинутый",
 }
 
 

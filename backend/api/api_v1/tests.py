@@ -213,7 +213,7 @@ async def list_pending_course_submissions(
     admin: User = Depends(current_admin)
 ):
     """
-    Returns all ungraded submissions for manual test blocks within a specific course.
+    Returns all ungraded submissions for test blocks within a specific course.
     Used by admins to find work that needs review.
     """
     result = await db.execute(
@@ -221,7 +221,7 @@ async def list_pending_course_submissions(
         .join(Block, TestSubmission.block_id == Block.id)
         .where(
             Block.course_id == course_id,
-            Block.block_type == BlockType.manual_test,
+            Block.block_type.in_(TEST_BLOCK_TYPES),
             TestSubmission.is_graded == False
         )
         .options(selectinload(TestSubmission.answers))

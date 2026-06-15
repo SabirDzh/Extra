@@ -52,12 +52,12 @@ async def test_level_label_intermediate_returns_russian(
     superuser_token_headers: dict,
 ):
     """
-    Стресс-тест 2: level=intermediate → level_label="Продвинутый".
+    Стресс-тест 2: level=intermediate → level_label="Средний".
     """
     course = await _create_course(
         client, superuser_token_headers, "Intermediate Course", "intermediate"
     )
-    assert course["level_label"] == "Продвинутый"
+    assert course["level_label"] == "Средний"
 
 
 @pytest.mark.anyio
@@ -66,12 +66,12 @@ async def test_level_label_advanced_returns_russian(
     superuser_token_headers: dict,
 ):
     """
-    Стресс-тест 3: level=advanced → level_label="Эксперт".
+    Стресс-тест 3: level=advanced → level_label="Продвинутый".
     """
     course = await _create_course(
         client, superuser_token_headers, "Advanced Course", "advanced"
     )
-    assert course["level_label"] == "Эксперт"
+    assert course["level_label"] == "Продвинутый"
 
 
 @pytest.mark.anyio
@@ -175,7 +175,7 @@ async def test_level_label_and_audience_label_in_list_endpoint(
     for course in courses:
         assert "level_label" in course, f"Нет level_label у курса {course.get('id')}"
         assert "audience_label" in course, f"Нет audience_label у курса {course.get('id')}"
-        assert course["level_label"] in ("Начинающий", "Продвинутый", "Эксперт")
+        assert course["level_label"] in ("Начинающий", "Средний", "Продвинутый")
         assert course["audience_label"] in ("Для всех", "Монтажник")
 
 

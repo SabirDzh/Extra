@@ -12,6 +12,8 @@ from core.models.course import (
 )
 from core.models.progress import UserBlockProgress
 from core.models.test import TestSubmission
+from core.models.notification import Notification
+from Domain.Enums.notification import NotificationType
 from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import load_only, selectinload
@@ -66,6 +68,31 @@ async def delete_course(
     session: AsyncSession,
     course: Course,
 ) -> None:
+    # Select block ids for this course
+    stmt_block_ids = select(Block.id).where(Block.course_id == course.id)
+    block_ids = (await session.execute(stmt_block_ids)).scalars().all()
+
+    # Select submission ids for those blocks
+    submission_ids = []
+    if block_ids:
+        stmt_submission_ids = select(TestSubmission.id).where(TestSubmission.block_id.in_(block_ids))
+        submission_ids = (await session.execute(stmt_submission_ids)).scalars().all()
+
+    # Delete notifications with new_course type referencing this course
+    stmt_del_course_notif = delete(Notification).where(
+        Notification.type == NotificationType.new_course,
+        Notification.reference_id == course.id
+    )
+    await session.execute(stmt_del_course_notif)
+
+    # Delete notifications with manual_test_check type referencing block submissions
+    if submission_ids:
+        stmt_del_sub_notif = delete(Notification).where(
+            Notification.type == NotificationType.manual_test_check,
+            Notification.reference_id.in_(submission_ids)
+        )
+        await session.execute(stmt_del_sub_notif)
+
     await session.delete(course)
     await session.commit()
 
@@ -205,6 +232,34 @@ async def search_courses(
 
 
 async def delete_courses(session: AsyncSession, courses_id: list[uuid.UUID]):
+    if not courses_id:
+        return
+
+    # Select block ids for these courses
+    stmt_block_ids = select(Block.id).where(Block.course_id.in_(courses_id))
+    block_ids = (await session.execute(stmt_block_ids)).scalars().all()
+
+    # Select submission ids for those blocks
+    submission_ids = []
+    if block_ids:
+        stmt_submission_ids = select(TestSubmission.id).where(TestSubmission.block_id.in_(block_ids))
+        submission_ids = (await session.execute(stmt_submission_ids)).scalars().all()
+
+    # Delete notifications with new_course type referencing these courses
+    stmt_del_course_notif = delete(Notification).where(
+        Notification.type == NotificationType.new_course,
+        Notification.reference_id.in_(courses_id)
+    )
+    await session.execute(stmt_del_course_notif)
+
+    # Delete notifications with manual_test_check type referencing block submissions
+    if submission_ids:
+        stmt_del_sub_notif = delete(Notification).where(
+            Notification.type == NotificationType.manual_test_check,
+            Notification.reference_id.in_(submission_ids)
+        )
+        await session.execute(stmt_del_sub_notif)
+
     stmt = delete(Course).where(Course.id.in_(courses_id))
     await session.execute(stmt)
     await session.commit()

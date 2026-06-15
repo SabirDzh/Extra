@@ -220,3 +220,20 @@ async def test_enroll_in_nonexistent_course_fails(auth_client: AsyncClient):
     fake_uuid = str(uuid.uuid4())
     resp = await auth_client.post(f"/api/v1/courses/{fake_uuid}/enroll")
     assert resp.status_code == 404
+
+
+@pytest.mark.anyio
+async def test_create_course_medium_difficulty(client: AsyncClient, superuser_token_headers: dict):
+    payload = {
+        "title": "Medium Difficulty Course",
+        "description": "This is a course of medium difficulty.",
+        "level": "intermediate",
+        "audience": "everyone",
+        "is_published": True
+    }
+    resp = await client.post("/api/v1/courses/", json=payload, headers=superuser_token_headers)
+    assert resp.status_code == 201
+    data = resp.json()
+    assert data["title"] == "Medium Difficulty Course"
+    assert data["level"] == "intermediate"
+    assert data["level_label"] == "Средний"
