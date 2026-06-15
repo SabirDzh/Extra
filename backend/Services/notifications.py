@@ -8,7 +8,7 @@ from core.schemas.user import UserRead, UserRegisteredNotification
 
 log = logging.getLogger(__name__)
 
-WEBHOOK_URL = os.getenv("WEBHOOK_URL", "https://httpbin.org/post")
+WEBHOOK_URL = os.getenv("WEBHOOK_URL")
 
 
 async def send_new_user_notification(user: User) -> None:
