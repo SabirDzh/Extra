@@ -62,6 +62,7 @@ class ApiV1Prefix(BaseModel):
     error: str = "/error"
     recommendations: str = "/recommendation"
     tests: str = "/tests"
+    product_attributes: str = "/product-attributes"
 
 
 class ApiPrefix(BaseModel):

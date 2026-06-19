@@ -405,6 +405,12 @@ async def import_products(session: AsyncSession, file: UploadFile):
         await session.execute(stmt_insert)
         await session.commit()
 
+        from Repository.product_attribute import ensure_product_attributes_exist
+
+        for p in new_products:
+            if p.get("attributes"):
+                await ensure_product_attributes_exist(session, p["attributes"])
+
         return {
             "msg": f"Успешно импортировано приборов: {len(new_products)}. Изображений сохранено (WebP): {sum(len(p['image_url']) for p in new_products)}.",
             "status": "OK",

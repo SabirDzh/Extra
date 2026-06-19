@@ -19,6 +19,7 @@ __all__ = (
     "Error",
     "Recommendation",
     "Notification",
+    "ProductAttribute",
 )
 
 from .access_token import AccessToken
@@ -37,3 +38,4 @@ from .term import Term
 from .test import AnswerOption, Question, TestAnswer, TestSubmission
 from .user import User
 from .notification import Notification
+from .product_attribute import ProductAttribute

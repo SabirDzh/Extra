@@ -13,6 +13,7 @@ from .error import router as error_router
 from .faq import router as faq_router
 from .messages import router as messages_router
 from .product import router as product_router
+from .product_attribute import router as product_attribute_router
 from .profile import router as profile_router
 from .recomendation import router as recommendations_router
 from .search import router as search_router
@@ -44,3 +45,4 @@ router.include_router(search_router)
 router.include_router(error_router)
 router.include_router(recommendations_router)
 router.include_router(notifications_router)
+router.include_router(product_attribute_router)

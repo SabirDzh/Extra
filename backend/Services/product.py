@@ -7,6 +7,7 @@ from fastapi import UploadFile
 from Repository import product as repo
 from sqlalchemy.ext.asyncio import AsyncSession
 from Repository.common import ensure_unique_field
+from Services import product_attribute as attribute_crud
 
 
 async def get_products(session: AsyncSession, **kwargs):
@@ -25,7 +26,12 @@ async def create_product(session: AsyncSession, product_in: ProductCreate) -> Pr
         product_in.title,
         error_msg=f"Product with title '{product_in.title}' already exists",
     )
-    return await repo.create_product(session, product_in)
+    product = await repo.create_product(session, product_in)
+    if product_in.attributes:
+        await attribute_crud.ensure_product_attributes_exist(
+            session, product_in.attributes
+        )
+    return product
 
 
 async def update_product(
@@ -41,7 +47,12 @@ async def update_product(
             exclude_id=product.id,
             error_msg=f"Product with title '{patch['title']}' already exists",
         )
-    return await repo.update_product(session, product, product_update)
+    updated = await repo.update_product(session, product, product_update)
+    if product_update.attributes:
+        await attribute_crud.ensure_product_attributes_exist(
+            session, product_update.attributes
+        )
+    return updated
 
 
 async def delete_product(session: AsyncSession, product: Product) -> None:
