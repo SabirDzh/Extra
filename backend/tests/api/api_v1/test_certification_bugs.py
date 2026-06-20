@@ -1,0 +1,621 @@
+"""
+Tests covering certification system bugs:
+- Double /api prefix on certificate router
+- Certificate counts ALL blocks vs completion counts TEST blocks only
+- Certificate download without authentication
+- Certificate model UUID vs int type mismatch
+- GradeSubmission score bounds validation
+- Free-text question grading granularity
+- Test answer ownership validation
+- Double-commit pattern
+- Enroll endpoint race condition (no unique constraint)
+"""
+
+import uuid
+import pytest
+from httpx import AsyncClient
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from core.models.block import Block, BlockType
+from core.models.certificates import Certificate
+from core.models.course import Course, CourseEnrollment
+from core.models.progress import UserBlockProgress
+from core.models.test import (
+    AnswerOption,
+    Question,
+    QuestionType,
+    TestAnswer,
+    TestSubmission,
+)
+from core.models.user import User
+
+
+async def _login(client: AsyncClient, email: str, password: str = "Password12345!") -> dict:
+    resp = await client.post("/api/v1/auth/login", data={"username": email, "password": password})
+    token = resp.cookies.get("fastapiusersauth", "")
+    return {"fastapiusersauth": token} if token else {}
+
+
+async def _setup_course_with_lessons_and_tests(
+    session: AsyncSession,
+    admin_id: uuid.UUID,
+    lesson_count: int = 2,
+    test_count: int = 2,
+):
+    course = Course(title=f"Cert Bug Course {uuid.uuid4().hex[:6]}", created_by=admin_id, is_published=True)
+    session.add(course)
+    await session.flush()
+
+    blocks = []
+    for i in range(lesson_count):
+        b = Block(course_id=course.id, title=f"Lesson {i}", block_type=BlockType.lesson, order_index=i)
+        session.add(b)
+        blocks.append(b)
+    await session.flush()
+
+    questions = []
+    options = []
+    for i in range(test_count):
+        b = Block(course_id=course.id, title=f"Test {i}", block_type=BlockType.auto_test, order_index=lesson_count + i)
+        session.add(b)
+        blocks.append(b)
+        q = Question(block_id=b.id, text=f"Q {i}", question_type=QuestionType.single_choice, order_index=0)
+        session.add(q)
+        questions.append(q)
+        o = AnswerOption(question_id=q.id, text="Correct", is_correct=True, order_index=0)
+        session.add(o)
+        options.append(o)
+    await session.flush()
+    await session.commit()
+    return course, blocks, questions, options
+
+
+async def _enroll(session: AsyncSession, user_id: uuid.UUID, course_id: uuid.UUID):
+    e = CourseEnrollment(user_id=user_id, course_id=course_id)
+    session.add(e)
+    await session.commit()
+
+
+# ============================================================
+# ISSUE 1: Double /api prefix on certificate router
+# ============================================================
+
+class TestCertificateRoutePrefix:
+    """The certificate router uses f'/api{settings.api.v1.certificates}' which
+    results in '/api/certificates'. Combined with the v1 prefix '/v1' and the
+    top-level prefix '/api', the final path is '/api/v1/api/certificates/...',
+    duplicating the /api segment."""
+
+    @pytest.mark.anyio
+    async def test_generate_certificate_uses_correct_prefix(
+        self, client: AsyncClient, session: AsyncSession, create_user
+    ):
+        admin = await create_user("cert_prefix_admin@test.com", is_superuser=True, role="administrator")
+        course, blocks, _, _ = await _setup_course_with_lessons_and_tests(session, admin.id, 0, 1)
+        await _enroll(session, admin.id, course.id)
+        headers = await _login(client, "cert_prefix_admin@test.com")
+
+        b = blocks[0]
+        q = (await session.execute(select(Question).where(Question.block_id == b.id))).scalar_one()
+        o = (await session.execute(select(AnswerOption).where(AnswerOption.question_id == q.id))).scalar_one()
+
+        resp = await client.post(
+            f"/api/v1/tests/blocks/{b.id}/submit",
+            json={"answers": [{"question_id": str(q.id), "selected_answer_id": str(o.id)}]},
+            cookies=headers,
+        )
+        assert resp.status_code == 200
+
+        correct_path = f"/api/v1/certificates/courses/{course.id}/generate"
+        resp = await client.post(correct_path, cookies=headers)
+        assert resp.status_code in (200, 201), (
+            f"Certificate generate should work at {correct_path}, got {resp.status_code}"
+        )
+
+    @pytest.mark.anyio
+    async def test_download_certificate_uses_correct_prefix(
+        self, client: AsyncClient, session: AsyncSession, create_user
+    ):
+        admin = await create_user("cert_dl_admin@test.com", is_superuser=True, role="administrator")
+        course, blocks, _, _ = await _setup_course_with_lessons_and_tests(session, admin.id, 0, 1)
+        await _enroll(session, admin.id, course.id)
+        headers = await _login(client, "cert_dl_admin@test.com")
+
+        b = blocks[0]
+        q = (await session.execute(select(Question).where(Question.block_id == b.id))).scalar_one()
+        o = (await session.execute(select(AnswerOption).where(AnswerOption.question_id == q.id))).scalar_one()
+
+        await client.post(
+            f"/api/v1/tests/blocks/{b.id}/submit",
+            json={"answers": [{"question_id": str(q.id), "selected_answer_id": str(o.id)}]},
+            cookies=headers,
+        )
+
+        gen_resp = await client.post(
+            f"/api/v1/certificates/courses/{course.id}/generate", cookies=headers
+        )
+        cert_number = gen_resp.json()["certificate_number"]
+
+        correct_path = f"/api/v1/certificates/{cert_number}/download"
+        resp = await client.get(correct_path)
+        assert resp.status_code == 200, (
+            f"Download should work at {correct_path}, got {resp.status_code}"
+        )
+
+
+# ============================================================
+# ISSUE 2: Certificate counts ALL blocks, completion counts TEST blocks only
+# ============================================================
+
+class TestCertificateBlockCountingMismatch:
+    """Certificate requires all blocks (lessons+tests) completed,
+    but enrollment completion only requires test blocks."""
+
+    @pytest.mark.anyio
+    async def test_lesson_blocks_block_certificate_generation(
+        self, client: AsyncClient, session: AsyncSession, create_user
+    ):
+        admin = await create_user("cert_block_admin@test.com", is_superuser=True, role="administrator")
+        course, blocks, questions, _ = await _setup_course_with_lessons_and_tests(
+            session, admin.id, lesson_count=2, test_count=1
+        )
+        await _enroll(session, admin.id, course.id)
+        headers = await _login(client, "cert_block_admin@test.com")
+
+        test_blocks = [b for b in blocks if b.block_type == BlockType.auto_test]
+        lesson_blocks = [b for b in blocks if b.block_type == BlockType.lesson]
+
+        for tb in test_blocks:
+            q = (await session.execute(select(Question).where(Question.block_id == tb.id))).scalar_one()
+            o = (await session.execute(select(AnswerOption).where(AnswerOption.question_id == q.id))).scalar_one()
+            await client.post(
+                f"/api/v1/tests/blocks/{tb.id}/submit",
+                json={"answers": [{"question_id": str(q.id), "selected_answer_id": str(o.id)}]},
+                cookies=headers,
+            )
+
+        for lb in lesson_blocks:
+            resp = await client.post(
+                f"/api/v1/courses/{course.id}/blocks/{lb.id}/complete", cookies=headers
+            )
+            assert resp.status_code == 200
+
+        resp = await client.post(
+            f"/api/v1/certificates/courses/{course.id}/generate", cookies=headers
+        )
+        assert resp.status_code == 201
+
+    @pytest.mark.anyio
+    async def test_certificate_rejects_when_lessons_not_completed(
+        self, client: AsyncClient, session: AsyncSession, create_user
+    ):
+        admin = await create_user("cert_nocomplete_admin@test.com", is_superuser=True, role="administrator")
+        course, blocks, questions, _ = await _setup_course_with_lessons_and_tests(
+            session, admin.id, lesson_count=2, test_count=1
+        )
+        await _enroll(session, admin.id, course.id)
+        headers = await _login(client, "cert_nocomplete_admin@test.com")
+
+        test_blocks = [b for b in blocks if b.block_type == BlockType.auto_test]
+        for tb in test_blocks:
+            q = (await session.execute(select(Question).where(Question.block_id == tb.id))).scalar_one()
+            o = (await session.execute(select(AnswerOption).where(AnswerOption.question_id == q.id))).scalar_one()
+            await client.post(
+                f"/api/v1/tests/blocks/{tb.id}/submit",
+                json={"answers": [{"question_id": str(q.id), "selected_answer_id": str(o.id)}]},
+                cookies=headers,
+            )
+
+        resp = await client.post(
+            f"/api/v1/certificates/courses/{course.id}/generate", cookies=headers
+        )
+        assert resp.status_code == 400, (
+            "Certificate should be rejected when lessons are not completed"
+        )
+
+    @pytest.mark.anyio
+    async def test_enrollment_completed_but_certificate_blocked(
+        self, client: AsyncClient, session: AsyncSession, create_user
+    ):
+        admin = await create_user("cert_mismatch_admin@test.com", is_superuser=True, role="administrator")
+        course, blocks, _, _ = await _setup_course_with_lessons_and_tests(
+            session, admin.id, lesson_count=1, test_count=1
+        )
+        await _enroll(session, admin.id, course.id)
+        headers = await _login(client, "cert_mismatch_admin@test.com")
+
+        test_blocks = [b for b in blocks if b.block_type == BlockType.auto_test]
+        for tb in test_blocks:
+            q = (await session.execute(select(Question).where(Question.block_id == tb.id))).scalar_one()
+            o = (await session.execute(select(AnswerOption).where(AnswerOption.question_id == q.id))).scalar_one()
+            await client.post(
+                f"/api/v1/tests/blocks/{tb.id}/submit",
+                json={"answers": [{"question_id": str(q.id), "selected_answer_id": str(o.id)}]},
+                cookies=headers,
+            )
+
+        enrollment = (await session.execute(
+            select(CourseEnrollment).where(
+                CourseEnrollment.user_id == admin.id,
+                CourseEnrollment.course_id == course.id,
+            )
+        )).scalar_one()
+        await session.refresh(enrollment)
+        assert enrollment.completed_at is not None, "Enrollment should be completed (only tests counted)"
+
+        resp = await client.post(
+            f"/api/v1/certificates/courses/{course.id}/generate", cookies=headers
+        )
+        assert resp.status_code == 400, (
+            "Certificate should be blocked even though enrollment is completed"
+        )
+
+
+# ============================================================
+# ISSUE 3: Certificate download has no authentication
+# ============================================================
+
+class TestCertificateDownloadAuth:
+    """Download endpoint has no auth — anyone with the certificate number can get PDF."""
+
+    @pytest.mark.anyio
+    async def test_anonymous_can_download_certificate(
+        self, client: AsyncClient, session: AsyncSession, create_user
+    ):
+        admin = await create_user("cert_anon_admin@test.com", is_superuser=True, role="administrator")
+        course, blocks, _, _ = await _setup_course_with_lessons_and_tests(session, admin.id, 0, 1)
+        await _enroll(session, admin.id, course.id)
+        headers = await _login(client, "cert_anon_admin@test.com")
+
+        b = blocks[0]
+        q = (await session.execute(select(Question).where(Question.block_id == b.id))).scalar_one()
+        o = (await session.execute(select(AnswerOption).where(AnswerOption.question_id == q.id))).scalar_one()
+        await client.post(
+            f"/api/v1/tests/blocks/{b.id}/submit",
+            json={"answers": [{"question_id": str(q.id), "selected_answer_id": str(o.id)}]},
+            cookies=headers,
+        )
+
+        gen_resp = await client.post(
+            f"/api/v1/certificates/courses/{course.id}/generate", cookies=headers
+        )
+        cert_number = gen_resp.json()["certificate_number"]
+
+        client.cookies.clear()
+        resp = await client.get(f"/api/v1/certificates/{cert_number}/download")
+        assert resp.status_code == 200, (
+            "Currently download has no auth — this documents the behavior"
+        )
+
+    @pytest.mark.anyio
+    async def test_non_owner_cannot_get_certificate_info(
+        self, client: AsyncClient, session: AsyncSession, create_user
+    ):
+        admin = await create_user("cert_info_admin@test.com", is_superuser=True, role="administrator")
+        course, blocks, _, _ = await _setup_course_with_lessons_and_tests(session, admin.id, 0, 1)
+        await _enroll(session, admin.id, course.id)
+        headers = await _login(client, "cert_info_admin@test.com")
+
+        b = blocks[0]
+        q = (await session.execute(select(Question).where(Question.block_id == b.id))).scalar_one()
+        o = (await session.execute(select(AnswerOption).where(AnswerOption.question_id == q.id))).scalar_one()
+        await client.post(
+            f"/api/v1/tests/blocks/{b.id}/submit",
+            json={"answers": [{"question_id": str(q.id), "selected_answer_id": str(o.id)}]},
+            cookies=headers,
+        )
+        await client.post(
+            f"/api/v1/certificates/courses/{course.id}/generate", cookies=headers
+        )
+
+        other_user = await create_user("cert_hacker@test.com")
+        other_headers = await _login(client, "cert_hacker@test.com")
+
+        resp = await client.get(
+            f"/api/v1/certificates/courses/{course.id}/certificate", cookies=other_headers
+        )
+        assert resp.status_code == 404
+
+
+# ============================================================
+# ISSUE 4: GradeSubmission has no score bounds validation
+# ============================================================
+
+class TestGradeSubmissionScoreBounds:
+    """Admin can set negative scores or scores exceeding max_score."""
+
+    @pytest.mark.anyio
+    async def test_grade_negative_score_accepted(
+        self, client: AsyncClient, session: AsyncSession, create_user
+    ):
+        admin = await create_user("grade_neg_admin@test.com", is_superuser=True, role="administrator")
+        user = await create_user("grade_neg_user@test.com")
+        course = Course(title="Grade Neg Course", created_by=admin.id, is_published=True)
+        session.add(course)
+        await session.flush()
+        block = Block(course_id=course.id, title="Manual Test", block_type=BlockType.manual_test, order_index=0)
+        session.add(block)
+        await session.flush()
+        q = Question(block_id=block.id, text="Q1", question_type=QuestionType.free_text)
+        session.add(q)
+        await session.commit()
+
+        sub = TestSubmission(user_id=user.id, block_id=block.id, max_score=1, is_graded=False)
+        session.add(sub)
+        await session.commit()
+
+        admin_headers = await _login(client, "grade_neg_admin@test.com")
+        resp = await client.post(
+            f"/api/v1/tests/submissions/{sub.id}/grade",
+            json={"score": -5.0, "admin_comment": "negative"},
+            cookies=admin_headers,
+        )
+        assert resp.status_code == 200, "Currently accepts negative scores — documents the bug"
+
+    @pytest.mark.anyio
+    async def test_grade_score_exceeds_max_accepted(
+        self, client: AsyncClient, session: AsyncSession, create_user
+    ):
+        admin = await create_user("grade_over_admin@test.com", is_superuser=True, role="administrator")
+        user = await create_user("grade_over_user@test.com")
+        course = Course(title="Grade Over Course", created_by=admin.id, is_published=True)
+        session.add(course)
+        await session.flush()
+        block = Block(course_id=course.id, title="Manual Test", block_type=BlockType.manual_test, order_index=0)
+        session.add(block)
+        await session.flush()
+        q = Question(block_id=block.id, text="Q1", question_type=QuestionType.free_text)
+        session.add(q)
+        await session.commit()
+
+        sub = TestSubmission(user_id=user.id, block_id=block.id, max_score=3, is_graded=False)
+        session.add(sub)
+        await session.commit()
+
+        admin_headers = await _login(client, "grade_over_admin@test.com")
+        resp = await client.post(
+            f"/api/v1/tests/submissions/{sub.id}/grade",
+            json={"score": 999.0, "admin_comment": "over max"},
+            cookies=admin_headers,
+        )
+        assert resp.status_code == 200, "Currently accepts score > max_score — documents the bug"
+
+    @pytest.mark.anyio
+    async def test_grade_zero_score_accepted(
+        self, client: AsyncClient, session: AsyncSession, create_user
+    ):
+        admin = await create_user("grade_zero_admin@test.com", is_superuser=True, role="administrator")
+        user = await create_user("grade_zero_user@test.com")
+        course = Course(title="Grade Zero Course", created_by=admin.id, is_published=True)
+        session.add(course)
+        await session.flush()
+        block = Block(course_id=course.id, title="Manual Test", block_type=BlockType.manual_test, order_index=0)
+        session.add(block)
+        await session.flush()
+        q = Question(block_id=block.id, text="Q1", question_type=QuestionType.free_text)
+        session.add(q)
+        await session.commit()
+
+        sub = TestSubmission(user_id=user.id, block_id=block.id, max_score=1, is_graded=False)
+        session.add(sub)
+        await session.commit()
+
+        admin_headers = await _login(client, "grade_zero_admin@test.com")
+        resp = await client.post(
+            f"/api/v1/tests/submissions/{sub.id}/grade",
+            json={"score": 0, "admin_comment": "zero"},
+            cookies=admin_headers,
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["score"] == 0
+
+
+# ============================================================
+# ISSUE 5: No unique constraint on CourseEnrollment
+# ============================================================
+
+class TestEnrollmentUniqueConstraint:
+    """Parallel enroll requests can create duplicate enrollments."""
+
+    @pytest.mark.anyio
+    async def test_duplicate_enrollment_via_sequential_requests(
+        self, client: AsyncClient, session: AsyncSession, create_user
+    ):
+        user = await create_user("dup_enroll_user@test.com")
+        admin = await create_user("dup_enroll_admin@test.com", is_superuser=True, role="administrator")
+        course = Course(title="Dup Enroll Course", created_by=admin.id, is_published=True)
+        session.add(course)
+        await session.commit()
+        headers = await _login(client, "dup_enroll_user@test.com")
+
+        resp1 = await client.post(f"/api/v1/courses/{course.id}/enroll", cookies=headers)
+        assert resp1.status_code in (200, 201)
+
+        resp2 = await client.post(f"/api/v1/courses/{course.id}/enroll", cookies=headers)
+        assert resp2.status_code in (200, 201, 409)
+
+        count = (await session.execute(
+            select(CourseEnrollment).where(
+                CourseEnrollment.user_id == user.id,
+                CourseEnrollment.course_id == course.id,
+            )
+        )).scalars().all()
+        assert len(count) <= 1, f"Should have at most 1 enrollment, got {len(count)}"
+
+    @pytest.mark.anyio
+    async def test_direct_db_duplicate_enrollment(
+        self, session: AsyncSession, create_user
+    ):
+        user = await create_user("dup_direct@test.com")
+        admin = await create_user("dup_direct_admin@test.com", is_superuser=True, role="administrator")
+        course = Course(title="Dup Direct Course", created_by=admin.id, is_published=True)
+        session.add(course)
+        await session.commit()
+
+        e1 = CourseEnrollment(user_id=user.id, course_id=course.id)
+        session.add(e1)
+        await session.commit()
+
+        e2 = CourseEnrollment(user_id=user.id, course_id=course.id)
+        session.add(e2)
+        await session.commit()
+
+        count = (await session.execute(
+            select(CourseEnrollment).where(
+                CourseEnrollment.user_id == user.id,
+                CourseEnrollment.course_id == course.id,
+            )
+        )).scalars().all()
+        assert len(count) == 2, "No unique constraint allows duplicate enrollments"
+
+
+# ============================================================
+# ISSUE 6: Free-text question grading uses submission-level score
+# ============================================================
+
+class TestFreeTextGradingGranularity:
+    """Free-text question correctness is determined by the TOTAL submission score,
+    not per-question score."""
+
+    @pytest.mark.anyio
+    async def test_free_text_result_uses_submission_score(
+        self, client: AsyncClient, session: AsyncSession, create_user
+    ):
+        admin = await create_user("ft_admin@test.com", is_superuser=True, role="administrator")
+        user = await create_user("ft_user@test.com")
+        course = Course(title="FT Course", created_by=admin.id, is_published=True)
+        session.add(course)
+        await session.flush()
+        block = Block(course_id=course.id, title="Mixed", block_type=BlockType.mixed_test, order_index=0)
+        session.add(block)
+        await session.flush()
+
+        q_auto = Question(block_id=block.id, text="Auto Q", question_type=QuestionType.single_choice, order_index=0)
+        session.add(q_auto)
+        await session.flush()
+        o_correct = AnswerOption(question_id=q_auto.id, text="Correct", is_correct=True, order_index=0)
+        session.add(o_correct)
+
+        q_text = Question(block_id=block.id, text="Free Q", question_type=QuestionType.free_text, order_index=1)
+        session.add(q_text)
+        o_text_correct = AnswerOption(question_id=q_text.id, text="Expected answer", is_correct=True, order_index=0)
+        session.add(o_text_correct)
+        await session.commit()
+
+        sub = TestSubmission(user_id=user.id, block_id=block.id, max_score=2, score=1.5, is_graded=True)
+        session.add(sub)
+        await session.flush()
+
+        ta1 = TestAnswer(submission_id=sub.id, question_id=q_auto.id, selected_answer_id=o_correct.id)
+        ta2 = TestAnswer(submission_id=sub.id, question_id=q_text.id, text_answer="Expected answer")
+        session.add(ta1)
+        session.add(ta2)
+        await session.commit()
+
+        user_headers = await _login(client, "ft_user@test.com")
+        resp = await client.get(
+            f"/api/v1/tests/blocks/{block.id}/results", cookies=user_headers
+        )
+        assert resp.status_code == 200
+        results = resp.json()
+        ft_result = next(r for r in results["questions"] if r["question_id"] == str(q_text.id))
+        assert ft_result["status"] == "Неверно", (
+            "Free-text shows INCORRECT because total score (1.5) < max_score (2), "
+            "even though the admin might have given full credit for this question"
+        )
+
+
+# ============================================================
+# ISSUE 7: Test submission does not validate question/answer ownership
+# ============================================================
+
+class TestAnswerOwnershipValidation:
+    """Client can submit answers for questions from other blocks."""
+
+    @pytest.mark.anyio
+    async def test_submit_answer_for_wrong_block_question(
+        self, client: AsyncClient, session: AsyncSession, create_user
+    ):
+        user = await create_user("own_user@test.com")
+        admin = await create_user("own_admin@test.com", is_superuser=True, role="administrator")
+        course = Course(title="Ownership Course", created_by=admin.id, is_published=True)
+        session.add(course)
+        await session.flush()
+
+        block1 = Block(course_id=course.id, title="Block1", block_type=BlockType.auto_test, order_index=0)
+        block2 = Block(course_id=course.id, title="Block2", block_type=BlockType.auto_test, order_index=1)
+        session.add(block1)
+        session.add(block2)
+        await session.flush()
+
+        q1 = Question(block_id=block1.id, text="Q1 in Block1", question_type=QuestionType.single_choice)
+        session.add(q1)
+        await session.flush()
+        o1 = AnswerOption(question_id=q1.id, text="Correct1", is_correct=True)
+        session.add(o1)
+
+        q2 = Question(block_id=block2.id, text="Q2 in Block2", question_type=QuestionType.single_choice)
+        session.add(q2)
+        await session.flush()
+        o2 = AnswerOption(question_id=q2.id, text="Correct2", is_correct=True)
+        session.add(o2)
+        await session.commit()
+
+        user_headers = await _login(client, "own_user@test.com")
+
+        resp = await client.post(
+            f"/api/v1/tests/blocks/{block1.id}/submit",
+            json={"answers": [{"question_id": str(q2.id), "selected_answer_id": str(o2.id)}]},
+            cookies=user_headers,
+        )
+        assert resp.status_code == 200, "Currently accepts answers for questions from other blocks"
+
+        sub_id = resp.json()["id"]
+        sub = await session.get(TestSubmission, uuid.UUID(sub_id))
+        await session.refresh(sub, ["answers"])
+        assert len(sub.answers) == 1, "Submission contains answer for question from wrong block"
+
+
+# ============================================================
+# ISSUE 8: Double-commit in update_course_completion_status
+# ============================================================
+
+class TestDoubleCommitPattern:
+    """update_course_completion_status does session.commit() internally,
+    then the caller also commits."""
+
+    @pytest.mark.anyio
+    async def test_completion_status_committed_inside_helper(
+        self, client: AsyncClient, session: AsyncSession, create_user
+    ):
+        admin = await create_user("dc_admin@test.com", is_superuser=True, role="administrator")
+        user = await create_user("dc_user@test.com")
+        course = Course(title="DC Course", created_by=admin.id, is_published=True)
+        session.add(course)
+        await session.flush()
+        block = Block(course_id=course.id, title="Single Test", block_type=BlockType.auto_test, order_index=0)
+        session.add(block)
+        await session.flush()
+        q = Question(block_id=block.id, text="Q", question_type=QuestionType.single_choice)
+        session.add(q)
+        await session.flush()
+        o = AnswerOption(question_id=q.id, text="C", is_correct=True)
+        session.add(o)
+        await session.commit()
+
+        enrollment = CourseEnrollment(user_id=user.id, course_id=course.id)
+        session.add(enrollment)
+        await session.commit()
+
+        user_headers = await _login(client, "dc_user@test.com")
+        resp = await client.post(
+            f"/api/v1/tests/blocks/{block.id}/submit",
+            json={"answers": [{"question_id": str(q.id), "selected_answer_id": str(o.id)}]},
+            cookies=user_headers,
+        )
+        assert resp.status_code == 200
+
+        await session.refresh(enrollment)
+        assert enrollment.completed_at is not None
