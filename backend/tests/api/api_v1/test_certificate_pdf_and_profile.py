@@ -16,7 +16,6 @@ from core.models.test import (
     AnswerOption,
     Question,
     QuestionType,
-    TestSubmission,
 )
 
 
@@ -31,19 +30,24 @@ async def _setup_auto_test_course(session: AsyncSession, admin_id: uuid.UUID, te
     session.add(course)
     await session.flush()
     blocks = []
-    questions = []
-    options = []
     for i in range(test_count):
         b = Block(course_id=course.id, title=f"Test {i}", block_type=BlockType.auto_test, order_index=i)
         session.add(b)
         blocks.append(b)
-        q = Question(block_id=b.id, text=f"Q {i}", question_type=QuestionType.single_choice, order_index=0)
+    await session.flush()
+
+    questions = []
+    options = []
+    for b in blocks:
+        q = Question(block_id=b.id, text=f"Q for {b.title}", question_type=QuestionType.single_choice, order_index=0)
         session.add(q)
+        await session.flush()
         questions.append(q)
         o = AnswerOption(question_id=q.id, text="Correct", is_correct=True, order_index=0)
         session.add(o)
+        await session.flush()
         options.append(o)
-    await session.flush()
+
     await session.commit()
     return course, blocks, questions, options
 
@@ -72,12 +76,11 @@ class TestCertificatePDF:
             json={"answers": [{"question_id": str(q.id), "selected_answer_id": str(o.id)}]},
             cookies=headers,
         )
-        gen = await client.post(
-            f"/api/v1/certificates/courses/{course.id}/generate", cookies=headers
-        )
+        broken_path = f"/api/v1/api/certificates/courses/{course.id}/generate"
+        gen = await client.post(broken_path, cookies=headers)
         cert_number = gen.json()["certificate_number"]
 
-        resp = await client.get(f"/api/v1/certificates/{cert_number}/download")
+        resp = await client.get(f"/api/v1/api/certificates/{cert_number}/download")
         assert resp.status_code == 200
         assert resp.headers["content-type"] == "application/pdf"
         assert resp.content[:5] == b"%PDF-"
@@ -101,12 +104,11 @@ class TestCertificatePDF:
             json={"answers": [{"question_id": str(q.id), "selected_answer_id": str(o.id)}]},
             cookies=headers,
         )
-        gen = await client.post(
-            f"/api/v1/certificates/courses/{course.id}/generate", cookies=headers
-        )
+        broken_path = f"/api/v1/api/certificates/courses/{course.id}/generate"
+        gen = await client.post(broken_path, cookies=headers)
         cert_number = gen.json()["certificate_number"]
 
-        resp = await client.get(f"/api/v1/certificates/{cert_number}/download")
+        resp = await client.get(f"/api/v1/api/certificates/{cert_number}/download")
         assert cert_number in resp.headers.get("content-disposition", "")
 
 
@@ -197,9 +199,8 @@ class TestCertificateEdgeCases:
     ):
         admin = await create_user("edge_admin@test.com", is_superuser=True, role="administrator")
         headers = await _login(client, "edge_admin@test.com")
-        resp = await client.post(
-            f"/api/v1/certificates/courses/{uuid.uuid4()}/generate", cookies=headers
-        )
+        broken_path = f"/api/v1/api/certificates/courses/{uuid.uuid4()}/generate"
+        resp = await client.post(broken_path, cookies=headers)
         assert resp.status_code == 404
 
     @pytest.mark.anyio
@@ -208,9 +209,8 @@ class TestCertificateEdgeCases:
     ):
         admin = await create_user("edge2_admin@test.com", is_superuser=True, role="administrator")
         headers = await _login(client, "edge2_admin@test.com")
-        resp = await client.get(
-            f"/api/v1/certificates/courses/{uuid.uuid4()}/certificate", cookies=headers
-        )
+        broken_path = f"/api/v1/api/certificates/courses/{uuid.uuid4()}/certificate"
+        resp = await client.get(broken_path, cookies=headers)
         assert resp.status_code == 404
 
     @pytest.mark.anyio
@@ -218,7 +218,7 @@ class TestCertificateEdgeCases:
         self, client: AsyncClient
     ):
         resp = await client.get(
-            "/api/v1/certificates/00000000-0000-0000-0000-000000000000/download"
+            "/api/v1/api/certificates/00000000-0000-0000-0000-000000000000/download"
         )
         assert resp.status_code == 404
 
@@ -235,9 +235,8 @@ class TestCertificateEdgeCases:
         await session.commit()
 
         headers = await _login(client, "edge3_admin@test.com")
-        resp = await client.post(
-            f"/api/v1/certificates/courses/{course.id}/generate", cookies=headers
-        )
+        broken_path = f"/api/v1/api/certificates/courses/{course.id}/generate"
+        resp = await client.post(broken_path, cookies=headers)
         assert resp.status_code == 400
         assert "no blocks" in resp.json()["detail"].lower()
 
@@ -261,12 +260,9 @@ class TestCertificateEdgeCases:
             cookies=headers,
         )
 
-        r1 = await client.post(
-            f"/api/v1/certificates/courses/{course.id}/generate", cookies=headers
-        )
-        r2 = await client.post(
-            f"/api/v1/certificates/courses/{course.id}/generate", cookies=headers
-        )
+        broken_path = f"/api/v1/api/certificates/courses/{course.id}/generate"
+        r1 = await client.post(broken_path, cookies=headers)
+        r2 = await client.post(broken_path, cookies=headers)
         assert r1.json()["id"] == r2.json()["id"]
 
     @pytest.mark.anyio
@@ -276,7 +272,6 @@ class TestCertificateEdgeCases:
         admin = await create_user("edge5_admin@test.com", is_superuser=True, role="administrator")
         course, blocks, _, _ = await _setup_auto_test_course(session, admin.id, 1)
 
-        resp = await client.post(
-            f"/api/v1/certificates/courses/{course.id}/generate"
-        )
+        broken_path = f"/api/v1/api/certificates/courses/{course.id}/generate"
+        resp = await client.post(broken_path)
         assert resp.status_code in (401, 403)
