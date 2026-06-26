@@ -380,11 +380,6 @@ async def get_product_summary(db: Session, pagination: PaginationParams = Depend
     )
 
 
-@router.get("/filters/", response_model=list[str])
-async def get_product_filters(db: Session):
-    return await product_crud.get_product_attributes_list(db)
-
-
 @router.post("/import", status_code=status.HTTP_201_CREATED)
 async def import_products(
     db: Session,

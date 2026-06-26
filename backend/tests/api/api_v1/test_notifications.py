@@ -170,10 +170,6 @@ async def test_clear_notifications(client: AsyncClient, normal_user_token_header
 
 @pytest.mark.anyio
 async def test_course_deletion_deletes_notifications(session: AsyncSession, create_user):
-    from core.models.course import Course
-    from core.models.block import Block, BlockType
-    from core.models.test import TestSubmission
-    from Repository.course import delete_course
     import uuid_utils
     from datetime import datetime, timezone
     

@@ -153,12 +153,57 @@ async def test_list_active_product_attributes(
         headers=superuser_token_headers,
     )
 
-    response = await client.get("/api/v1/product-attributes/active")
+    response = await client.get("/api/v1/product-attributes/")
     assert response.status_code == 200
     data = response.json()
     keys = [a["key"] for a in data]
     assert "visible_attr" in keys
     assert "hidden_attr" not in keys
+
+
+@pytest.mark.anyio
+async def test_list_all_attributes_as_admin(
+    client: AsyncClient, superuser_token_headers
+):
+    await client.post(
+        "/api/v1/product-attributes/",
+        json={"key": "admin_visible", "is_visible": True},
+        headers=superuser_token_headers,
+    )
+    await client.post(
+        "/api/v1/product-attributes/",
+        json={"key": "admin_hidden", "is_visible": False},
+        headers=superuser_token_headers,
+    )
+
+    response = await client.get(
+        "/api/v1/product-attributes/",
+        params={"visible_only": False},
+        headers=superuser_token_headers,
+    )
+    assert response.status_code == 200
+    data = response.json()
+    keys = [a["key"] for a in data]
+    assert "admin_visible" in keys
+    assert "admin_hidden" in keys
+
+
+@pytest.mark.anyio
+async def test_non_admin_cannot_see_hidden_attributes(
+    client: AsyncClient, superuser_token_headers
+):
+    await client.post(
+        "/api/v1/product-attributes/",
+        json={"key": "hidden_for_user", "is_visible": False},
+        headers=superuser_token_headers,
+    )
+
+    client.cookies.clear()
+    response = await client.get(
+        "/api/v1/product-attributes/",
+        params={"visible_only": False},
+    )
+    assert response.status_code == 403
 
 
 @pytest.mark.anyio

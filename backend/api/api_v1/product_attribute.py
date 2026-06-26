@@ -2,6 +2,7 @@ import uuid
 from typing import Annotated
 
 from api.dependencies.authorization import current_admin
+from core.authentication.fastapi_users import current_optional_user
 from core.config import settings
 from core.models.db_helper import db_helper
 from core.models.user import User
@@ -11,6 +12,7 @@ from core.schemas.product_attribute import (
     ProductAttributeRead,
     ProductAttributeUpdate,
 )
+from Domain.Enums.user_role import UserRole
 from Services import product_attribute as attribute_crud
 from fastapi import (
     APIRouter,
@@ -36,16 +38,17 @@ async def list_product_attributes(
     db: Session,
     offset: int = Query(0, ge=0),
     limit: int | None = Query(None, ge=1, le=1000),
+    visible_only: bool = Query(True),
+    user: User | None = Depends(current_optional_user),
 ):
+    if not visible_only:
+        if not user or user.role != UserRole.admin:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only admins can access hidden attributes",
+            )
     return await attribute_crud.get_product_attributes(
-        db, offset=offset, limit=limit
-    )
-
-
-@router.get("/active", response_model=list[ProductAttributeRead])
-async def list_active_product_attributes(db: Session):
-    return await attribute_crud.get_product_attributes(
-        db, visible_only=True
+        db, offset=offset, limit=limit, visible_only=visible_only
     )
 
 
