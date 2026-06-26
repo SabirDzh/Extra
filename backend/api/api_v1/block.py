@@ -12,7 +12,7 @@ from core.models.progress import UserBlockProgress
 from core.models.test import TestSubmission
 from core.models.user import User
 from core.schemas.block import BlockCreate, BlockRead, BlockUpdate, CourseBlocksResponse
-from core.schemas.test import BlockTestResults
+from core.schemas.test import BlockTestResults, SubmissionHistoryResponse
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, status
 from Services import course as course_crud
 from Services.test_grading import _mark_block_completed
@@ -21,7 +21,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from Repository.common import ensure_unique_field
 from api.dependencies.authorization import current_admin, current_course_allowed_user
 
-from Services.test_results import get_test_results_for_block
+from Services.test_results import get_submission_history, get_test_results_for_block
 
 router = APIRouter(
     prefix="/courses/{course_id}/blocks",
@@ -403,3 +403,28 @@ async def get_block_test_results(
         )
 
     return results
+
+
+@router.get("/{block_id}/submission-history", response_model=SubmissionHistoryResponse)
+async def get_block_submission_history(
+    course_id: uuid.UUID,
+    block_id: uuid.UUID,
+    db: Session,
+    user: CourseAllowedUser,
+):
+    block = await _get_block_or_404(db, block_id, course_id)
+
+    if block.block_type not in (
+        BlockType.auto_test,
+        BlockType.manual_test,
+        BlockType.mixed_test,
+    ):
+        raise HTTPException(status_code=400, detail="Block is not a test block")
+
+    history = await get_submission_history(db, user.id, block_id)
+    if not history:
+        raise HTTPException(
+            status_code=404, detail="No submissions found"
+        )
+
+    return history

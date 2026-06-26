@@ -134,6 +134,22 @@ class BlockTestResults(BaseModel):
     questions: list[QuestionResult]
 
 
+class SubmissionWithResults(BaseModel):
+    submission_id: uuid.UUID
+    submitted_at: datetime
+    score: float | None
+    max_score: float
+    is_graded: bool
+    admin_comment: str | None
+    questions: list[QuestionResult]
+
+
+class SubmissionHistoryResponse(BaseModel):
+    block_id: uuid.UUID
+    total_attempts: int
+    submissions: list[SubmissionWithResults]
+
+
 class CorrectTextAnswerCreate(BaseModel):
     text: str = Field(min_length=1)
 

@@ -6,7 +6,13 @@ from sqlalchemy.orm import selectinload
 
 from core.models.block import Block, BlockType
 from core.models.test import Question, TestAnswer, TestSubmission
-from core.schemas.test import BlockTestResults, QuestionResult, TestResultStatus
+from core.schemas.test import (
+    BlockTestResults,
+    QuestionResult,
+    SubmissionHistoryResponse,
+    SubmissionWithResults,
+    TestResultStatus,
+)
 
 
 async def get_test_results_for_block(
@@ -169,5 +175,123 @@ async def get_test_results_for_block(
         passed_stages=current_stage,
         progress=course.progress,
         questions=question_results,
+    )
+
+
+async def get_submission_history(
+    db: AsyncSession,
+    user_id: uuid.UUID,
+    block_id: uuid.UUID,
+) -> SubmissionHistoryResponse | None:
+    block = await db.get(Block, block_id)
+    if not block or block.block_type not in (
+        BlockType.auto_test,
+        BlockType.manual_test,
+        BlockType.mixed_test,
+    ):
+        return None
+
+    stmt_sub = (
+        select(TestSubmission)
+        .where(
+            TestSubmission.user_id == user_id,
+            TestSubmission.block_id == block_id,
+        )
+        .options(selectinload(TestSubmission.answers).selectinload(TestAnswer.selected_option))
+        .order_by(TestSubmission.submitted_at.desc())
+    )
+    submissions = (await db.execute(stmt_sub)).scalars().all()
+
+    if not submissions:
+        return None
+
+    stmt_q = (
+        select(Question)
+        .where(Question.block_id == block_id)
+        .options(selectinload(Question.options))
+        .order_by(Question.order_index)
+    )
+    questions = (await db.execute(stmt_q)).scalars().all()
+
+    submission_results = []
+    for sub in submissions:
+        user_answers_map = {}
+        for ans in sub.answers:
+            user_answers_map.setdefault(ans.question_id, []).append(ans)
+
+        question_results = []
+        for q in questions:
+            correct_options = [opt for opt in q.options if opt.is_correct]
+            correct_text = ", ".join(o.text for o in correct_options) if correct_options else None
+            correct_option_ids = {opt.id for opt in correct_options}
+
+            q_answers = user_answers_map.get(q.id, [])
+            user_answer_text = None
+            res_status = TestResultStatus.INCORRECT
+            score = 0
+
+            user_selected_texts = []
+            user_selected_ids = set()
+            text_answer = None
+
+            for ans in q_answers:
+                if ans.selected_option:
+                    user_selected_texts.append(ans.selected_option.text)
+                    user_selected_ids.add(ans.selected_answer_id)
+                if ans.text_answer:
+                    text_answer = ans.text_answer
+
+            if user_selected_texts:
+                user_answer_text = ", ".join(user_selected_texts)
+            elif text_answer:
+                user_answer_text = text_answer
+
+            if q_answers:
+                if q.question_type == "single_choice":
+                    if len(user_selected_ids) == 1 and list(user_selected_ids)[0] in correct_option_ids:
+                        res_status = TestResultStatus.CORRECT
+                        score = 1
+                elif q.question_type == "multiple_choice":
+                    if user_selected_ids == correct_option_ids and correct_option_ids:
+                        res_status = TestResultStatus.CORRECT
+                        score = 1
+                elif q.question_type == "free_text":
+                    if sub.is_graded:
+                        if sub.score is not None and sub.score >= sub.max_score and sub.max_score > 0:
+                            res_status = TestResultStatus.CORRECT
+                            score = 1
+                    else:
+                        res_status = TestResultStatus.REQUIRES_REVIEW
+            else:
+                if q.question_type == "free_text" and not sub.is_graded:
+                    res_status = TestResultStatus.REQUIRES_REVIEW
+
+            question_results.append(
+                QuestionResult(
+                    question_id=q.id,
+                    text=q.text,
+                    status=res_status,
+                    correct_answer=correct_text,
+                    user_answer=user_answer_text,
+                    score=score,
+                )
+            )
+
+        submission_results.append(
+            SubmissionWithResults(
+                submission_id=sub.id,
+                submitted_at=sub.submitted_at,
+                score=sub.score,
+                max_score=sub.max_score,
+                is_graded=sub.is_graded,
+                admin_comment=sub.admin_comment,
+                questions=question_results,
+            )
+        )
+
+    return SubmissionHistoryResponse(
+        block_id=block_id,
+        total_attempts=len(submission_results),
+        submissions=submission_results,
     )
 
