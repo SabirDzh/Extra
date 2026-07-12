@@ -311,7 +311,7 @@ async def test_24_admin_can_regrade(client: AsyncClient, session: AsyncSession, 
     cookies = await _get_auth_cookies(client, admin)
     course = await _create_course(session)
     block = await _create_block(session, course.id)
-    sub = TestSubmission(user_id=user.id, block_id=block.id, score=1, is_graded=True)
+    sub = TestSubmission(user_id=user.id, block_id=block.id, score=1, max_score=5, is_graded=True)
     session.add(sub)
     await session.commit()
     
@@ -326,7 +326,7 @@ async def test_27_graded_by_tracked(client: AsyncClient, session: AsyncSession, 
     cookies = await _get_auth_cookies(client, admin)
     course = await _create_course(session)
     block = await _create_block(session, course.id)
-    sub = TestSubmission(user_id=user.id, block_id=block.id, score=0, is_graded=False)
+    sub = TestSubmission(user_id=user.id, block_id=block.id, score=0, max_score=10, is_graded=False)
     session.add(sub)
     await session.commit()
     

@@ -14,7 +14,7 @@ from core.models.course import (
 
 class CourseCreate(BaseModel):
     title: str = Field(min_length=1, max_length=256)
-    description: str = Field("", max_length=1024)
+    description: str = Field("", max_length=2048)
     level: CourseLevel = Field(default=CourseLevel.beginner)
     audience: CourseAudience = Field(default=CourseAudience.everyone)
     is_published: bool = True
@@ -22,7 +22,7 @@ class CourseCreate(BaseModel):
 
 class CourseUpdate(BaseModel):
     title: str | None = Field(None, min_length=1, max_length=256)
-    description: str | None = Field(None, max_length=1024)
+    description: str | None = Field(None, max_length=2048)
     level: CourseLevel | None = None
     audience: CourseAudience | None = None
     is_published: bool | None = None

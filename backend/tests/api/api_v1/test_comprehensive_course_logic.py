@@ -332,8 +332,7 @@ class TestSecurityPermissions:
         payload = {"answers": [{"question_id": str(uuid.uuid4()), "selected_answer_id": str(uuid.uuid4())}]}
         resp = await client.post(f"/api/v1/tests/blocks/{blocks[1].id}/submit", json=payload)
 
-        assert resp.status_code == 200
-        assert resp.json()["score"] == 0
+        assert resp.status_code == 400
 
     async def test_submit_answers_from_different_block(self, client, session):
         admin = await _create_user(session, "admsec5@test.com", is_superuser=True)
@@ -345,7 +344,7 @@ class TestSecurityPermissions:
         payload = {"answers": [{"question_id": str(questions[0].id), "selected_answer_id": str(options[0].id)}]}
         resp = await client.post(f"/api/v1/tests/blocks/{blocks[3].id}/submit", json=payload)
 
-        assert resp.json()["score"] == 0
+        assert resp.status_code == 400
 
     async def test_manual_test_result_excluded_from_counts(self, client, session):
         admin = await _create_user(session, "admfails1@test.com", is_superuser=True)

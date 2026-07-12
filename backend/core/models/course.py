@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, Index, String, Text, func
+from sqlalchemy import DateTime, ForeignKey, Index, String, Text, UniqueConstraint, func
 from sqlalchemy import Enum as SaEnum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -86,6 +86,10 @@ class Course(IdUuidPkMixin, Base):
 
 
 class CourseEnrollment(IdUuidPkMixin, Base):
+    __table_args__ = (
+        UniqueConstraint("user_id", "course_id", name="uq_course_enrollment_user_course"),
+    )
+
     user_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("users.id", ondelete="CASCADE")
     )

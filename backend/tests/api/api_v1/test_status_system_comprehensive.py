@@ -70,7 +70,7 @@ async def test_block_status_transitions(
         admin_auth = await client.post("/api/v1/auth/login", data={"username": admin.email, "password": "Password12345!"})
         admin_cookies = {"auth_user": admin_auth.cookies.get("auth_user")}
         
-        score = 85 if action == "grade_positive" else 0
+        score = 1 if action == "grade_positive" else 0
         resp_grade = await client.post(
             f"/api/v1/tests/submissions/{submission_id}/grade", 
             json={"score": score, "admin_comment": "Graded"}, 

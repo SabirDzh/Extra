@@ -227,9 +227,9 @@ async def test_admin_grades_submission(client: AsyncClient, session: AsyncSessio
     sub_id = resp.json()["id"]
     
     admin_headers = await _get_auth_headers(client, {"email": "test_admin@test.com", "password": "Password12345!"})
-    grade_resp = await client.post(f"/api/v1/tests/submissions/{sub_id}/grade", json={"score": 100, "admin_comment": "Good"}, headers=admin_headers)
+    grade_resp = await client.post(f"/api/v1/tests/submissions/{sub_id}/grade", json={"score": 1, "admin_comment": "Good"}, headers=admin_headers)
     assert grade_resp.status_code == 200
-    assert grade_resp.json()["score"] == 100
+    assert grade_resp.json()["score"] == 1
     assert grade_resp.json()["is_graded"] is True
 
 

@@ -21,15 +21,12 @@ async def test_admin_grade_normalization(client: AsyncClient, session: AsyncSess
     
     student = await create_user("student_s2_1@test.com")
     session.add(CourseEnrollment(user_id=student.id, course_id=course.id))
+    await session.flush()
+    sub = TestSubmission(user_id=student.id, block_id=b.id, max_score=100, is_graded=False)
+    session.add(sub)
     await session.commit()
+    submission_id = str(sub.id)
     
-
-    auth_resp = await client.post("/api/v1/auth/login", data={"username": "student_s2_1@test.com", "password": "Password12345!"})
-    cookies = {"fastapiusersauth": auth_resp.cookies.get("fastapiusersauth")}
-    resp_sub = await client.post(f"/api/v1/tests/blocks/{b.id}/submit", json={"answers": []}, cookies=cookies)
-    submission_id = resp_sub.json()["id"]
-    
-
     admin_auth = await client.post("/api/v1/auth/login", data={"username": "adm_s2@test.com", "password": "Password12345!"})
     admin_cookies = {"fastapiusersauth": admin_auth.cookies.get("fastapiusersauth")}
     
@@ -41,6 +38,7 @@ async def test_admin_grade_normalization(client: AsyncClient, session: AsyncSess
     assert data["score"] == 85
     
 
+    session.expire_all()
     stmt = select(TestSubmission).where(TestSubmission.id == uuid.UUID(submission_id))
     submission = (await session.execute(stmt)).scalar_one()
     assert submission.score == 85
@@ -58,30 +56,31 @@ async def test_admin_grade_boundaries(client: AsyncClient, session: AsyncSession
     
     student = await create_user("std_bound@test.com")
     session.add(CourseEnrollment(user_id=student.id, course_id=course.id))
+    await session.flush()
+    
+    sub1 = TestSubmission(user_id=student.id, block_id=b.id, max_score=100, is_graded=False)
+    session.add(sub1)
+    await session.flush()
+    sub2 = TestSubmission(user_id=student.id, block_id=b.id, max_score=100, is_graded=False)
+    session.add(sub2)
     await session.commit()
-    
-    auth_resp = await client.post("/api/v1/auth/login", data={"username": "std_bound@test.com", "password": "Password12345!"})
-    cookies = {"fastapiusersauth": auth_resp.cookies.get("fastapiusersauth")}
-    
-
-    resp1 = await client.post(f"/api/v1/tests/blocks/{b.id}/submit", json={"answers": []}, cookies=cookies)
-    sub1_id = resp1.json()["id"]
     
     admin_auth = await client.post("/api/v1/auth/login", data={"username": "adm_s2_bound@test.com", "password": "Password12345!"})
     admin_cookies = {"fastapiusersauth": admin_auth.cookies.get("fastapiusersauth")}
     
-    await client.post(f"/api/v1/tests/submissions/{sub1_id}/grade", json={"score": 0}, cookies=admin_cookies)
+    await client.post(f"/api/v1/tests/submissions/{sub1.id}/grade", json={"score": 0}, cookies=admin_cookies)
     
 
-    resp2 = await client.post(f"/api/v1/tests/blocks/{b.id}/submit", json={"answers": []}, cookies=cookies)
-    sub2_id = resp2.json()["id"]
-    await client.post(f"/api/v1/tests/submissions/{sub2_id}/grade", json={"score": 100}, cookies=admin_cookies)
+    await client.post(f"/api/v1/tests/submissions/{sub2.id}/grade", json={"score": 100}, cookies=admin_cookies)
     
 
-    sub1 = (await session.execute(select(TestSubmission).where(TestSubmission.id == uuid.UUID(sub1_id)))).scalar_one()
+    sub1_id = sub1.id
+    sub2_id = sub2.id
+    session.expire_all()
+    sub1 = (await session.execute(select(TestSubmission).where(TestSubmission.id == sub1_id))).scalar_one()
     assert sub1.score == 0.0
     
-    sub2 = (await session.execute(select(TestSubmission).where(TestSubmission.id == uuid.UUID(sub2_id)))).scalar_one()
+    sub2 = (await session.execute(select(TestSubmission).where(TestSubmission.id == sub2_id))).scalar_one()
     assert sub2.score == 100.0
 
 @pytest.mark.anyio

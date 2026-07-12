@@ -2,7 +2,7 @@ import uuid
 from typing import Annotated
 
 from core.authentication.fastapi_users import current_active_user
-from core.certificate_pdf import generate_certificate_pdf
+from core.certificate_pdf import async_generate_certificate_pdf
 from core.models.block import Block
 from core.models.certificates import Certificate
 from core.models.course import Course
@@ -18,9 +18,10 @@ from sqlalchemy.orm import selectinload
 from core.config import settings
 
 from api.dependencies.authorization import current_course_allowed_user
+from Domain.Enums.user_role import UserRole
 
 router = APIRouter(
-    prefix=f"/api{settings.api.v1.certificates}",
+    prefix=settings.api.v1.certificates,
     tags=["Certificates"],
 )
 
@@ -96,7 +97,11 @@ async def get_certificate(
 
 
 @router.get("/{certificate_number}/download")
-async def download_certificate(certificate_number: str, db: Session):
+async def download_certificate(
+    certificate_number: str,
+    db: Session,
+    user: User = Depends(current_active_user),
+):
     cert = (
         await db.execute(
             select(Certificate)
@@ -110,7 +115,10 @@ async def download_certificate(certificate_number: str, db: Session):
     if not cert:
         raise HTTPException(status_code=404, detail="Certificate not found")
 
-    pdf_bytes = generate_certificate_pdf(
+    if user.role != UserRole.admin and cert.user_id != user.id:
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    pdf_bytes = await async_generate_certificate_pdf(
         full_name=cert.user.full_name,
         course_title=cert.course.title,
         certificate_number=cert.certificate_number,

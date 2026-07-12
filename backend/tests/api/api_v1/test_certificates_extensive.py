@@ -52,7 +52,7 @@ async def _mark_blocks_completed(client: AsyncClient, course_id: uuid.UUID, bloc
 @pytest.mark.anyio
 async def test_generate_cert_no_blocks(client: AsyncClient, session: AsyncSession, admin_user, superuser_token_headers):
     course, _ = await _create_course_with_blocks(session, admin_user.id, block_count=0)
-    resp = await client.post(f"/api/v1/api/certificates/courses/{course.id}/generate", headers=superuser_token_headers)
+    resp = await client.post(f"/api/v1/certificates/courses/{course.id}/generate", headers=superuser_token_headers)
     assert resp.status_code == 400
     assert "no blocks" in resp.json()["detail"].lower()
 
@@ -60,7 +60,7 @@ async def test_generate_cert_no_blocks(client: AsyncClient, session: AsyncSessio
 @pytest.mark.anyio
 async def test_generate_cert_zero_progress(client: AsyncClient, session: AsyncSession, admin_user, superuser_token_headers):
     course, blocks = await _create_course_with_blocks(session, admin_user.id, block_count=1)
-    resp = await client.post(f"/api/v1/api/certificates/courses/{course.id}/generate", headers=superuser_token_headers)
+    resp = await client.post(f"/api/v1/certificates/courses/{course.id}/generate", headers=superuser_token_headers)
     assert resp.status_code == 400
 
 
@@ -68,7 +68,7 @@ async def test_generate_cert_zero_progress(client: AsyncClient, session: AsyncSe
 async def test_generate_cert_partial_progress(client: AsyncClient, session: AsyncSession, admin_user, superuser_token_headers):
     course, blocks = await _create_course_with_blocks(session, admin_user.id, block_count=2)
     await _mark_blocks_completed(client, course.id, [blocks[0]], superuser_token_headers)
-    resp = await client.post(f"/api/v1/api/certificates/courses/{course.id}/generate", headers=superuser_token_headers)
+    resp = await client.post(f"/api/v1/certificates/courses/{course.id}/generate", headers=superuser_token_headers)
     assert resp.status_code == 400
 
 
@@ -76,7 +76,7 @@ async def test_generate_cert_partial_progress(client: AsyncClient, session: Asyn
 async def test_generate_cert_full_progress(client: AsyncClient, session: AsyncSession, admin_user, superuser_token_headers):
     course, blocks = await _create_course_with_blocks(session, admin_user.id, block_count=2)
     await _mark_blocks_completed(client, course.id, blocks, superuser_token_headers)
-    resp = await client.post(f"/api/v1/api/certificates/courses/{course.id}/generate", headers=superuser_token_headers)
+    resp = await client.post(f"/api/v1/certificates/courses/{course.id}/generate", headers=superuser_token_headers)
     assert resp.status_code == 201
     assert "certificate_number" in resp.json()
 
@@ -85,24 +85,24 @@ async def test_generate_cert_full_progress(client: AsyncClient, session: AsyncSe
 async def test_generate_cert_twice_returns_existing(client: AsyncClient, session: AsyncSession, admin_user, superuser_token_headers):
     course, blocks = await _create_course_with_blocks(session, admin_user.id, block_count=1)
     await _mark_blocks_completed(client, course.id, blocks, superuser_token_headers)
-    resp1 = await client.post(f"/api/v1/api/certificates/courses/{course.id}/generate", headers=superuser_token_headers)
+    resp1 = await client.post(f"/api/v1/certificates/courses/{course.id}/generate", headers=superuser_token_headers)
     cert_id = resp1.json()["id"]
     
-    resp2 = await client.post(f"/api/v1/api/certificates/courses/{course.id}/generate", headers=superuser_token_headers)
+    resp2 = await client.post(f"/api/v1/certificates/courses/{course.id}/generate", headers=superuser_token_headers)
     assert resp2.status_code == 201
     assert resp2.json()["id"] == cert_id
 
 
 @pytest.mark.anyio
 async def test_generate_cert_nonexistent_course(client: AsyncClient, superuser_token_headers):
-    resp = await client.post(f"/api/v1/api/certificates/courses/{uuid.uuid4()}/generate", headers=superuser_token_headers)
+    resp = await client.post(f"/api/v1/certificates/courses/{uuid.uuid4()}/generate", headers=superuser_token_headers)
     assert resp.status_code == 404
 
 
 @pytest.mark.anyio
 async def test_generate_cert_anonymous(client: AsyncClient, session: AsyncSession, admin_user):
     course, _ = await _create_course_with_blocks(session, admin_user.id, block_count=1)
-    resp = await client.post(f"/api/v1/api/certificates/courses/{course.id}/generate")
+    resp = await client.post(f"/api/v1/certificates/courses/{course.id}/generate")
     assert resp.status_code == 401
 
 
@@ -110,10 +110,10 @@ async def test_generate_cert_anonymous(client: AsyncClient, session: AsyncSessio
 async def test_get_own_certificate(client: AsyncClient, session: AsyncSession, admin_user, superuser_token_headers):
     course, blocks = await _create_course_with_blocks(session, admin_user.id, block_count=1)
     await _mark_blocks_completed(client, course.id, blocks, superuser_token_headers)
-    gen_resp = await client.post(f"/api/v1/api/certificates/courses/{course.id}/generate", headers=superuser_token_headers)
+    gen_resp = await client.post(f"/api/v1/certificates/courses/{course.id}/generate", headers=superuser_token_headers)
     cert_num = gen_resp.json()["certificate_number"]
     
-    resp = await client.get(f"/api/v1/api/certificates/courses/{course.id}/certificate", headers=superuser_token_headers)
+    resp = await client.get(f"/api/v1/certificates/courses/{course.id}/certificate", headers=superuser_token_headers)
     assert resp.status_code == 200
     assert resp.json()["certificate_number"] == cert_num
 
@@ -121,7 +121,7 @@ async def test_get_own_certificate(client: AsyncClient, session: AsyncSession, a
 @pytest.mark.anyio
 async def test_get_nonexistent_certificate(client: AsyncClient, session: AsyncSession, admin_user, superuser_token_headers):
     course, _ = await _create_course_with_blocks(session, admin_user.id, block_count=1)
-    resp = await client.get(f"/api/v1/api/certificates/courses/{course.id}/certificate", headers=superuser_token_headers)
+    resp = await client.get(f"/api/v1/certificates/courses/{course.id}/certificate", headers=superuser_token_headers)
     assert resp.status_code == 404
 
 
@@ -129,13 +129,13 @@ async def test_get_nonexistent_certificate(client: AsyncClient, session: AsyncSe
 async def test_get_other_user_certificate(client: AsyncClient, session: AsyncSession, admin_user, create_user, superuser_token_headers):
     course, blocks = await _create_course_with_blocks(session, admin_user.id, block_count=1)
     await _mark_blocks_completed(client, course.id, blocks, superuser_token_headers)
-    await client.post(f"/api/v1/api/certificates/courses/{course.id}/generate", headers=superuser_token_headers)
+    await client.post(f"/api/v1/certificates/courses/{course.id}/generate", headers=superuser_token_headers)
     
     client.cookies.clear()
     user2 = await create_user("hacker_cert@test.com")
     headers2 = await _get_auth_headers(client, {"email": "hacker_cert@test.com", "password": "Password12345!"})
     
-    resp = await client.get(f"/api/v1/api/certificates/courses/{course.id}/certificate", headers=headers2)
+    resp = await client.get(f"/api/v1/certificates/courses/{course.id}/certificate", headers=headers2)
     assert resp.status_code == 404
 
 
@@ -143,25 +143,23 @@ async def test_get_other_user_certificate(client: AsyncClient, session: AsyncSes
 async def test_download_pdf(client: AsyncClient, session: AsyncSession, admin_user, superuser_token_headers):
     course, blocks = await _create_course_with_blocks(session, admin_user.id, block_count=1)
     await _mark_blocks_completed(client, course.id, blocks, superuser_token_headers)
-    gen_resp = await client.post(f"/api/v1/api/certificates/courses/{course.id}/generate", headers=superuser_token_headers)
+    gen_resp = await client.post(f"/api/v1/certificates/courses/{course.id}/generate", headers=superuser_token_headers)
     cert_num = gen_resp.json()["certificate_number"]
     
-    client.cookies.clear()
-    headers = await _get_auth_headers(client, {"email": "block_admin@test.com", "password": "Password12345!"})
-    resp = await client.get(f"/api/v1/api/certificates/{cert_num}/download", headers=headers)
+    resp = await client.get(f"/api/v1/certificates/{cert_num}/download", headers=superuser_token_headers)
     assert resp.status_code == 200
     assert resp.headers["content-type"] == "application/pdf"
 
 
 @pytest.mark.anyio
 async def test_download_nonexistent_pdf(client: AsyncClient, superuser_token_headers):
-    resp = await client.get("/api/v1/api/certificates/FAKE-1234/download", headers=superuser_token_headers)
+    resp = await client.get("/api/v1/certificates/FAKE-1234/download", headers=superuser_token_headers)
     assert resp.status_code == 404
 
 
 @pytest.mark.anyio
 async def test_download_bad_string_pdf(client: AsyncClient):
-    resp = await client.get("/api/v1/api/certificates/../../etc/passwd/download")
+    resp = await client.get("/api/v1/certificates/../../etc/passwd/download")
     assert resp.status_code == 404
 
 
@@ -169,17 +167,17 @@ async def test_download_bad_string_pdf(client: AsyncClient):
 @pytest.mark.anyio
 async def test_invalid_uuid_endpoints(client: AsyncClient, invalid_course_id, superuser_token_headers):
 
-    resp = await client.get(f"/api/v1/api/certificates/courses/{invalid_course_id}/certificate", headers=superuser_token_headers)
+    resp = await client.get(f"/api/v1/certificates/courses/{invalid_course_id}/certificate", headers=superuser_token_headers)
     assert resp.status_code in (422, 404)
 
 @pytest.mark.anyio
 async def test_cert_anonymous_get_info(client: AsyncClient):
-    resp = await client.get(f"/api/v1/api/certificates/courses/{uuid.uuid4()}/certificate")
+    resp = await client.get(f"/api/v1/certificates/courses/{uuid.uuid4()}/certificate")
     assert resp.status_code == 401
 
 @pytest.mark.anyio
 async def test_fake_admin(client: AsyncClient, create_user):
     user = await create_user("fake_a@test.com")
     headers = await _get_auth_headers(client, {"email": "fake_a@test.com", "password": "Password12345!"})
-    resp = await client.post(f"/api/v1/api/certificates/courses/{uuid.uuid4()}/generate", headers=headers)
+    resp = await client.post(f"/api/v1/certificates/courses/{uuid.uuid4()}/generate", headers=headers)
     assert resp.status_code == 404

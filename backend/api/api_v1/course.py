@@ -10,6 +10,7 @@ from core.schemas.course import CourseCreate, CourseListRead, CourseProgress, Co
 from Repository.search_engine import SearchIn, SearchSort
 from Services import course as course_crud
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from api.dependencies.authorization import current_admin, current_course_allowed_user
 
@@ -236,7 +237,13 @@ async def enroll(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Already enrolled"
         )
 
-    await course_crud.create_enrollment(db, user.id, course_id)
+    try:
+        await course_crud.create_enrollment(db, user.id, course_id)
+    except IntegrityError:
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Already enrolled"
+        )
     return {"detail": "Enrolled successfully"}
 
 

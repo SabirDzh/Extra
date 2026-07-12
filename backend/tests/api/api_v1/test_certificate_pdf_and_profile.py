@@ -76,11 +76,11 @@ class TestCertificatePDF:
             json={"answers": [{"question_id": str(q.id), "selected_answer_id": str(o.id)}]},
             cookies=headers,
         )
-        broken_path = f"/api/v1/api/certificates/courses/{course.id}/generate"
+        broken_path = f"/api/v1/certificates/courses/{course.id}/generate"
         gen = await client.post(broken_path, cookies=headers)
         cert_number = gen.json()["certificate_number"]
 
-        resp = await client.get(f"/api/v1/api/certificates/{cert_number}/download")
+        resp = await client.get(f"/api/v1/certificates/{cert_number}/download", cookies=headers)
         assert resp.status_code == 200
         assert resp.headers["content-type"] == "application/pdf"
         assert resp.content[:5] == b"%PDF-"
@@ -104,11 +104,11 @@ class TestCertificatePDF:
             json={"answers": [{"question_id": str(q.id), "selected_answer_id": str(o.id)}]},
             cookies=headers,
         )
-        broken_path = f"/api/v1/api/certificates/courses/{course.id}/generate"
+        broken_path = f"/api/v1/certificates/courses/{course.id}/generate"
         gen = await client.post(broken_path, cookies=headers)
         cert_number = gen.json()["certificate_number"]
 
-        resp = await client.get(f"/api/v1/api/certificates/{cert_number}/download")
+        resp = await client.get(f"/api/v1/certificates/{cert_number}/download", cookies=headers)
         assert cert_number in resp.headers.get("content-disposition", "")
 
 
@@ -199,7 +199,7 @@ class TestCertificateEdgeCases:
     ):
         admin = await create_user("edge_admin@test.com", is_superuser=True, role="administrator")
         headers = await _login(client, "edge_admin@test.com")
-        broken_path = f"/api/v1/api/certificates/courses/{uuid.uuid4()}/generate"
+        broken_path = f"/api/v1/certificates/courses/{uuid.uuid4()}/generate"
         resp = await client.post(broken_path, cookies=headers)
         assert resp.status_code == 404
 
@@ -209,16 +209,19 @@ class TestCertificateEdgeCases:
     ):
         admin = await create_user("edge2_admin@test.com", is_superuser=True, role="administrator")
         headers = await _login(client, "edge2_admin@test.com")
-        broken_path = f"/api/v1/api/certificates/courses/{uuid.uuid4()}/certificate"
+        broken_path = f"/api/v1/certificates/courses/{uuid.uuid4()}/certificate"
         resp = await client.get(broken_path, cookies=headers)
         assert resp.status_code == 404
 
     @pytest.mark.anyio
     async def test_download_nonexistent_certificate_number(
-        self, client: AsyncClient
+        self, client: AsyncClient, create_user
     ):
+        admin = await create_user("edge_dl_admin@test.com", is_superuser=True, role="administrator")
+        headers = await _login(client, "edge_dl_admin@test.com")
         resp = await client.get(
-            "/api/v1/api/certificates/00000000-0000-0000-0000-000000000000/download"
+            "/api/v1/certificates/00000000-0000-0000-0000-000000000000/download",
+            cookies=headers,
         )
         assert resp.status_code == 404
 
@@ -235,7 +238,7 @@ class TestCertificateEdgeCases:
         await session.commit()
 
         headers = await _login(client, "edge3_admin@test.com")
-        broken_path = f"/api/v1/api/certificates/courses/{course.id}/generate"
+        broken_path = f"/api/v1/certificates/courses/{course.id}/generate"
         resp = await client.post(broken_path, cookies=headers)
         assert resp.status_code == 400
         assert "no blocks" in resp.json()["detail"].lower()
@@ -260,7 +263,7 @@ class TestCertificateEdgeCases:
             cookies=headers,
         )
 
-        broken_path = f"/api/v1/api/certificates/courses/{course.id}/generate"
+        broken_path = f"/api/v1/certificates/courses/{course.id}/generate"
         r1 = await client.post(broken_path, cookies=headers)
         r2 = await client.post(broken_path, cookies=headers)
         assert r1.json()["id"] == r2.json()["id"]
@@ -272,6 +275,6 @@ class TestCertificateEdgeCases:
         admin = await create_user("edge5_admin@test.com", is_superuser=True, role="administrator")
         course, blocks, _, _ = await _setup_auto_test_course(session, admin.id, 1)
 
-        broken_path = f"/api/v1/api/certificates/courses/{course.id}/generate"
+        broken_path = f"/api/v1/certificates/courses/{course.id}/generate"
         resp = await client.post(broken_path)
         assert resp.status_code in (401, 403)

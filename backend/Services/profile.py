@@ -172,7 +172,7 @@ async def get_certificates(db: AsyncSession, user_id):
                 "course_title": course.title,
                 "certificate_number": cert.certificate_number,
                 "issued_at": cert.issued_at,
-                "download_url": f"/api/certificates/{cert.certificate_number}/download",
+                "download_url": f"/api/v1/certificates/{cert.certificate_number}/download",
             }
         )
     return items

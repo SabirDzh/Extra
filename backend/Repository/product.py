@@ -279,7 +279,17 @@ def extract_images_using_loader(
     return row_images
 
 
+MAX_EXCEL_FILE_SIZE = 10 * 1024 * 1024  # 10 MB
+MAX_EXCEL_ROWS = 10000
+
+
 def parse_product_excel_file(contents: bytes) -> list[dict]:
+    if len(contents) > MAX_EXCEL_FILE_SIZE:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Excel file is too large. Max size is {MAX_EXCEL_FILE_SIZE / 1024 / 1024:.0f} MB.",
+        )
+
     df_tmp = pd.read_excel(io.BytesIO(contents), nrows=0)
 
     image_col_idx = -1

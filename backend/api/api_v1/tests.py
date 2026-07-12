@@ -153,10 +153,32 @@ async def submit_test(
         raise HTTPException(status_code=400, detail="Block is not a test")
 
     questions = (
-        (await db.execute(select(Question).where(Question.block_id == block_id)))
+        (await db.execute(
+            select(Question)
+            .where(Question.block_id == block_id)
+            .options(selectinload(Question.options))
+        ))
         .scalars()
         .all()
     )
+    allowed_question_ids = {q.id for q in questions}
+    question_map = {q.id: q for q in questions}
+
+    for ans in data.answers:
+        if ans.question_id not in allowed_question_ids:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Question {ans.question_id} does not belong to block {block_id}",
+            )
+
+        question = question_map[ans.question_id]
+        if ans.selected_answer_id is not None:
+            allowed_option_ids = {o.id for o in question.options}
+            if ans.selected_answer_id not in allowed_option_ids:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Answer option {ans.selected_answer_id} does not belong to question {ans.question_id}",
+                )
 
     submission = TestSubmission(
         user_id=user.id,
@@ -242,6 +264,12 @@ async def grade_submission(
     submission = await db.get(TestSubmission, submission_id)
     if not submission:
         raise HTTPException(status_code=404, detail="Submission not found")
+
+    if data.score < 0 or data.score > submission.max_score:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Score must be between 0 and {submission.max_score}",
+        )
 
     submission.score = float(data.score)
     submission.admin_comment = data.admin_comment
