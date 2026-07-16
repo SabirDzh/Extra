@@ -91,10 +91,10 @@ class CourseEnrollment(IdUuidPkMixin, Base):
     )
 
     user_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("users.id", ondelete="CASCADE")
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
     )
     course_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("courses.id", ondelete="CASCADE")
+        ForeignKey("courses.id", ondelete="CASCADE"), index=True
     )
     enrolled_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()

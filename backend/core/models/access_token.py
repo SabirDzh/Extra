@@ -25,6 +25,7 @@ class AccessToken(Base, SQLAlchemyBaseAccessTokenTable[UuIDMixin]):
     user_id: Mapped[UuIDMixin] = mapped_column(
         ForeignKey("users.id", ondelete="cascade"),
         nullable=False,
+        index=True,
     )
 
     user: Mapped["User"] = relationship(

@@ -10,7 +10,9 @@ from .mixins.id_int_pk import IdUuidPkMixin
 
 
 class Notification(IdUuidPkMixin, Base):
-    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
     type: Mapped[NotificationType] = mapped_column(Enum(NotificationType))
     title: Mapped[str] = mapped_column(String(255))
     message: Mapped[str] = mapped_column(Text)

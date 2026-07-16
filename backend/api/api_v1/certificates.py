@@ -10,8 +10,9 @@ from core.models.db_helper import db_helper
 from core.models.progress import UserBlockProgress
 from core.models.user import User
 from core.schemas.certificate import CertificateRead
-from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.responses import Response
+from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi.responses import HTMLResponse, Response
+from jinja_templates import templates
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -129,5 +130,40 @@ async def download_certificate(
         media_type="application/pdf",
         headers={
             "Content-Disposition": f'attachment; filename="certificate_{cert.certificate_number}.pdf"'
+        },
+    )
+
+
+@router.get("/{certificate_number}/view", response_class=HTMLResponse)
+async def view_certificate_html(
+    request: Request,
+    certificate_number: str,
+    db: Session,
+    user: User = Depends(current_active_user),
+):
+    cert = (
+        await db.execute(
+            select(Certificate)
+            .where(Certificate.certificate_number == certificate_number)
+            .options(
+                selectinload(Certificate.user),
+                selectinload(Certificate.course),
+            )
+        )
+    ).scalar_one_or_none()
+    if not cert:
+        raise HTTPException(status_code=404, detail="Certificate not found")
+
+    if user.role != UserRole.admin and cert.user_id != user.id:
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    return templates.TemplateResponse(
+        "certificate.html",
+        {
+            "request": request,
+            "full_name": cert.user.full_name,
+            "course_title": cert.course.title,
+            "certificate_number": cert.certificate_number,
+            "issued_at": cert.issued_at.strftime("%d.%m.%Y") if cert.issued_at else "",
         },
     )

@@ -262,7 +262,7 @@ async def get_progress(
     from core.models.block import TEST_BLOCK_TYPES
     test_blocks = [b for b in course.blocks if b.block_type in TEST_BLOCK_TYPES]
     total = len(test_blocks)
-    
+
     if total == 0:
         return CourseProgress(completed=0, total=0, percent=0.0, progress={"total": 0})
 
@@ -295,6 +295,12 @@ async def reset_progress(
             status_code=status.HTTP_404_NOT_FOUND, detail="Course not found"
         )
 
+    target_user = await db.get(User, user_id)
+    if not target_user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
+        )
+
     reset_done = await course_crud.reset_course_progress(db, user_id, course_id)
     if not reset_done:
         raise HTTPException(
@@ -304,8 +310,32 @@ async def reset_progress(
     return {"detail": "Progress reset successfully"}
 
 
+@router.post("/{course_id}/users/{user_id}/complete")
+async def complete_progress(
+    course_id: uuid.UUID,
+    user_id: uuid.UUID,
+    db: Session,
+    admin: AdminUser,
+):
+    course = await course_crud.get_course(db, course_id)
+    if not course:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Course not found"
+        )
+
+    target_user = await db.get(User, user_id)
+    if not target_user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
+        )
+
+    await course_crud.complete_course_for_user(db, user_id, course_id)
+    return {"detail": "Course marked as completed for user successfully"}
+
+
 @router.delete("/", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_courses(
     db: Session, courses_id: Annotated[list[uuid.UUID], Query()], admin: AdminUser
 ):
     await course_crud.delete_courses(db, courses_id)
+

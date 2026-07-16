@@ -48,6 +48,65 @@ async def _get_block_or_404(db, block_id: uuid.UUID, course_id: uuid.UUID) -> Bl
     return block
 
 
+async def _validate_block_sequence(
+    db: AsyncSession,
+    course_id: uuid.UUID,
+    new_block_data: dict | None = None,
+    update_block_id: uuid.UUID | None = None,
+    update_block_data: dict | None = None,
+) -> None:
+    from core.models.block import TEST_BLOCK_TYPES
+
+    stmt = select(Block).where(Block.course_id == course_id)
+    result = await db.execute(stmt)
+    blocks = list(result.scalars().all())
+
+    # Map blocks to a list of dicts simulating the new state after commit
+    block_states = []
+    for b in blocks:
+        if update_block_id and b.id == update_block_id:
+            block_states.append({
+                "id": b.id,
+                "order_index": update_block_data.get("order_index", b.order_index) if update_block_data and "order_index" in update_block_data else b.order_index,
+                "block_type": b.block_type,
+            })
+        else:
+            block_states.append({
+                "id": b.id,
+                "order_index": b.order_index,
+                "block_type": b.block_type,
+            })
+
+    if new_block_data:
+        block_states.append({
+            "id": uuid.uuid4(),
+            "order_index": new_block_data.get("order_index", 0),
+            "block_type": new_block_data.get("block_type"),
+        })
+
+    # Sort blocks based on order_index, then by id as a tie-breaker
+    block_states.sort(key=lambda x: (x["order_index"], str(x["id"])))
+
+    # Validate alternating sequence:
+    # Even index: BlockType.lesson
+    # Odd index: one of TEST_BLOCK_TYPES
+    for idx, b_state in enumerate(block_states):
+        b_type = b_state["block_type"]
+        if idx % 2 == 0:
+            if b_type != BlockType.lesson:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Нарушена последовательность этапов: блок на позиции {idx + 1} (с индексом порядка {b_state['order_index']}) должен быть лекцией, но является {b_type}."
+                )
+        else:
+            if b_type not in TEST_BLOCK_TYPES:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Нарушена последовательность этапов: блок на позиции {idx + 1} (с индексом порядка {b_state['order_index']}) должен быть тестом, но является {b_type}."
+                )
+
+
+
 async def _format_block_read(
     db: AsyncSession, block: Block, course: Course, user_id: uuid.UUID | None = None
 ) -> BlockRead:
@@ -263,6 +322,11 @@ async def create_block(
     admin: User = Depends(current_admin),
 ):
     course = await _get_course_or_404(db, course_id)
+    await _validate_block_sequence(
+        db,
+        course_id=course_id,
+        new_block_data={"block_type": data.block_type, "order_index": data.order_index},
+    )
     payload = data.model_dump()
     if data.block_type == BlockType.lesson:
         payload["title"] = course.title
@@ -296,6 +360,14 @@ async def update_block(
     course = await _get_course_or_404(db, course_id)
     block = await _get_block_or_404(db, block_id, course_id)
     patch = data.model_dump(exclude_unset=True)
+
+    if "order_index" in patch:
+        await _validate_block_sequence(
+            db,
+            course_id=course_id,
+            update_block_id=block_id,
+            update_block_data={"order_index": patch["order_index"]},
+        )
 
     if (
         block.block_type == BlockType.lesson

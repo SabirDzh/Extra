@@ -78,6 +78,20 @@ async def delete_course(
         stmt_submission_ids = select(TestSubmission.id).where(TestSubmission.block_id.in_(block_ids))
         submission_ids = (await session.execute(stmt_submission_ids)).scalars().all()
 
+    # Explicitly delete user progress and submissions for auditability,
+    # even though cascade deletes would handle them via block deletion.
+    if block_ids:
+        await session.execute(
+            delete(UserBlockProgress).where(
+                UserBlockProgress.block_id.in_(block_ids),
+            )
+        )
+        await session.execute(
+            delete(TestSubmission).where(
+                TestSubmission.block_id.in_(block_ids),
+            )
+        )
+
     # Delete notifications with new_course type referencing this course
     stmt_del_course_notif = delete(Notification).where(
         Notification.type == NotificationType.new_course,
@@ -244,6 +258,20 @@ async def delete_courses(session: AsyncSession, courses_id: list[uuid.UUID]):
     if block_ids:
         stmt_submission_ids = select(TestSubmission.id).where(TestSubmission.block_id.in_(block_ids))
         submission_ids = (await session.execute(stmt_submission_ids)).scalars().all()
+
+    # Explicitly delete user progress and submissions for auditability,
+    # even though cascade deletes would handle them via block deletion.
+    if block_ids:
+        await session.execute(
+            delete(UserBlockProgress).where(
+                UserBlockProgress.block_id.in_(block_ids),
+            )
+        )
+        await session.execute(
+            delete(TestSubmission).where(
+                TestSubmission.block_id.in_(block_ids),
+            )
+        )
 
     # Delete notifications with new_course type referencing these courses
     stmt_del_course_notif = delete(Notification).where(
@@ -455,3 +483,46 @@ async def reset_course_progress(
 
     await session.commit()
     return True
+
+
+async def complete_course_for_user(
+    session: AsyncSession,
+    user_id: uuid.UUID,
+    course_id: uuid.UUID,
+) -> bool:
+    stmt_course = select(Course).where(Course.id == course_id).options(selectinload(Course.blocks))
+    res_course = await session.execute(stmt_course)
+    course = res_course.scalar_one_or_none()
+    if not course:
+        return False
+
+    enrollment = await get_enrollment(session, user_id, course_id)
+    if not enrollment:
+        enrollment = CourseEnrollment(user_id=user_id, course_id=course_id)
+        session.add(enrollment)
+        await session.flush()
+
+    for block in course.blocks:
+        stmt = select(UserBlockProgress).where(
+            UserBlockProgress.user_id == user_id,
+            UserBlockProgress.block_id == block.id
+        )
+        res = await session.execute(stmt)
+        progress = res.scalar_one_or_none()
+        if not progress:
+            progress = UserBlockProgress(
+                user_id=user_id,
+                block_id=block.id,
+                is_completed=True,
+                completed_at=datetime.now(timezone.utc)
+            )
+            session.add(progress)
+        else:
+            progress.is_completed = True
+            if not progress.completed_at:
+                progress.completed_at = datetime.now(timezone.utc)
+
+    enrollment.completed_at = datetime.now(timezone.utc)
+    await session.commit()
+    return True
+

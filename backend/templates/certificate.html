@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Сертификат Монтажника — Акваконтроль</title>
+    <style>
+        :root {
+            --brand-red: #E31E24;
+            --brand-dark: #1A1A1A;
+            --stamp-blue: #3A75B4;
+            --paper-bg: #FCFBF9;
+            --gold-border: #D4AF37;
+        }
+
+        body {
+            margin: 0;
+            padding: 40px 20px;
+            background-color: #E5E5E5;
+            font-family: 'Segoe UI', Arial, sans-serif;
+            color: var(--brand-dark);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            box-sizing: border-box;
+        }
+
+        /* Контейнер сертификата */
+        .certificate {
+            background-color: var(--paper-bg);
+            width: 100%;
+            max-width: 850px;
+            padding: 50px 60px;
+            box-sizing: border-box;
+            border: 12px double var(--gold-border);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+            position: relative;
+            background-image: radial-gradient(rgba(212, 175, 55, 0.03) 1px, transparent 0);
+            background-size: 24px 24px;
+        }
+
+        /* Шапка с логотипом */
+        .header {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-bottom: 40px;
+        }
+
+        .logo-extra {
+            font-size: 48px;
+            font-weight: 900;
+            color: var(--brand-red);
+            letter-spacing: -2px;
+            position: relative;
+            font-family: 'Arial Black', Impact, sans-serif;
+            line-height: 1;
+        }
+
+        .logo-extra sup {
+            font-size: 16px;
+            font-weight: bold;
+            position: absolute;
+            top: 0;
+            right: -18px;
+        }
+
+        .logo-subtitle {
+            margin-top: 8px;
+            border: 2px solid var(--brand-dark);
+            border-radius: 25px;
+            padding: 6px 35px;
+            font-size: 22px;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 4px;
+            color: var(--brand-dark);
+        }
+
+        /* Главный контент */
+        .content {
+            text-align: center;
+            margin-bottom: 50px;
+        }
+
+        h1 {
+            font-size: 32px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin: 0 0 10px 0;
+            color: var(--brand-dark);
+            font-family: 'Georgia', serif;
+        }
+
+        h2 {
+            font-size: 24px;
+            text-transform: uppercase;
+            letter-spacing: 4px;
+            margin: 0 0 35px 0;
+            color: #555;
+            font-weight: 400;
+        }
+
+        .recipient-line {
+            width: 80%;
+            margin: 0 auto 30px auto;
+            border-bottom: 2px solid #999;
+            height: 40px;
+            font-size: 22px;
+            font-style: italic;
+            color: #333;
+        }
+
+        .lecture-text {
+            font-size: 18px;
+            line-height: 1.6;
+            max-width: 650px;
+            margin: 0 auto;
+            color: #444;
+        }
+
+        .topic {
+            font-weight: bold;
+            font-size: 20px;
+            margin-top: 10px;
+            color: var(--brand-dark);
+        }
+
+        /* Подвал документа */
+        .footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            margin-top: 60px;
+            padding: 0 20px;
+        }
+
+        .meta-info {
+            font-size: 14px;
+            color: #666;
+            line-height: 1.8;
+        }
+
+        .signature-block {
+            text-align: center;
+            width: 200px;
+        }
+
+        .signature-line {
+            border-bottom: 1px solid var(--brand-dark);
+            margin-bottom: 5px;
+            height: 30px;
+        }
+
+        /* Декоративная круглая печать компании на CSS */
+        .stamp-container {
+            position: absolute;
+            bottom: 40px;
+            right: 240px;
+            width: 110px;
+            height: 110px;
+            opacity: 0.85;
+            transform: rotate(-12deg);
+            pointer-events: none;
+        }
+
+        .stamp {
+            width: 100%;
+            height: 100%;
+            border: 3px double var(--stamp-blue);
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            box-sizing: border-box;
+        }
+
+        .stamp-inner {
+            width: 82%;
+            height: 82%;
+            border: 1px dashed var(--stamp-blue);
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 9px;
+            font-weight: bold;
+            color: var(--stamp-blue);
+            text-align: center;
+            text-transform: uppercase;
+            box-sizing: border-box;
+        }
+
+        .stamp-signature {
+            position: absolute;
+            font-family: 'Courier New', monospace;
+            font-size: 24px;
+            font-weight: bold;
+            color: var(--stamp-blue);
+            transform: rotate(15deg);
+            opacity: 0.9;
+            letter-spacing: -2px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="certificate">
+        <div class="stamp-container">
+            <div class="stamp">
+                <div class="stamp-inner">
+                    АКВАКОНТРОЛЬ<br>МОСКВА
+                </div>
+                <div class="stamp-signature">Впф</div>
+            </div>
+        </div>
+
+        <div class="header">
+            <div class="logo-extra">EXTRA<sup>®</sup></div>
+            <div class="logo-subtitle">Акваконтроль</div>
+        </div>
+
+        <div class="content">
+            <h1>Сертификат</h1>
+            <h2>Монтажника</h2>
+
+            <div class="recipient-line">Иванов Александр Владимирович</div>
+
+            <div class="lecture-text">
+                Прослушал(а) лекцию по теме:
+                <div class="topic">«Технические особенности приборов "Extra Акваконтроль"»</div>
+            </div>
+        </div>
+
+        <div class="footer">
+            <div class="meta-info">
+                <div>Сертификат выдан: ООО «АКВАКОНТРОЛЬ»</div>
+                <div>Действителен до: 31.12.2027 г.</div>
+            </div>
+            <div class="signature-block">
+                <div class="signature-line"></div>
+                <div class="meta-info">Подпись руководителя</div>
+            </div>
+        </div>
+    </div>
+
+</body>
+
+</html>

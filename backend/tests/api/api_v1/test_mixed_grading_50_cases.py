@@ -45,9 +45,16 @@ async def test_01_create_mixed_block_success(client: AsyncClient, session: Async
     cookies = await _get_auth_cookies(client, admin)
     course = await _create_course(session, admin.id)
     
+    # Create lesson block first
+    await client.post(
+        f"/api/v1/courses/{course.id}/blocks/",
+        json={"title": "Lesson 1", "block_type": "lesson", "text_content": "Text", "order_index": 1},
+        cookies=cookies
+    )
+    
     resp = await client.post(
         f"/api/v1/courses/{course.id}/blocks/",
-        json={"title": "Mixed Test Block", "block_type": "mixed_test", "order_index": 10},
+        json={"title": "Mixed Test Block", "block_type": "mixed_test", "order_index": 2},
         cookies=cookies
     )
     assert resp.status_code == 201

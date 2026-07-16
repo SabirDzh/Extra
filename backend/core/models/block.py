@@ -16,7 +16,9 @@ TEST_BLOCK_TYPES = {BlockType.auto_test, BlockType.manual_test, BlockType.mixed_
 
 
 class Block(IdUuidPkMixin, Base):
-    course_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("courses.id", ondelete="CASCADE"))
+    course_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("courses.id", ondelete="CASCADE"), index=True
+    )
     order_index: Mapped[int] = mapped_column(Integer, default=0)
     title: Mapped[str] = mapped_column(String(500))
     block_type: Mapped[BlockType] = mapped_column(Enum(BlockType))

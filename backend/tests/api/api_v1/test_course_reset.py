@@ -72,3 +72,38 @@ async def test_reset_unauthorized_fails(client: AsyncClient, session: AsyncSessi
 
     resp = await client.post(f"/api/v1/courses/{uuid.uuid4()}/users/{user.id}/reset", cookies=cookies)
     assert resp.status_code in [401, 403]
+
+
+@pytest.mark.anyio
+async def test_admin_completes_user_course(client: AsyncClient, session: AsyncSession, create_user):
+    admin = await create_user("admin_complete@test.com", is_superuser=True, role="administrator")
+    user = await create_user("student_complete@test.com")
+    
+    course = Course(title="Complete Course", created_by=admin.id, is_published=True)
+    session.add(course)
+    await session.flush()
+    
+    block = Block(course_id=course.id, title="Test Block", block_type=BlockType.auto_test, order_index=0)
+    session.add(block)
+    await session.commit()
+    
+    auth_resp = await client.post("/api/v1/auth/login", data={"username": admin.email, "password": "Password12345!"})
+    cookies = {"auth_user": auth_resp.cookies.get("auth_user")}
+    
+    resp = await client.post(f"/api/v1/courses/{course.id}/users/{user.id}/complete", cookies=cookies)
+    assert resp.status_code == 200
+    assert resp.json()["detail"] == "Course marked as completed for user successfully"
+    
+    # Reload and check progress and enrollment
+    stmt_prog = select(UserBlockProgress).where(UserBlockProgress.user_id == user.id, UserBlockProgress.block_id == block.id)
+    res_prog = await session.execute(stmt_prog)
+    progress = res_prog.scalar_one_or_none()
+    assert progress is not None
+    assert progress.is_completed is True
+    
+    stmt_enroll = select(CourseEnrollment).where(CourseEnrollment.user_id == user.id, CourseEnrollment.course_id == course.id)
+    res_enroll = await session.execute(stmt_enroll)
+    enrollment = res_enroll.scalar_one_or_none()
+    assert enrollment is not None
+    assert enrollment.completed_at is not None
+

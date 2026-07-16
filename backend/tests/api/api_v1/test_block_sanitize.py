@@ -53,6 +53,16 @@ async def test_auto_test_text_content_is_stripped(
     Никакой 422, блок создаётся.
     """
     course = await _create_course(session)
+    await _post_block(
+        client,
+        superuser_token_headers,
+        course.id,
+        {
+            "title": "Lesson 1",
+            "block_type": "lesson",
+            "text_content": "Lesson content",
+        },
+    )
     resp = await _post_block(
         client,
         superuser_token_headers,
@@ -61,6 +71,7 @@ async def test_auto_test_text_content_is_stripped(
             "title": "Auto Test Block",
             "block_type": "auto_test",
             "text_content": "This should be stripped",
+            "order_index": 1,
         },
     )
     assert resp.status_code == 201, f"Ожидали 201, получили {resp.status_code}: {resp.text}"
@@ -80,6 +91,16 @@ async def test_manual_test_video_url_is_stripped(
     Стресс-тест 2: manual_test + video_url → поле молча отсекается.
     """
     course = await _create_course(session)
+    await _post_block(
+        client,
+        superuser_token_headers,
+        course.id,
+        {
+            "title": "Lesson 1",
+            "block_type": "lesson",
+            "text_content": "Lesson content",
+        },
+    )
     resp = await _post_block(
         client,
         superuser_token_headers,
@@ -88,6 +109,7 @@ async def test_manual_test_video_url_is_stripped(
             "title": "Manual Test Block",
             "block_type": "manual_test",
             "video_url": "https://example.com/video.mp4",
+            "order_index": 1,
         },
     )
     assert resp.status_code == 201
@@ -107,6 +129,16 @@ async def test_auto_test_both_fields_stripped(
     Стресс-тест 3: auto_test + оба поля → оба молча отсекаются.
     """
     course = await _create_course(session)
+    await _post_block(
+        client,
+        superuser_token_headers,
+        course.id,
+        {
+            "title": "Lesson 1",
+            "block_type": "lesson",
+            "text_content": "Lesson content",
+        },
+    )
     resp = await _post_block(
         client,
         superuser_token_headers,
@@ -116,6 +148,7 @@ async def test_auto_test_both_fields_stripped(
             "block_type": "auto_test",
             "text_content": "some text",
             "video_url": "https://example.com/video.mp4",
+            "order_index": 1,
         },
     )
     assert resp.status_code == 201
@@ -135,11 +168,21 @@ async def test_auto_test_without_extra_fields_still_works(
     Базовое поведение не сломано.
     """
     course = await _create_course(session)
+    await _post_block(
+        client,
+        superuser_token_headers,
+        course.id,
+        {
+            "title": "Lesson 1",
+            "block_type": "lesson",
+            "text_content": "Lesson content",
+        },
+    )
     resp = await _post_block(
         client,
         superuser_token_headers,
         course.id,
-        {"title": "Clean Auto Test", "block_type": "auto_test"},
+        {"title": "Clean Auto Test", "block_type": "auto_test", "order_index": 1},
     )
     assert resp.status_code == 201
     data = resp.json()

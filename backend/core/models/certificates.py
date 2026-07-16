@@ -10,8 +10,8 @@ from .mixins.id_int_pk import IdUuidPkMixin
 
 
 class Certificate(IdUuidPkMixin, Base):
-    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"))
-    course_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("courses.id"))
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), index=True)
+    course_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("courses.id"), index=True)
     certificate_number: Mapped[str] = mapped_column(
         String(36), unique=True, default=lambda: str(uuid.uuid4())
     )

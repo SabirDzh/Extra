@@ -11,7 +11,9 @@ from .mixins.id_int_pk import IdUuidPkMixin
 
 
 class AdminRoleRequest(IdUuidPkMixin, Base):
-    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
     status: Mapped[AdminRoleRequestStatus] = mapped_column(
         Enum(AdminRoleRequestStatus),
         default=AdminRoleRequestStatus.pending,
@@ -24,6 +26,7 @@ class AdminRoleRequest(IdUuidPkMixin, Base):
     reviewed_by: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL"),
         nullable=True,
+        index=True,
     )
 
     user = relationship("User", foreign_keys=[user_id])

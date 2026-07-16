@@ -1,11 +1,16 @@
+import os
 import uuid
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Literal
 
+from core.config import BASE_DIR
+from core.models.block import Block
 from core.models.course import Course, CourseAudience, CourseEnrollment, CourseLevel, CourseStatus
 from core.schemas.course import CourseCreate, CourseUpdate
 from Repository import course as repo
 from Repository.search_engine import SearchIn, SearchSort
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from Repository.common import ensure_unique_field
 
@@ -70,7 +75,31 @@ async def delete_course(
     session: AsyncSession,
     course: Course,
 ) -> None:
+    await _delete_course_video_files(session, course.id)
     await repo.delete_course(session, course)
+
+
+async def _delete_course_video_files(session: AsyncSession, course_id: uuid.UUID) -> None:
+    """Delete video files associated with lesson blocks of a course."""
+    result = await session.execute(
+        select(Block.video_url).where(
+            Block.course_id == course_id,
+            Block.video_url.is_not(None),
+        )
+    )
+    for video_url in result.scalars().all():
+        if not video_url:
+            continue
+        try:
+            file_path = Path(video_url)
+            if file_path.is_absolute():
+                path = file_path
+            else:
+                path = BASE_DIR / video_url.lstrip("/")
+            if path.exists():
+                path.unlink()
+        except OSError:
+            pass
 
 
 async def get_enrollment(
@@ -126,6 +155,8 @@ async def search_courses(
 
 
 async def delete_courses(session: AsyncSession, courses_id: list[uuid.UUID]):
+    for course_id in courses_id:
+        await _delete_course_video_files(session, course_id)
     await repo.delete_courses(session, courses_id)
 
 
@@ -151,3 +182,12 @@ async def reset_course_progress(
     course_id: uuid.UUID,
 ) -> bool:
     return await repo.reset_course_progress(session, user_id, course_id)
+
+
+async def complete_course_for_user(
+    session: AsyncSession,
+    user_id: uuid.UUID,
+    course_id: uuid.UUID,
+) -> bool:
+    return await repo.complete_course_for_user(session, user_id, course_id)
+

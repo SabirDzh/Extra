@@ -63,7 +63,13 @@ async def test_admin_create_lesson_block(client: AsyncClient, session: AsyncSess
 @pytest.mark.anyio
 async def test_admin_create_test_block(client: AsyncClient, session: AsyncSession, admin_user, superuser_token_headers):
     course = await _create_course(session, admin_user.id)
-    payload = {"title": "Test 1", "block_type": "auto_test", "order_index": 1}
+    # Create lesson block first
+    await client.post(
+        f"/api/v1/courses/{course.id}/blocks/",
+        json={"title": "Lesson 1", "block_type": "lesson", "text_content": "Text", "order_index": 1},
+        headers=superuser_token_headers
+    )
+    payload = {"title": "Test 1", "block_type": "auto_test", "order_index": 2}
     resp = await client.post(f"/api/v1/courses/{course.id}/blocks/", json=payload, headers=superuser_token_headers)
     assert resp.status_code == 201
     assert resp.json()["block_type"] == "auto_test"
@@ -72,7 +78,13 @@ async def test_admin_create_test_block(client: AsyncClient, session: AsyncSessio
 @pytest.mark.anyio
 async def test_create_test_block_strips_text_content(client: AsyncClient, session: AsyncSession, admin_user, superuser_token_headers):
     course = await _create_course(session, admin_user.id)
-    payload = {"title": "Test STRIP", "block_type": "auto_test", "text_content": "Should be gone", "order_index": 1}
+    # Create lesson block first
+    await client.post(
+        f"/api/v1/courses/{course.id}/blocks/",
+        json={"title": "Lesson 1", "block_type": "lesson", "text_content": "Text", "order_index": 1},
+        headers=superuser_token_headers
+    )
+    payload = {"title": "Test STRIP", "block_type": "auto_test", "text_content": "Should be gone", "order_index": 2}
     resp = await client.post(f"/api/v1/courses/{course.id}/blocks/", json=payload, headers=superuser_token_headers)
     assert resp.status_code == 201
     assert resp.json()["text_content"] is None
