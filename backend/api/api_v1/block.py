@@ -20,6 +20,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from Repository.common import ensure_unique_field
 from api.dependencies.authorization import current_admin, current_course_allowed_user
+from Domain.Enums.user_role import UserRole
 
 from Services.test_results import get_submission_history, get_test_results_for_block
 
@@ -317,7 +318,7 @@ async def list_blocks(course_id: uuid.UUID, db: Session, user: CourseAllowedUser
         if active_stage_blocks:
             current_block_id = active_stage_blocks[0].id
 
-    is_admin = user and (user.role == "administrator" or user.is_superuser)
+    is_admin = user and (user.role == UserRole.admin or user.is_superuser)
     if is_admin:
         active_stage = all_stages_count
 
@@ -402,7 +403,8 @@ async def create_block(
         new_block_data={"block_type": data.block_type, "order_index": data.order_index},
     )
     payload = data.model_dump()
-    payload["title"] = course.title
+    if not payload.get("title"):
+        payload["title"] = course.title
     block = Block(**payload, course_id=course_id)
     db.add(block)
     await db.commit()
