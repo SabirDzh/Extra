@@ -82,7 +82,7 @@ async def auto_grade_submission(
     
 
 
-    if block.block_type in (BlockType.manual_test, BlockType.mixed_test):
+    if block.block_type == BlockType.manual_test:
         submission.is_graded = False
     else:
         submission.is_graded = not has_manual_questions

@@ -7,7 +7,7 @@ from core.models.block import BlockType, TEST_BLOCK_TYPES
 from core.schemas.course import CourseProgress
 
 class BlockCreate(BaseModel):
-    title: str
+    title: str | None = None
     block_type: BlockType
     order_index: int = 0
     text_content: str | None = None

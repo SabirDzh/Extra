@@ -244,7 +244,7 @@ class TestQuestionTypeValidation:
 
 class TestBlockTitleUpdate:
     @pytest.mark.anyio
-    async def test_update_test_block_title_silently_ignored(
+    async def test_update_test_block_title_is_updated(
         self, client: AsyncClient, session: AsyncSession, create_user
     ):
         admin = await create_user("btu_admin@test.com", is_superuser=True, role="administrator")
@@ -264,10 +264,10 @@ class TestBlockTitleUpdate:
         assert resp.status_code == 200
 
         await session.refresh(block)
-        assert block.title == "Original Title", "Test block title was silently dropped"
+        assert block.title == "New Test Title"
 
     @pytest.mark.anyio
-    async def test_update_lesson_block_title_changes_course_title(
+    async def test_update_lesson_block_title_does_not_change_course_title(
         self, client: AsyncClient, session: AsyncSession, create_user
     ):
         admin = await create_user("btu_lesson_admin@test.com", is_superuser=True, role="administrator")
@@ -287,7 +287,7 @@ class TestBlockTitleUpdate:
         assert resp.status_code == 200
 
         await session.refresh(course)
-        assert course.title == "Updated Course"
+        assert course.title == "Original Course"
 
 
 # ============================================================

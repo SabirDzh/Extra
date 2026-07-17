@@ -54,7 +54,6 @@ async def update_course(
     course_update: CourseUpdate,
 ) -> Course:
     patch = course_update.model_dump(exclude_unset=True)
-    title_changed = "title" in patch and patch["title"] and patch["title"] != course.title
     if "title" in patch and patch["title"]:
         await ensure_unique_field(
             session,
@@ -66,8 +65,6 @@ async def update_course(
         )
     for field, value in patch.items():
         setattr(course, field, value)
-    if title_changed:
-        await repo.sync_course_title_to_blocks(session, course.id, course.title)
     return await repo.update_course(session, course)
 
 

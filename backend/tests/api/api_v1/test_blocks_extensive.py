@@ -144,6 +144,7 @@ async def test_create_block_str_coercion(client: AsyncClient, session: AsyncSess
 @pytest.mark.anyio
 async def test_admin_update_block(client: AsyncClient, session: AsyncSession, admin_user, superuser_token_headers):
     course = await _create_course(session, admin_user.id)
+    old_course_title = course.title
     block = await _create_block(session, course.id, title="Old")
     payload = {"title": "New", "text_content": "updated content"}
     resp = await client.patch(f"/api/v1/courses/{course.id}/blocks/{block.id}", json=payload, headers=superuser_token_headers)
@@ -151,7 +152,7 @@ async def test_admin_update_block(client: AsyncClient, session: AsyncSession, ad
     assert resp.json()["title"] == "New"
     assert resp.json()["text_content"] == "updated content"
     await session.refresh(course)
-    assert course.title == "New"
+    assert course.title == old_course_title
 
 
 @pytest.mark.anyio

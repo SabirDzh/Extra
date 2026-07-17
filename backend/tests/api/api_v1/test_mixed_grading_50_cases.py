@@ -111,7 +111,7 @@ async def test_04_mixed_with_free_text_is_not_graded(client: AsyncClient, sessio
     assert resp.json()["is_graded"] is False
 
 @pytest.mark.anyio
-async def test_05_mixed_always_requires_admin(client: AsyncClient, session: AsyncSession, create_user):
+async def test_05_mixed_without_text_is_auto_graded(client: AsyncClient, session: AsyncSession, create_user):
     user = await create_user("qa_user5@test.com")
     cookies = await _get_auth_cookies(client, user)
     course = await _create_course(session)
@@ -125,7 +125,7 @@ async def test_05_mixed_always_requires_admin(client: AsyncClient, session: Asyn
         json={"answers": []},
         cookies=cookies
     )
-    assert resp.json()["is_graded"] is False
+    assert resp.json()["is_graded"] is True
 
 @pytest.mark.parametrize("role, expected_status", [("user", 403), ("admin", 200)])
 @pytest.mark.anyio
