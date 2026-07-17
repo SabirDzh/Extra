@@ -65,10 +65,12 @@ async def test_progressive_unlocking_stages(client: AsyncClient, session: AsyncS
     await _mark_block_completed(session, student.id, blocks[1].id, course.id)
     await session.commit()
     resp3 = await client.get(f"/api/v1/courses/{course.id}/blocks/", cookies=cookies)
-    assert len(resp3.json()["blocks"]) == 4
+    assert len(resp3.json()["blocks"]) == 2
     visible_ids_3 = [b["id"] for b in resp3.json()["blocks"]]
     assert str(blocks[2].id) in visible_ids_3
     assert str(blocks[3].id) in visible_ids_3
+    assert str(blocks[0].id) not in visible_ids_3
+    assert str(blocks[1].id) not in visible_ids_3
 
 @pytest.mark.anyio
 async def test_admin_sees_all_blocks(client: AsyncClient, session: AsyncSession, multi_stage_course):
@@ -136,4 +138,4 @@ async def test_stage_logic_with_odd_number_of_blocks(client: AsyncClient, sessio
     await session.commit()
     
     resp2 = await client.get(f"/api/v1/courses/{course.id}/blocks/", cookies=cookies)
-    assert len(resp2.json()["blocks"]) == 3
+    assert len(resp2.json()["blocks"]) == 1

@@ -57,9 +57,9 @@ async def test_unlocking_partial_progress(client: AsyncClient, session: AsyncSes
     data = resp.json()
     
 
-    assert len(data["blocks"]) == 4
-    assert data["blocks"][0]["title"] == "L1"
-    assert data["blocks"][3]["title"] == "T2"
+    assert len(data["blocks"]) == 2
+    assert data["blocks"][0]["title"] == "L2"
+    assert data["blocks"][1]["title"] == "T2"
 
 @pytest.mark.anyio
 async def test_unlocking_single_block_completed(client: AsyncClient, session: AsyncSession, create_user):

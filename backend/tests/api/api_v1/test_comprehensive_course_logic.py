@@ -118,7 +118,7 @@ class TestUnlockingLogic:
         
         await client.post("/api/v1/auth/login", data={"username": "u4@test.com", "password": "Password12345!"})
         resp = await client.get(f"/api/v1/courses/{course.id}/blocks/")
-        assert len(resp.json()["blocks"]) == 4
+        assert len(resp.json()["blocks"]) == 2
 
     async def test_full_completion_sees_everything(self, client: AsyncClient, session: AsyncSession):
         admin = await _create_user(session, "adm5@test.com", is_superuser=True, role="administrator")
@@ -131,7 +131,7 @@ class TestUnlockingLogic:
         
         await client.post("/api/v1/auth/login", data={"username": "u5@test.com", "password": "Password12345!"})
         resp = await client.get(f"/api/v1/courses/{course.id}/blocks/")
-        assert len(resp.json()["blocks"]) == 6
+        assert len(resp.json()["blocks"]) == 2
 
     async def test_odd_number_of_blocks(self, client: AsyncClient, session: AsyncSession):
         admin = await _create_user(session, "adm6@test.com", is_superuser=True, role="administrator")
@@ -160,7 +160,7 @@ class TestUnlockingLogic:
         
         await client.post("/api/v1/auth/login", data={"username": "u6@test.com", "password": "Password12345!"})
         resp = await client.get(f"/api/v1/courses/{course.id}/blocks/")
-        assert len(resp.json()["blocks"]) == 3
+        assert len(resp.json()["blocks"]) == 1
 
 
 
@@ -412,10 +412,8 @@ class TestSecurityPermissions:
         await client.post("/api/v1/auth/login", data={"username": user.email, "password": "Password12345!"})
         resp = await client.get(f"/api/v1/courses/{course.id}/blocks/")
         data = resp.json()
-        assert data["all_stages"] == 3
-        assert len(data["blocks"]) == 5
-        assert data["blocks"][0]["stage"] == 1
-        assert data["blocks"][4]["stage"] == 3
+        assert len(data["blocks"]) == 1
+        assert data["blocks"][0]["stage"] == 3
 
     async def test_root_progress_completed_stages_only(self, client, session):
         admin = await _create_user(session, "admfails4@test.com", is_superuser=True)
@@ -493,4 +491,4 @@ class TestSecurityPermissions:
         await client.post("/api/v1/auth/login", data={"username": u2.email, "password": "Password12345!"})
         data2 = (await client.get(f"/api/v1/courses/{course.id}/blocks/")).json()
         assert data2["all_stages"] == 5
-        assert len(data2["blocks"]) == 10
+        assert len(data2["blocks"]) == 2

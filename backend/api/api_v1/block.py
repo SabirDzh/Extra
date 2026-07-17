@@ -117,6 +117,7 @@ async def _format_block_read(
 
     is_done = False
     is_attempted = False
+    under_review = False
     if user_id:
         stmt_done = select(UserBlockProgress.is_completed).where(
             UserBlockProgress.user_id == user_id,
@@ -125,16 +126,21 @@ async def _format_block_read(
         )
         is_done = (await db.execute(stmt_done)).scalar() or False
 
-        if not is_done:
-            stmt_attempt = (
-                select(TestSubmission.id)
-                .where(
-                    TestSubmission.user_id == user_id,
-                    TestSubmission.block_id == block.id,
-                )
-                .limit(1)
+        # Fetch the latest submission to check if it's graded/under review
+        stmt_sub = (
+            select(TestSubmission)
+            .where(
+                TestSubmission.user_id == user_id,
+                TestSubmission.block_id == block.id,
             )
-            is_attempted = (await db.execute(stmt_attempt)).scalar() is not None
+            .order_by(TestSubmission.submitted_at.desc())
+            .limit(1)
+        )
+        sub = (await db.execute(stmt_sub)).scalar_one_or_none()
+        if sub:
+            is_attempted = True
+            if not sub.is_graded:
+                under_review = True
 
     from core.models.test import Question
     from sqlalchemy import func
@@ -192,6 +198,7 @@ async def _format_block_read(
         progress=block_progress,
         next_block_id=next_id,
         stage=pos_stage,
+        under_review=under_review,
     )
 
 
@@ -206,6 +213,7 @@ async def list_blocks(course_id: uuid.UUID, db: Session, user: CourseAllowedUser
     blocks = result.scalars().all()
 
     completed_block_ids = set()
+    latest_submissions = {}
     if user:
         stmt_progress = select(UserBlockProgress.block_id).where(
             UserBlockProgress.user_id == user.id,
@@ -219,6 +227,19 @@ async def list_blocks(course_id: uuid.UUID, db: Session, user: CourseAllowedUser
             TestSubmission.block_id.in_([b.id for b in blocks]),
         )
         submitted_block_ids = set((await db.execute(stmt_submissions)).scalars().all())
+
+        # Get all submissions for this user on these blocks, sorted by submitted_at desc
+        stmt_sub_details = select(TestSubmission).where(
+            TestSubmission.user_id == user.id,
+            TestSubmission.block_id.in_([b.id for b in blocks])
+        ).order_by(TestSubmission.submitted_at.desc())
+        
+        sub_details_res = await db.execute(stmt_sub_details)
+        all_subs = sub_details_res.scalars().all()
+        
+        for sub in all_subs:
+            if sub.block_id not in latest_submissions:
+                latest_submissions[sub.block_id] = sub
     else:
         submitted_block_ids = set()
 
@@ -236,33 +257,85 @@ async def list_blocks(course_id: uuid.UUID, db: Session, user: CourseAllowedUser
     aud_label = AUDIENCE_DISPLAY_NAMES.get(course.audience, str(course.audience))
     lvl_label = LEVEL_DISPLAY_NAMES.get(course.level, str(course.level))
 
-    current_block_id = None
-    active_stage = 1
-    block_reads = []
     all_blocks_count = len(blocks)
     all_stages_count = (all_blocks_count + 1) // 2
 
-    found_active = False
-    for i, b in enumerate(blocks):
-        if not found_active and b.id not in completed_block_ids:
-            active_stage = (i // 2) + 1
-            current_block_id = b.id
-            found_active = True
+    # Map each stage to whether it is passed 100%
+    stage_passed_100 = {}
+    for stage_num in range(1, all_stages_count + 1):
+        stage_blocks = [b for idx, b in enumerate(blocks) if (idx // 2) + 1 == stage_num]
+        
+        all_passed = True
+        for b in stage_blocks:
+            if b.block_type == BlockType.lesson:
+                if b.id not in completed_block_ids:
+                    all_passed = False
+            else: # test block
+                if b.id not in completed_block_ids:
+                    all_passed = False
+                else:
+                    sub = latest_submissions.get(b.id)
+                    if sub is not None:
+                        if not sub.is_graded:
+                            all_passed = False
+                        elif sub.score is None or sub.score < sub.max_score:
+                            all_passed = False
+        
+        stage_passed_100[stage_num] = all_passed
 
-    if user and (user.role == "administrator" or user.is_superuser):
+    # Find the active stage: the first stage that is not passed 100%
+    active_stage = 1
+    for stage_num in range(1, all_stages_count + 1):
+        if not stage_passed_100[stage_num]:
+            active_stage = stage_num
+            break
+    else:
+        # If all stages are passed 100%, set active_stage to all_stages_count
+        if all_stages_count > 0:
+            active_stage = all_stages_count
+
+    current_block_id = None
+    # Find current block id for active stage
+    active_stage_blocks = [b for idx, b in enumerate(blocks) if (idx // 2) + 1 == active_stage]
+    for b in active_stage_blocks:
+        if b.block_type == BlockType.lesson:
+            if b.id not in completed_block_ids:
+                current_block_id = b.id
+                break
+        else:
+            is_passed = False
+            if b.id in completed_block_ids:
+                sub = latest_submissions.get(b.id)
+                if sub is None:
+                    is_passed = True
+                elif sub.is_graded and sub.score is not None and sub.score >= sub.max_score:
+                    is_passed = True
+            if not is_passed:
+                current_block_id = b.id
+                break
+    else:
+        if active_stage_blocks:
+            current_block_id = active_stage_blocks[0].id
+
+    is_admin = user and (user.role == "administrator" or user.is_superuser)
+    if is_admin:
         active_stage = all_stages_count
 
-    elif not found_active and blocks:
-        active_stage = all_stages_count
-
+    block_reads = []
     for i, b in enumerate(blocks):
         pos_index = i + 1
         pos_stage = (i // 2) + 1
 
-        if pos_stage > active_stage:
+        if not is_admin and pos_stage != active_stage:
+            continue
+
+        if is_admin and pos_stage > active_stage:
             continue
 
         next_id = blocks[i + 1].id if i + 1 < len(blocks) else None
+
+        sub = latest_submissions.get(b.id) if user else None
+        under_review = (sub is not None and not sub.is_graded) if sub else False
 
         block_reads.append(
             BlockRead(
@@ -279,6 +352,7 @@ async def list_blocks(course_id: uuid.UUID, db: Session, user: CourseAllowedUser
                 description=course.description,
                 next_block_id=next_id,
                 stage=pos_stage,
+                under_review=under_review,
                 progress=CourseProgress(
                     completed=1 if b.id in completed_block_ids else 0,
                     total=question_counts.get(b.id, 0),

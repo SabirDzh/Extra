@@ -48,6 +48,7 @@ class BlockRead(BaseModel):
     progress: CourseProgress | None
     next_block_id: uuid.UUID | None = None
     stage: int = 1
+    under_review: bool = False
 
     model_config = ConfigDict(from_attributes=True)
 
