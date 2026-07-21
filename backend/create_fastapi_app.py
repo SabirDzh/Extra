@@ -21,6 +21,7 @@ from sqladmin import Admin
 from starlette.responses import HTMLResponse
 from starlette.staticfiles import StaticFiles
 
+from core.scheduler import start_scheduler, stop_scheduler
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
@@ -32,9 +33,12 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         RedisBackend(redis),
         prefix=settings.cache.prefix,
     )
+    
+    start_scheduler()
 
     yield
 
+    stop_scheduler()
     await db_helper.dispose()
     await redis_pool.disconnect()
 

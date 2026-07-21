@@ -57,7 +57,7 @@ async def test_admin_create_lesson_block(client: AsyncClient, session: AsyncSess
     payload = {"title": "Lesson 1", "block_type": "lesson", "text_content": "Text", "order_index": 1}
     resp = await client.post(f"/api/v1/courses/{course.id}/blocks/", json=payload, headers=superuser_token_headers)
     assert resp.status_code == 201
-    assert resp.json()["title"] == course.title
+    assert resp.json()["title"] == payload["title"]
 
 
 @pytest.mark.anyio
@@ -138,7 +138,7 @@ async def test_create_block_str_coercion(client: AsyncClient, session: AsyncSess
     payload = {"title": "12345", "block_type": "lesson", "text_content": "Content"}
     resp = await client.post(f"/api/v1/courses/{course.id}/blocks/", json=payload, headers=superuser_token_headers)
     assert resp.status_code == 201
-    assert resp.json()["title"] == course.title
+    assert resp.json()["title"] == payload["title"]
 
 
 @pytest.mark.anyio

@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, model_validator
+from pydantic import BaseModel, ConfigDict, model_validator, field_validator
 
 from core.models.block import BlockType, TEST_BLOCK_TYPES
 from core.schemas.course import CourseProgress
@@ -13,10 +13,16 @@ class BlockCreate(BaseModel):
     text_content: str | None = None
     video_url: str | None = None
 
+    @field_validator("video_url")
+    @classmethod
+    def validate_url(cls, v: str | None) -> str | None:
+        if v is not None and not (v.startswith("http://") or v.startswith("https://")):
+            raise ValueError("URL must start with http:// or https://")
+        return v
+
     @model_validator(mode="after")
     def normalize_by_block_type(self):
         if self.block_type in TEST_BLOCK_TYPES:
-
             self.text_content = None
             self.video_url = None
         elif self.block_type == BlockType.lesson:
@@ -30,6 +36,13 @@ class BlockUpdate(BaseModel):
     order_index: int | None = None
     text_content: str | None = None
     video_url: str | None = None
+
+    @field_validator("video_url")
+    @classmethod
+    def validate_url(cls, v: str | None) -> str | None:
+        if v is not None and not (v.startswith("http://") or v.startswith("https://")):
+            raise ValueError("URL must start with http:// or https://")
+        return v
 
 
 class BlockRead(BaseModel):

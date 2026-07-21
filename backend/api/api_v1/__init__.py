@@ -22,6 +22,7 @@ from .term import router as term_router
 from .tests import router as tests_router
 from .users import router as users_router
 from .notifications import router as notifications_router
+from .backups import router as backups_router
 
 http_bearer = HTTPBearer(auto_error=False)
 
@@ -46,3 +47,4 @@ router.include_router(error_router)
 router.include_router(recommendations_router)
 router.include_router(notifications_router)
 router.include_router(product_attribute_router)
+router.include_router(backups_router)
