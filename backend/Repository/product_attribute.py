@@ -46,6 +46,7 @@ async def ensure_product_attributes_exist(
         if key not in existing_keys:
             new_attrs.append(
                 ProductAttribute(
+                    id=uuid.uuid4(),
                     key=key,
                     display_name=key,
                     data_type=data_type,
@@ -176,6 +177,7 @@ async def sync_product_attributes(session: AsyncSession) -> dict:
                 updated += 1
         else:
             new_attr = ProductAttribute(
+                id=uuid.uuid4(),
                 key=key,
                 display_name=key,
                 data_type=data_type,

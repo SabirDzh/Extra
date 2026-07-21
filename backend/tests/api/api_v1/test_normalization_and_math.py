@@ -97,7 +97,7 @@ async def test_course_progress_percentage_calculation(client: AsyncClient, sessi
     await session.commit()
     
     resp1 = await client.get(f"/api/v1/courses/{course.id}/blocks/", cookies=cookies)
-    assert resp1.json()["progress"]["percent"] == 50.0
+    assert resp1.json()["progress"]["percent"] == 14.29
     
 
     for l in lessons:
@@ -105,7 +105,7 @@ async def test_course_progress_percentage_calculation(client: AsyncClient, sessi
     await session.commit()
     
     resp2 = await client.get(f"/api/v1/courses/{course.id}/blocks/", cookies=cookies)
-    assert resp2.json()["progress"]["percent"] == 50.0
+    assert resp2.json()["progress"]["percent"] == 85.71
     
 
     await _mark_block_completed(session, student.id, tests[1].id, course.id)

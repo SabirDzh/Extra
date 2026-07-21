@@ -79,6 +79,24 @@ async def create_product_attribute(
     return await attribute_crud.create_product_attribute(db, data)
 
 
+@router.delete("/bulk", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_product_attributes_bulk(
+    db: Session,
+    data: ProductAttributeBulkDelete,
+    admin: AdminUser,
+):
+    await attribute_crud.delete_product_attributes(db, data.ids)
+
+
+@router.delete("/clear", status_code=status.HTTP_200_OK)
+async def clear_all_product_attributes(
+    db: Session,
+    admin: AdminUser,
+):
+    count = await attribute_crud.delete_all_product_attributes(db)
+    return {"msg": f"Удалено атрибутов: {count}", "status": "OK"}
+
+
 @router.patch("/{attribute_id}", response_model=ProductAttributeRead)
 async def update_product_attribute(
     db: Session,
@@ -110,22 +128,6 @@ async def delete_product_attribute(
     await attribute_crud.delete_product_attribute(db, attribute)
 
 
-@router.delete("/bulk", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_product_attributes_bulk(
-    db: Session,
-    data: ProductAttributeBulkDelete,
-    admin: AdminUser,
-):
-    await attribute_crud.delete_product_attributes(db, data.ids)
-
-
-@router.delete("/clear", status_code=status.HTTP_200_OK)
-async def clear_all_product_attributes(
-    db: Session,
-    admin: AdminUser,
-):
-    count = await attribute_crud.delete_all_product_attributes(db)
-    return {"msg": f"Удалено атрибутов: {count}", "status": "OK"}
 
 
 @router.post("/sync", status_code=status.HTTP_200_OK)

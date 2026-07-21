@@ -98,19 +98,19 @@ SCENARIOS = [
     (
         "lessons_and_test",
         [BlockType.lesson, BlockType.lesson, BlockType.auto_test],
-        1,
+        3,
         1,
     ),
     (
         "many_tests_and_lesson",
         [BlockType.auto_test, BlockType.manual_test, BlockType.mixed_test, BlockType.lesson],
-        3,
+        4,
         3,
     ),
     (
         "only_lessons",
         [BlockType.lesson, BlockType.lesson, BlockType.lesson],
-        0,
+        3,
         0,
     ),
     (
@@ -122,17 +122,16 @@ SCENARIOS = [
     (
         "test_then_lesson",
         [BlockType.auto_test, BlockType.lesson],
-        1,
+        2,
         1,
     ),
     (
         "one_stage_then_lesson_without_test",
         [BlockType.lesson, BlockType.auto_test, BlockType.lesson],
-        1,
+        3,
         1,
     ),
 ]
-
 
 @pytest.mark.anyio
 @pytest.mark.parametrize("_name,block_types,expected_total_tests,expected_completed_tests", SCENARIOS)

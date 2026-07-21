@@ -82,8 +82,8 @@ async def test_total_excludes_lesson_blocks(
     resp = await auth_client.get(f"/api/v1/courses/{course.id}")
     assert resp.status_code == 200
     progress = resp.json()["progress"]
-    assert progress["total"] == 1, (
-        f"Ожидали total=1 (только auto_test), получили {progress['total']}"
+    assert progress["total"] == 3, (
+        f"Ожидали total=3, получили {progress['total']}"
     )
 
 
@@ -103,7 +103,7 @@ async def test_total_counts_both_auto_and_manual_test(
     resp = await auth_client.get(f"/api/v1/courses/{course.id}")
     assert resp.status_code == 200
     progress = resp.json()["progress"]
-    assert progress["total"] == 2
+    assert progress["total"] == 3
 
 
 @pytest.mark.anyio
@@ -137,8 +137,8 @@ async def test_completed_ignores_lesson_completion(
     )
     assert resp2.status_code == 200
     progress = resp2.json()["progress"]
-    assert progress["total"] == 1, "total должен считать только тесты"
-    assert progress["completed"] == 0, "завершение урока не должно засчитываться"
+    assert progress["total"] == 2, "total должен считать все блоки"
+    assert progress["completed"] == 1, "завершение урока должно засчитываться"
 
 
 @pytest.mark.anyio
@@ -157,7 +157,7 @@ async def test_only_lesson_blocks_gives_zero_total(
     resp = await auth_client.get(f"/api/v1/courses/{course.id}")
     assert resp.status_code == 200
     progress = resp.json()["progress"]
-    assert progress["total"] == 0
+    assert progress["total"] == 3
     assert progress["completed"] == 0
     assert progress["percent"] == 0.0
 
@@ -200,8 +200,8 @@ async def test_full_test_progress_gives_100_percent(
     )
     assert resp2.status_code == 200
     progress = resp2.json()["progress"]
-    assert progress["total"] == 2, f"total должен быть 2, получили {progress['total']}"
-    assert progress["completed"] == 2
+    assert progress["total"] == 5, f"total должен быть 5, получили {progress['total']}"
+    assert progress["completed"] == 5
     assert progress["percent"] == 100.0
     assert progress["status"] == "completed"
 
@@ -239,7 +239,7 @@ async def test_partial_test_completion_gives_correct_percent(
     )
     assert resp2.status_code == 200
     progress = resp2.json()["progress"]
-    assert progress["total"] == 4
+    assert progress["total"] == 5
     assert progress["completed"] == 1
-    assert progress["percent"] == 25.0
+    assert progress["percent"] == 20.0
     assert progress["status"] == "in_progress"

@@ -329,7 +329,6 @@ async def update_course_completion_status(
 
     stmt_total = select(func.count(Block.id)).where(
         Block.course_id == course_id,
-        Block.block_type.in_(TEST_BLOCK_TYPES),
     )
     total: int = (await session.execute(stmt_total)).scalar() or 0
 
@@ -341,7 +340,6 @@ async def update_course_completion_status(
         .join(Block, UserBlockProgress.block_id == Block.id)
         .where(
             Block.course_id == course_id,
-            Block.block_type.in_(TEST_BLOCK_TYPES),
             UserBlockProgress.user_id == user_id,
             UserBlockProgress.is_completed == True,
         )
@@ -380,7 +378,6 @@ async def attach_course_progress(
         select(Block.course_id, func.count(Block.id).label("total"))
         .where(
             Block.course_id.in_(course_ids),
-            Block.block_type.in_(TEST_BLOCK_TYPES),
         )
         .group_by(Block.course_id)
     )
@@ -396,7 +393,6 @@ async def attach_course_progress(
             .join(UserBlockProgress, Block.id == UserBlockProgress.block_id)
             .where(
                 Block.course_id.in_(course_ids),
-                Block.block_type.in_(TEST_BLOCK_TYPES),
                 UserBlockProgress.user_id == user_id,
                 UserBlockProgress.is_completed == True,
             )

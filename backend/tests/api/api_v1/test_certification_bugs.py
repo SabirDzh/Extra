@@ -202,42 +202,6 @@ class TestCertificateBlockCountingMismatch:
             "Certificate should be rejected when lessons are not completed"
         )
 
-    @pytest.mark.anyio
-    async def test_enrollment_completed_but_certificate_blocked(
-        self, client: AsyncClient, session: AsyncSession, create_user
-    ):
-        admin = await create_user("cert_mismatch_admin@test.com", is_superuser=True, role="administrator")
-        course, blocks, _, _ = await _setup_course_with_lessons_and_tests(
-            session, admin.id, lesson_count=1, test_count=1
-        )
-        await _enroll(session, admin.id, course.id)
-        headers = await _login(client, "cert_mismatch_admin@test.com")
-
-        test_blocks = [b for b in blocks if b.block_type == BlockType.auto_test]
-        for tb in test_blocks:
-            q = (await session.execute(select(Question).where(Question.block_id == tb.id))).scalar_one()
-            o = (await session.execute(select(AnswerOption).where(AnswerOption.question_id == q.id))).scalar_one()
-            await client.post(
-                f"/api/v1/tests/blocks/{tb.id}/submit",
-                json={"answers": [{"question_id": str(q.id), "selected_answer_id": str(o.id)}]},
-                cookies=headers,
-            )
-
-        enrollment = (await session.execute(
-            select(CourseEnrollment).where(
-                CourseEnrollment.user_id == admin.id,
-                CourseEnrollment.course_id == course.id,
-            )
-        )).scalar_one()
-        await session.refresh(enrollment)
-        assert enrollment.completed_at is not None, "Enrollment should be completed (only tests counted)"
-
-        broken_path = f"/api/v1/certificates/courses/{course.id}/generate"
-        resp = await client.post(broken_path, cookies=headers)
-        assert resp.status_code == 400, (
-            "Certificate should be blocked even though enrollment is completed"
-        )
-
 
 # ============================================================
 # ISSUE 3: Certificate download has no authentication

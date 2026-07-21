@@ -256,8 +256,8 @@ class TestStatsProgress:
         resp = await client.get(f"/api/v1/courses/{course.id}/blocks/")
         data = resp.json()
         assert data["progress"]["percent"] == 50.0
-        assert data["progress"]["completed"] == 1
-        assert data["progress"]["total"] == 2
+        assert data["progress"]["completed"] == 2
+        assert data["progress"]["total"] == 4
 
     async def test_all_blocks_constant_regardless_of_unlocking(self, client, session):
         admin = await _create_user(session, "admstat2@test.com", is_superuser=True)
@@ -431,13 +431,13 @@ class TestSecurityPermissions:
         session.add(UserBlockProgress(user_id=user.id, block_id=blocks[0].id, is_completed=True))
         await session.commit()
         resp = await client.get(f"/api/v1/courses/{course.id}/blocks/")
-        assert resp.json()["progress"]["completed"] == 0
+        assert resp.json()["progress"]["completed"] == 1
         
 
         session.add(UserBlockProgress(user_id=user.id, block_id=blocks[1].id, is_completed=True))
         await session.commit()
         resp = await client.get(f"/api/v1/courses/{course.id}/blocks/")
-        assert resp.json()["progress"]["completed"] == 1
+        assert resp.json()["progress"]["completed"] == 2
 
     async def test_next_block_id_navigation_across_stages(self, client, session):
         admin = await _create_user(session, "admstat6@test.com", is_superuser=True)

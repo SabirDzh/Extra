@@ -2,7 +2,6 @@ from sqlalchemy import func, select, union_all
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.models.block import Block
-from core.models.block import TEST_BLOCK_TYPES
 from core.models.certificates import Certificate
 from core.models.course import Course, CourseEnrollment
 from core.models.progress import UserBlockProgress
@@ -62,7 +61,7 @@ async def get_courses_progress(
         .where(CourseEnrollment.user_id == user_id)
         .outerjoin(
             Block,
-            (Block.course_id == Course.id) & (Block.block_type.in_(TEST_BLOCK_TYPES)),
+            (Block.course_id == Course.id),
         )
         .outerjoin(
             UserBlockProgress,

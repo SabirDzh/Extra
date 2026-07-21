@@ -259,8 +259,7 @@ async def get_progress(
             status_code=status.HTTP_404_NOT_FOUND, detail="Course not found"
         )
 
-    from core.models.block import TEST_BLOCK_TYPES
-    test_blocks = [b for b in course.blocks if b.block_type in TEST_BLOCK_TYPES]
+    test_blocks = course.blocks
     total = len(test_blocks)
 
     if total == 0:
