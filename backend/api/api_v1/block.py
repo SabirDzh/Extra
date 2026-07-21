@@ -263,17 +263,21 @@ async def list_blocks(course_id: uuid.UUID, db: Session, user: CourseAllowedUser
 
     # Map each stage to whether it is passed 100%
     stage_passed_100 = {}
+    stage_unlocks_next = {}
     for stage_num in range(1, all_stages_count + 1):
         stage_blocks = [b for idx, b in enumerate(blocks) if (idx // 2) + 1 == stage_num]
         
         all_passed = True
+        unlocks_next = True
         for b in stage_blocks:
             if b.block_type == BlockType.lesson:
                 if b.id not in completed_block_ids:
                     all_passed = False
+                    unlocks_next = False
             else: # test block
                 if b.id not in completed_block_ids:
                     all_passed = False
+                    unlocks_next = False
                 else:
                     sub = latest_submissions.get(b.id)
                     if sub is not None:
@@ -281,23 +285,23 @@ async def list_blocks(course_id: uuid.UUID, db: Session, user: CourseAllowedUser
                             all_passed = False
                         elif sub.score is None or sub.score < sub.max_score:
                             all_passed = False
+                            unlocks_next = False
         
         stage_passed_100[stage_num] = all_passed
+        stage_unlocks_next[stage_num] = unlocks_next
 
-    # Find the active stage: the first stage that is not passed 100%
-    active_stage = 1
-    for stage_num in range(1, all_stages_count + 1):
-        if not stage_passed_100[stage_num]:
-            active_stage = stage_num
+    highest_unlocked_stage = 1
+    for stage_num in range(1, all_stages_count):
+        if stage_unlocks_next[stage_num]:
+            highest_unlocked_stage = stage_num + 1
+        else:
             break
-    else:
-        # If all stages are passed 100%, set active_stage to all_stages_count
-        if all_stages_count > 0:
-            active_stage = all_stages_count
+
+    is_course_finished = all_stages_count > 0 and all(stage_passed_100.values())
 
     current_block_id = None
-    # Find current block id for active stage
-    active_stage_blocks = [b for idx, b in enumerate(blocks) if (idx // 2) + 1 == active_stage]
+    # Find current block id for highest unlocked stage
+    active_stage_blocks = [b for idx, b in enumerate(blocks) if (idx // 2) + 1 == highest_unlocked_stage]
     for b in active_stage_blocks:
         if b.block_type == BlockType.lesson:
             if b.id not in completed_block_ids:
@@ -319,19 +323,21 @@ async def list_blocks(course_id: uuid.UUID, db: Session, user: CourseAllowedUser
             current_block_id = active_stage_blocks[0].id
 
     is_admin = user and (user.role == UserRole.admin or user.is_superuser)
-    if is_admin:
-        active_stage = all_stages_count
 
     block_reads = []
     for i, b in enumerate(blocks):
         pos_index = i + 1
         pos_stage = (i // 2) + 1
 
-        if not is_admin and pos_stage != active_stage:
-            continue
-
-        if is_admin and pos_stage > active_stage:
-            continue
+        if not is_admin:
+            if is_course_finished:
+                if pos_stage != all_stages_count:
+                    continue
+            else:
+                if pos_stage > highest_unlocked_stage:
+                    continue
+                if stage_passed_100.get(pos_stage, False):
+                    continue
 
         next_id = blocks[i + 1].id if i + 1 < len(blocks) else None
 

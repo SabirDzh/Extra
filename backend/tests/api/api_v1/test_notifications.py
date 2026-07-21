@@ -172,6 +172,7 @@ async def test_clear_notifications(client: AsyncClient, normal_user_token_header
 async def test_course_deletion_deletes_notifications(session: AsyncSession, create_user):
     import uuid_utils
     from datetime import datetime, timezone
+    from core.models.course import Course
     
     admin = await create_user("adm_del@example.com", role=UserRole.admin.value, is_superuser=True)
     user = await create_user("usr_del@example.com")
