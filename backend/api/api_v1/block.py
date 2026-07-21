@@ -228,6 +228,7 @@ async def list_blocks(course_id: uuid.UUID, db: Session, user: CourseAllowedUser
             TestSubmission.block_id.in_([b.id for b in blocks]),
         )
         submitted_block_ids = set((await db.execute(stmt_submissions)).scalars().all())
+        completed_block_ids.update(submitted_block_ids)
 
         # Get all submissions for this user on these blocks, sorted by submitted_at desc
         stmt_sub_details = select(TestSubmission).where(
