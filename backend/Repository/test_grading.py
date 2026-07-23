@@ -110,6 +110,15 @@ async def _mark_block_completed(
         if block:
             course_id = block.course_id
 
+    for obj in db.new:
+        if isinstance(obj, UserBlockProgress) and obj.user_id == user_id and obj.block_id == block_id:
+            obj.is_completed = True
+            if not obj.completed_at:
+                obj.completed_at = datetime.now(timezone.utc)
+            if course_id:
+                await course_crud.update_course_completion_status(db, user_id, course_id)
+            return
+
     existing = (
         await db.execute(
             select(UserBlockProgress).where(

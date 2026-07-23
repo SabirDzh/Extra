@@ -9,6 +9,7 @@ from core.models.course import Course
 from core.models.block import Block, BlockType
 from core.models.test import Question, QuestionType, AnswerOption, TestSubmission, TestAnswer
 from core.models.progress import UserBlockProgress
+from Services.test_grading import _mark_block_completed
 
 
 
@@ -255,8 +256,8 @@ class TestStatsProgress:
         await client.post("/api/v1/auth/login", data={"username": user.email, "password": "Password12345!"})
         resp = await client.get(f"/api/v1/courses/{course.id}/blocks/")
         data = resp.json()
-        assert data["progress"]["percent"] == 50.0
-        assert data["progress"]["completed"] == 2
+        assert data["progress"]["percent"] == 75.0
+        assert data["progress"]["completed"] == 3
         assert data["progress"]["total"] == 4
 
     async def test_all_blocks_constant_regardless_of_unlocking(self, client, session):
@@ -315,7 +316,6 @@ class TestSecurityPermissions:
         resp = await client.get(f"/api/v1/tests/courses/{course.id}/pending-submissions")
         assert resp.status_code == 403
         
-
 
 
         await client.post("/api/v1/auth/login", data={"username": admin.email, "password": "Password12345!"})
@@ -425,19 +425,13 @@ class TestSecurityPermissions:
         
 
         resp = await client.get(f"/api/v1/courses/{course.id}/blocks/")
-        assert resp.json()["progress"]["completed"] == 0
-        
-
-        session.add(UserBlockProgress(user_id=user.id, block_id=blocks[0].id, is_completed=True))
-        await session.commit()
-        resp = await client.get(f"/api/v1/courses/{course.id}/blocks/")
         assert resp.json()["progress"]["completed"] == 1
         
 
-        session.add(UserBlockProgress(user_id=user.id, block_id=blocks[1].id, is_completed=True))
+        await _mark_block_completed(session, user.id, blocks[1].id, course.id)
         await session.commit()
         resp = await client.get(f"/api/v1/courses/{course.id}/blocks/")
-        assert resp.json()["progress"]["completed"] == 2
+        assert resp.json()["progress"]["completed"] == 3
 
     async def test_next_block_id_navigation_across_stages(self, client, session):
         admin = await _create_user(session, "admstat6@test.com", is_superuser=True)

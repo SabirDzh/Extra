@@ -263,6 +263,40 @@ async def list_blocks(course_id: uuid.UUID, db: Session, user: CourseAllowedUser
     all_blocks_count = len(blocks)
     all_stages_count = (all_blocks_count + 1) // 2
 
+    # Auto-complete lesson blocks in unlocked stages for the user
+    if user:
+        newly_completed = False
+        for stage_num in range(1, all_stages_count + 1):
+            is_unlocked = True
+            for prev_stage in range(1, stage_num):
+                prev_blocks = [b for idx, b in enumerate(blocks) if (idx // 2) + 1 == prev_stage]
+                for pb in prev_blocks:
+                    if pb.block_type == BlockType.lesson:
+                        if pb.id not in completed_block_ids:
+                            is_unlocked = False
+                    else:
+                        if pb.id not in interacted_block_ids:
+                            is_unlocked = False
+                        else:
+                            sub = latest_submissions.get(pb.id)
+                            if sub is not None:
+                                if not sub.is_graded or sub.score is None or sub.score < sub.max_score:
+                                    is_unlocked = False
+
+            if not is_unlocked:
+                break
+
+            stage_blocks = [b for idx, b in enumerate(blocks) if (idx // 2) + 1 == stage_num]
+            for b in stage_blocks:
+                if b.block_type == BlockType.lesson and b.id not in completed_block_ids:
+                    await _mark_block_completed(db, user.id, b.id, course_id)
+                    completed_block_ids.add(b.id)
+                    interacted_block_ids.add(b.id)
+                    newly_completed = True
+
+        if newly_completed:
+            await db.commit()
+
     # Map each stage to whether it is passed 100%
     stage_passed_100 = {}
     stage_unlocks_next = {}
