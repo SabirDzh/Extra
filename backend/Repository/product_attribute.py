@@ -77,6 +77,107 @@ async def get_product_attributes(
     return result.scalars().all()
 
 
+def _normalize_unit(unit: str) -> str:
+    u = unit.lower()
+    if u in ("метр", "метра", "метров", "м"):
+        return "метров"
+    if u in ("бар", "бара", "баров"):
+        return "бар"
+    if u in ("миллиметр", "миллиметра", "миллиметров", "мм"):
+        return "мм"
+    if u in ("сантиметр", "сантиметра", "сантиметров", "см"):
+        return "см"
+    if u in ("килограмм", "килограмма", "килограммов", "кг"):
+        return "кг"
+    if u in ("ватт", "ватта", "ваттов", "вт"):
+        return "Вт"
+    if u in ("киловатт", "киловатта", "киловаттов", "квт"):
+        return "кВт"
+    if u in ("литр", "литра", "литров", "л"):
+        return "л"
+    return unit
+
+
+async def get_grouped_product_attributes(
+    session: AsyncSession,
+    visible_only: bool = False,
+) -> list[dict]:
+    import re
+
+    attributes = await get_product_attributes(
+        session, offset=0, limit=None, visible_only=visible_only
+    )
+
+    pattern = re.compile(
+        r"^(?P<base>.*?\D)\s*(?P<val>\d+(?:[.,]\d+)?)\s*(?P<unit>[A-Za-zА-Яа-я%°/]+)$"
+    )
+
+    grouped: dict[str, dict] = {}
+    standalone: list[dict] = []
+
+    for attr in attributes:
+        key = attr.key.strip()
+        match = pattern.match(key)
+        if match:
+            base_title = match.group("base").strip()
+            raw_unit = match.group("unit").strip()
+            norm_unit = _normalize_unit(raw_unit)
+            val_str = match.group("val").replace(",", ".")
+            try:
+                num_val = float(val_str)
+            except ValueError:
+                num_val = None
+
+            if num_val is not None and base_title:
+                group_key = base_title.lower()
+                if group_key not in grouped:
+                    grouped[group_key] = {
+                        "title": base_title,
+                        "unit": norm_unit,
+                        "filter_type": "range",
+                        "min_value": num_val,
+                        "max_value": num_val,
+                        "values": set([num_val]),
+                        "attribute_ids": [attr.id],
+                        "original_keys": [key],
+                        "sort_order": attr.sort_order,
+                    }
+                else:
+                    item = grouped[group_key]
+                    item["values"].add(num_val)
+                    item["min_value"] = min(item["min_value"], num_val)
+                    item["max_value"] = max(item["max_value"], num_val)
+                    item["attribute_ids"].append(attr.id)
+                    item["original_keys"].append(key)
+                continue
+
+        standalone.append(
+            {
+                "title": attr.display_name or attr.key,
+                "unit": None,
+                "filter_type": (
+                    attr.data_type
+                    if attr.data_type in ("boolean", "text")
+                    else "select"
+                ),
+                "min_value": None,
+                "max_value": None,
+                "values": [True, False] if attr.data_type == "boolean" else [attr.key],
+                "attribute_ids": [attr.id],
+                "original_keys": [attr.key],
+                "sort_order": attr.sort_order,
+            }
+        )
+
+    result = []
+    for grp in grouped.values():
+        grp["values"] = sorted(list(grp["values"]))
+        result.append(grp)
+
+    result.extend(standalone)
+    return sorted(result, key=lambda x: (x.get("sort_order", 0), x["title"]))
+
+
 async def get_product_attribute(
     session: AsyncSession, attribute_id: uuid.UUID
 ) -> ProductAttribute | None:
@@ -139,21 +240,37 @@ async def delete_all_product_attributes(session: AsyncSession) -> int:
 
 
 async def sync_product_attributes(session: AsyncSession) -> dict:
-    stmt = select(func.jsonb_each(Product.attributes))
-    result = await session.execute(stmt)
-
     all_keys: dict[str, str] = {}
-    for row in result:
-        key, value = row[0]
-        key_str = str(key).strip()
-        if key_str in {"Артикул", "article"}:
-            continue
-        if isinstance(value, bool):
-            all_keys[key_str] = "boolean"
-        elif isinstance(value, (int, float)):
-            all_keys[key_str] = "numeric"
-        elif isinstance(value, str):
-            all_keys[key_str] = "text"
+    if session.bind and session.bind.dialect.name == "sqlite":
+        stmt = select(Product.attributes)
+        res = await session.execute(stmt)
+        for (attrs,) in res:
+            if not attrs or not isinstance(attrs, dict):
+                continue
+            for key, value in attrs.items():
+                key_str = str(key).strip()
+                if key_str in {"Артикул", "article"}:
+                    continue
+                if isinstance(value, bool):
+                    all_keys[key_str] = "boolean"
+                elif isinstance(value, (int, float)):
+                    all_keys[key_str] = "numeric"
+                elif isinstance(value, str):
+                    all_keys[key_str] = "text"
+    else:
+        stmt = select(func.jsonb_each(Product.attributes))
+        result = await session.execute(stmt)
+        for row in result:
+            key, value = row[0]
+            key_str = str(key).strip()
+            if key_str in {"Артикул", "article"}:
+                continue
+            if isinstance(value, bool):
+                all_keys[key_str] = "boolean"
+            elif isinstance(value, (int, float)):
+                all_keys[key_str] = "numeric"
+            elif isinstance(value, str):
+                all_keys[key_str] = "text"
 
     existing_stmt = select(ProductAttribute)
     existing_result = await session.execute(existing_stmt)

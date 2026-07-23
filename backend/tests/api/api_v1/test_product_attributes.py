@@ -302,3 +302,46 @@ async def test_product_attribute_invalid_data_type(
         headers=superuser_token_headers,
     )
     assert response.status_code == 422
+
+
+@pytest.mark.anyio
+async def test_list_grouped_product_attributes_range_sliders(
+    client: AsyncClient, superuser_token_headers
+):
+    await client.delete(
+        "/api/v1/product-attributes/clear",
+        headers=superuser_token_headers,
+    )
+
+    attributes = [
+        "Максимальное давление в системе 3 бар",
+        "Максимальное давление в системе 6 бар",
+        "Максимальное давление в системе 10 бар",
+        "Мксимальная высота столба воды 2 метра",
+        "Мксимальная высота столба воды 16 метров",
+    ]
+    for key in attributes:
+        await client.post(
+            "/api/v1/product-attributes/",
+            json={"key": key, "is_visible": True},
+            headers=superuser_token_headers,
+        )
+
+    response = await client.get("/api/v1/product-attributes/filters")
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data) == 2
+
+    pressure_filter = next(f for f in data if "давление" in f["title"].lower())
+    assert pressure_filter["unit"] == "бар"
+    assert pressure_filter["filter_type"] == "range"
+    assert pressure_filter["min_value"] == 3.0
+    assert pressure_filter["max_value"] == 10.0
+    assert pressure_filter["values"] == [3.0, 6.0, 10.0]
+    assert len(pressure_filter["original_keys"]) == 3
+
+    height_filter = next(f for f in data if "высота" in f["title"].lower())
+    assert height_filter["filter_type"] == "range"
+    assert height_filter["min_value"] == 2.0
+    assert height_filter["max_value"] == 16.0
+    assert height_filter["values"] == [2.0, 16.0]

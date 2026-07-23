@@ -7,6 +7,7 @@ from core.config import settings
 from core.models.db_helper import db_helper
 from core.models.user import User
 from core.schemas.product_attribute import (
+    GroupedAttributeRead,
     ProductAttributeBulkDelete,
     ProductAttributeCreate,
     ProductAttributeRead,
@@ -31,6 +32,28 @@ router = APIRouter(
 
 Session = Annotated[AsyncSession, Depends(db_helper.session_getter)]
 AdminUser = Annotated[User, Depends(current_admin)]
+
+
+@router.get("/grouped", response_model=list[GroupedAttributeRead])
+@router.get("/filters", response_model=list[GroupedAttributeRead])
+async def list_grouped_product_attributes(
+    db: Session,
+    visible_only: bool = Query(True),
+    user: User | None = Depends(current_optional_user),
+):
+    """
+    Returns aggregated attributes grouped into e-commerce range filters (with min/max/values)
+    specifically designed for frontend sliders and filter widgets.
+    """
+    if not visible_only:
+        if not user or user.role != UserRole.admin:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only admins can access hidden attributes",
+            )
+    return await attribute_crud.get_grouped_product_attributes(
+        db, visible_only=visible_only
+    )
 
 
 @router.get("/", response_model=list[ProductAttributeRead])

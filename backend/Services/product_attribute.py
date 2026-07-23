@@ -19,6 +19,13 @@ async def get_product_attributes(
     return await repo.get_product_attributes(session, offset, limit, visible_only)
 
 
+async def get_grouped_product_attributes(
+    session: AsyncSession,
+    visible_only: bool = False,
+) -> list[dict]:
+    return await repo.get_grouped_product_attributes(session, visible_only)
+
+
 async def get_product_attribute(
     session: AsyncSession, attribute_id: uuid.UUID
 ) -> ProductAttribute | None:

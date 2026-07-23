@@ -25,7 +25,8 @@ COPY pyproject.toml poetry.lock ./
 # Install dependencies into a virtual environment
 RUN poetry config virtualenvs.create true && \
     poetry config virtualenvs.in-project true && \
-    poetry install --no-interaction --no-ansi --no-root
+    poetry install --no-interaction --no-ansi --no-root && \
+    poetry run playwright install chromium
 
 # Stage 2: Runtime
 FROM python:3.12-slim

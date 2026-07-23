@@ -1,5 +1,6 @@
 import uuid
 from datetime import datetime
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -15,6 +16,17 @@ class ProductAttributeRead(BaseModel):
     updated_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class GroupedAttributeRead(BaseModel):
+    title: str
+    unit: str | None = None
+    filter_type: str = "range"  # "range", "boolean", "select"
+    min_value: float | None = None
+    max_value: float | None = None
+    values: list[Any] = []
+    attribute_ids: list[uuid.UUID] = []
+    original_keys: list[str] = []
 
 
 class ProductAttributeCreate(BaseModel):
