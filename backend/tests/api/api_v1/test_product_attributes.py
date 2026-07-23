@@ -327,7 +327,7 @@ async def test_list_grouped_product_attributes_range_sliders(
             headers=superuser_token_headers,
         )
 
-    response = await client.get("/api/v1/product-attributes/filters")
+    response = await client.get("/api/v1/product-attributes/", params={"grouped": "true"})
     assert response.status_code == 200
     data = response.json()
     assert len(data) == 2

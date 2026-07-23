@@ -34,34 +34,21 @@ Session = Annotated[AsyncSession, Depends(db_helper.session_getter)]
 AdminUser = Annotated[User, Depends(current_admin)]
 
 
-@router.get("/grouped", response_model=list[GroupedAttributeRead])
-@router.get("/filters", response_model=list[GroupedAttributeRead])
-async def list_grouped_product_attributes(
-    db: Session,
-    visible_only: bool = Query(True),
-    user: User | None = Depends(current_optional_user),
-):
-    """
-    Returns aggregated attributes grouped into e-commerce range filters (with min/max/values)
-    specifically designed for frontend sliders and filter widgets.
-    """
-    if not visible_only:
-        if not user or user.role != UserRole.admin:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Only admins can access hidden attributes",
-            )
-    return await attribute_crud.get_grouped_product_attributes(
-        db, visible_only=visible_only
-    )
-
-
-@router.get("/", response_model=list[ProductAttributeRead])
+@router.get(
+    "/", response_model=list[ProductAttributeRead] | list[GroupedAttributeRead]
+)
+@router.get(
+    "/filters", response_model=list[GroupedAttributeRead], include_in_schema=False
+)
 async def list_product_attributes(
     db: Session,
     offset: int = Query(0, ge=0),
     limit: int | None = Query(None, ge=1, le=1000),
     visible_only: bool = Query(True),
+    grouped: bool = Query(
+        False,
+        description="If true, returns attributes grouped into e-commerce range filters (min/max/values)",
+    ),
     user: User | None = Depends(current_optional_user),
 ):
     if not visible_only:
@@ -70,6 +57,10 @@ async def list_product_attributes(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Only admins can access hidden attributes",
             )
+    if grouped:
+        return await attribute_crud.get_grouped_product_attributes(
+            db, visible_only=visible_only
+        )
     return await attribute_crud.get_product_attributes(
         db, offset=offset, limit=limit, visible_only=visible_only
     )
