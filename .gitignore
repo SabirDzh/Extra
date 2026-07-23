@@ -166,3 +166,7 @@ cython_debug/
 
 backend/media/user_img/
 "\320\236\321\210\320\270\320\261\320\272\320\270/images/"
+
+# Temporary testing & debug artifacts
+*_cookies.txt
+curl_output.txt
