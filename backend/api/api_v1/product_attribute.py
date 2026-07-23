@@ -35,19 +35,21 @@ AdminUser = Annotated[User, Depends(current_admin)]
 
 
 @router.get(
-    "/", response_model=list[ProductAttributeRead] | list[GroupedAttributeRead]
+    "/", response_model=list[GroupedAttributeRead | ProductAttributeRead]
 )
 @router.get(
-    "/filters", response_model=list[GroupedAttributeRead], include_in_schema=False
+    "/filters",
+    response_model=list[GroupedAttributeRead | ProductAttributeRead],
+    include_in_schema=False,
 )
 async def list_product_attributes(
     db: Session,
     offset: int = Query(0, ge=0),
     limit: int | None = Query(None, ge=1, le=1000),
     visible_only: bool = Query(True),
-    grouped: bool = Query(
+    raw: bool = Query(
         False,
-        description="If true, returns attributes grouped into e-commerce range filters (min/max/values)",
+        description="If true, returns raw flat attributes without range grouping",
     ),
     user: User | None = Depends(current_optional_user),
 ):
@@ -57,12 +59,12 @@ async def list_product_attributes(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Only admins can access hidden attributes",
             )
-    if grouped:
-        return await attribute_crud.get_grouped_product_attributes(
-            db, visible_only=visible_only
+    if raw:
+        return await attribute_crud.get_product_attributes(
+            db, offset=offset, limit=limit, visible_only=visible_only
         )
-    return await attribute_crud.get_product_attributes(
-        db, offset=offset, limit=limit, visible_only=visible_only
+    return await attribute_crud.get_grouped_product_attributes(
+        db, visible_only=visible_only
     )
 
 

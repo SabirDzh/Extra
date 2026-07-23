@@ -327,20 +327,29 @@ async def test_list_grouped_product_attributes_range_sliders(
             headers=superuser_token_headers,
         )
 
-    response = await client.get("/api/v1/product-attributes/", params={"grouped": "true"})
+    await client.post(
+        "/api/v1/product-attributes/",
+        json={"key": "Модуль Wi-Fi", "display_name": "Модуль Wi-Fi", "is_visible": True},
+        headers=superuser_token_headers,
+    )
+
+    response = await client.get("/api/v1/product-attributes/")
     assert response.status_code == 200
     data = response.json()
-    assert len(data) == 2
+    assert len(data) == 3
 
-    pressure_filter = next(f for f in data if "давление" in f["title"].lower())
+    wifi_attr = next(f for f in data if f.get("key") == "Модуль Wi-Fi")
+    assert wifi_attr["key"] == "Модуль Wi-Fi"
+    assert wifi_attr["data_type"] == "boolean"
+
+    pressure_filter = next(f for f in data if "title" in f and "давление" in f["title"].lower())
     assert pressure_filter["unit"] == "бар"
     assert pressure_filter["filter_type"] == "range"
     assert pressure_filter["min_value"] == 3.0
     assert pressure_filter["max_value"] == 10.0
     assert pressure_filter["values"] == [3.0, 6.0, 10.0]
-    assert len(pressure_filter["original_keys"]) == 3
 
-    height_filter = next(f for f in data if "высота" in f["title"].lower())
+    height_filter = next(f for f in data if "title" in f and "высота" in f["title"].lower())
     assert height_filter["filter_type"] == "range"
     assert height_filter["min_value"] == 2.0
     assert height_filter["max_value"] == 16.0

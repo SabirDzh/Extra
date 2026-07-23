@@ -151,21 +151,17 @@ async def get_grouped_product_attributes(
                     item["original_keys"].append(key)
                 continue
 
+        # Non-range attributes: return in standard ProductAttributeRead format
         standalone.append(
             {
-                "title": attr.display_name or attr.key,
-                "unit": None,
-                "filter_type": (
-                    attr.data_type
-                    if attr.data_type in ("boolean", "text")
-                    else "select"
-                ),
-                "min_value": None,
-                "max_value": None,
-                "values": [True, False] if attr.data_type == "boolean" else [attr.key],
-                "attribute_ids": [attr.id],
-                "original_keys": [attr.key],
+                "id": attr.id,
+                "key": attr.key,
+                "display_name": attr.display_name or attr.key,
+                "data_type": attr.data_type,
                 "sort_order": attr.sort_order,
+                "is_visible": attr.is_visible,
+                "created_at": attr.created_at,
+                "updated_at": attr.updated_at,
             }
         )
 
@@ -175,7 +171,10 @@ async def get_grouped_product_attributes(
         result.append(grp)
 
     result.extend(standalone)
-    return sorted(result, key=lambda x: (x.get("sort_order", 0), x["title"]))
+    return sorted(
+        result,
+        key=lambda x: (x.get("sort_order", 0), x.get("title") or x.get("key") or ""),
+    )
 
 
 async def get_product_attribute(
