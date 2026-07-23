@@ -33,6 +33,8 @@ openpyxl-image-loader = "^1.0.5"
 rapidfuzz = "^3.14.1"
 pypdf = "^6.14.2"
 apscheduler = "^3.11.3"
+xhtml2pdf = "^0.2.17"
+playwright = "^1.61.0"
 
 [tool.pytest.ini_options]
 python_classes = ["Test*", "*Test", "!TestSubmission"]
