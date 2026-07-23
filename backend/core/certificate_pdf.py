@@ -22,7 +22,12 @@ async def async_generate_certificate_pdf(
     )
 
     async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=True)
+        try:
+            browser = await p.chromium.launch(headless=True)
+        except Exception:
+            import subprocess
+            subprocess.run(["playwright", "install", "chromium"], check=False)
+            browser = await p.chromium.launch(headless=True)
         page = await browser.new_page(viewport={"width": 1200, "height": 1600})
         await page.set_content(html_content, wait_until="networkidle")
         pdf_bytes = await page.pdf(
