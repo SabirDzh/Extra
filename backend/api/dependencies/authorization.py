@@ -24,7 +24,6 @@ async def current_course_allowed_user(
         UserRole.seller,
         UserRole.serviceman,
         UserRole.installer,
-        UserRole.buyer,
     }
     if current_user.role not in allowed_roles:
         raise HTTPException(
