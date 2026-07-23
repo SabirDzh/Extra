@@ -228,7 +228,6 @@ async def list_blocks(course_id: uuid.UUID, db: Session, user: CourseAllowedUser
             TestSubmission.block_id.in_([b.id for b in blocks]),
         )
         submitted_block_ids = set((await db.execute(stmt_submissions)).scalars().all())
-        completed_block_ids.update(submitted_block_ids)
 
         # Get all submissions for this user on these blocks, sorted by submitted_at desc
         stmt_sub_details = select(TestSubmission).where(
@@ -244,6 +243,8 @@ async def list_blocks(course_id: uuid.UUID, db: Session, user: CourseAllowedUser
                 latest_submissions[sub.block_id] = sub
     else:
         submitted_block_ids = set()
+
+    interacted_block_ids = completed_block_ids | submitted_block_ids
 
     from core.models.test import Question
     from sqlalchemy import func
@@ -276,7 +277,7 @@ async def list_blocks(course_id: uuid.UUID, db: Session, user: CourseAllowedUser
                     all_passed = False
                     unlocks_next = False
             else: # test block
-                if b.id not in completed_block_ids:
+                if b.id not in interacted_block_ids:
                     all_passed = False
                     unlocks_next = False
                 else:
@@ -310,7 +311,7 @@ async def list_blocks(course_id: uuid.UUID, db: Session, user: CourseAllowedUser
                 break
         else:
             is_passed = False
-            if b.id in completed_block_ids:
+            if b.id in interacted_block_ids:
                 sub = latest_submissions.get(b.id)
                 if sub is None:
                     is_passed = True
@@ -425,6 +426,9 @@ async def get_block(
 ):
     course = await _get_course_or_404(db, course_id)
     block = await _get_block_or_404(db, block_id, course_id)
+    if block.block_type == BlockType.lesson and user:
+        await _mark_block_completed(db, user.id, block.id, course_id)
+        await db.commit()
     return await _format_block_read(db, block, course, user.id if user else None)
 
 
@@ -495,11 +499,11 @@ async def mark_complete(
     course_id: uuid.UUID,
     block_id: uuid.UUID,
     db: Session,
-    user: CourseAllowedUser,
+    admin: User = Depends(current_admin),
 ):
     block = await _get_block_or_404(db, block_id, course_id)
 
-    await _mark_block_completed(db, user.id, block_id, course_id)
+    await _mark_block_completed(db, admin.id, block_id, course_id)
 
     await db.commit()
 
