@@ -323,22 +323,19 @@ async def list_blocks(course_id: uuid.UUID, db: Session, user: CourseAllowedUser
         if active_stage_blocks:
             current_block_id = active_stage_blocks[0].id
 
-    is_admin = user and (user.role == UserRole.admin or user.is_superuser)
-
     block_reads = []
     for i, b in enumerate(blocks):
         pos_index = i + 1
         pos_stage = (i // 2) + 1
 
-        if not is_admin:
-            if is_course_finished:
-                if pos_stage != all_stages_count:
-                    continue
-            else:
-                if pos_stage > highest_unlocked_stage:
-                    continue
-                if stage_passed_100.get(pos_stage, False):
-                    continue
+        if is_course_finished:
+            if pos_stage != all_stages_count:
+                continue
+        else:
+            if pos_stage > highest_unlocked_stage:
+                continue
+            if stage_passed_100.get(pos_stage, False):
+                continue
 
         next_id = blocks[i + 1].id if i + 1 < len(blocks) else None
 

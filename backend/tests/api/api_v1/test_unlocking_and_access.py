@@ -73,15 +73,15 @@ async def test_progressive_unlocking_stages(client: AsyncClient, session: AsyncS
     assert str(blocks[1].id) not in visible_ids_3
 
 @pytest.mark.anyio
-async def test_admin_sees_all_blocks(client: AsyncClient, session: AsyncSession, multi_stage_course):
-    """Admin should see all blocks regardless of progress."""
+async def test_admin_sees_progressively_unlocked_blocks(client: AsyncClient, session: AsyncSession, multi_stage_course):
+    """Admin should see blocks progressively unlocked like any student."""
     admin, course, blocks = multi_stage_course
     
     auth_resp = await client.post("/api/v1/auth/login", data={"username": admin.email, "password": "Password12345!"})
     cookies = {"auth_user": auth_resp.cookies.get("auth_user")}
     
     resp = await client.get(f"/api/v1/courses/{course.id}/blocks/", cookies=cookies)
-    assert len(resp.json()["blocks"]) == 4
+    assert len(resp.json()["blocks"]) == 2
 
 @pytest.mark.anyio
 async def test_block_access_content_security(client: AsyncClient, session: AsyncSession, multi_stage_course, create_user):
