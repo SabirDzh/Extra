@@ -49,3 +49,48 @@ async def test_login_user(client: AsyncClient):
     assert response.status_code == 204 or response.status_code == 200, response.text
 
     assert len(response.cookies) > 0 or "access_token" in response.json()
+
+
+@pytest.mark.anyio
+async def test_auth_email_spaces_rejected(client: AsyncClient):
+    # Registering with email containing spaces must fail (422)
+    payload_leading_space = {
+        "email": "  spaces_user@example.com  ",
+        "password": "SecretPassword123!",
+        "role": "user",
+        "fullname": "SpaceUser",
+    }
+    response = await client.post("/api/v1/auth/register", json=payload_leading_space)
+    assert response.status_code == 422
+
+    payload_internal_space = {
+        "email": "user name@example.com",
+        "password": "SecretPassword123!",
+        "role": "user",
+        "fullname": "SpaceUser",
+    }
+    response = await client.post("/api/v1/auth/register", json=payload_internal_space)
+    assert response.status_code == 422
+
+
+@pytest.mark.anyio
+async def test_auth_password_spaces_not_counted_towards_length(client: AsyncClient):
+    # Password with only spaces or less than 4 non-space characters must fail (422)
+    payload_spaces_only = {
+        "email": "valid_user@example.com",
+        "password": "    ",
+        "role": "user",
+        "fullname": "SpaceUser",
+    }
+    response = await client.post("/api/v1/auth/register", json=payload_spaces_only)
+    assert response.status_code == 422
+
+    payload_short_after_strip = {
+        "email": "valid_user2@example.com",
+        "password": "   a   ",
+        "role": "user",
+        "fullname": "SpaceUser",
+    }
+    response = await client.post("/api/v1/auth/register", json=payload_short_after_strip)
+    assert response.status_code == 422
+

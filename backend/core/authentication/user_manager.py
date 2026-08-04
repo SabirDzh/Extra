@@ -182,3 +182,28 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
             await self.user_db.session.refresh(user)
 
         return user
+
+    async def get_by_email(self, user_email: str) -> User:
+        if isinstance(user_email, str):
+            user_email = user_email.strip()
+        return await super().get_by_email(user_email)
+
+    async def authenticate(self, credentials) -> Optional[User]:
+        if getattr(credentials, "username", None) and isinstance(credentials.username, str):
+            credentials.username = credentials.username.strip()
+        if getattr(credentials, "password", None) and isinstance(credentials.password, str):
+            credentials.password = credentials.password.strip()
+            if len(credentials.password) < 4:
+                return None
+        return await super().authenticate(credentials)
+
+    async def reset_password(
+        self, token: str, password: str, request: Optional["Request"] = None
+    ) -> User:
+        if isinstance(password, str):
+            password = password.strip()
+            if len(password) < 4:
+                raise exceptions.InvalidPasswordException(
+                    reason="Password must contain at least 4 non-space characters"
+                )
+        return await super().reset_password(token, password, request)

@@ -36,6 +36,21 @@ class UserCreate(schemas.BaseUserCreate):
     fullname: str = Field(min_length=1, max_length=128)
     image_url: str | None = None
 
+    @field_validator("email", mode="before")
+    @classmethod
+    def validate_email_no_spaces(cls, v):
+        if isinstance(v, str) and any(c.isspace() for c in v):
+            raise ValueError("Email не должен содержать пробелов")
+        return v
+
+    @field_validator("password", mode="after")
+    @classmethod
+    def validate_password_min_non_space(cls, v):
+        if v is not None and isinstance(v, str):
+            if len(v.strip()) < 4:
+                raise ValueError("Пароль должен содержать не менее 4 символов (без учета внешних пробелов)")
+        return v
+
     @field_validator("role", mode="before")
     @classmethod
     def normalize_role(cls, v):
@@ -47,6 +62,21 @@ class UserUpdate(schemas.BaseUserUpdate):
     role: UserRole | None = None
     fullname: str | None = None
     image_url: str | None = None
+
+    @field_validator("email", mode="before")
+    @classmethod
+    def validate_email_no_spaces(cls, v):
+        if v is not None and isinstance(v, str) and any(c.isspace() for c in v):
+            raise ValueError("Email не должен содержать пробелов")
+        return v
+
+    @field_validator("password", mode="after")
+    @classmethod
+    def validate_password_min_non_space(cls, v):
+        if v is not None and isinstance(v, str):
+            if len(v.strip()) < 4:
+                raise ValueError("Пароль должен содержать не менее 4 символов (без учета внешних пробелов)")
+        return v
 
     @field_validator("role", mode="before")
     @classmethod
