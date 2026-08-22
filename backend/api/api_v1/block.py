@@ -148,6 +148,9 @@ async def _format_block_read(
 
     stmt_count = select(func.count(Question.id)).where(Question.block_id == block.id)
     n_questions = (await db.execute(stmt_count)).scalar() or 0
+    effective_limit = block.questions_count if block.questions_count is not None else 5
+    if effective_limit > 0 and effective_limit < n_questions:
+        n_questions = effective_limit
 
     stmt_pos = select(func.count(Block.id)).where(
         Block.course_id == block.course_id,
@@ -192,6 +195,7 @@ async def _format_block_read(
         block_type=block.block_type,
         text_content=block.text_content,
         video_url=block.video_url,
+        questions_count=block.questions_count,
         created_at=block.created_at,
         audience_label=aud_label,
         level_label=lvl_label,
@@ -361,18 +365,16 @@ async def list_blocks(course_id: uuid.UUID, db: Session, user: CourseAllowedUser
     is_admin = user and (user.role == UserRole.admin or user.is_superuser)
 
     block_reads = []
+    completed_block_reads = []
     for i, b in enumerate(blocks):
         pos_index = i + 1
         pos_stage = (i // 2) + 1
 
         if not is_admin:
             if is_course_finished:
-                if pos_stage != all_stages_count:
-                    continue
+                pass
             else:
                 if pos_stage > highest_unlocked_stage:
-                    continue
-                if stage_passed_100.get(pos_stage, False):
                     continue
 
         next_id = blocks[i + 1].id if i + 1 < len(blocks) else None
@@ -380,41 +382,63 @@ async def list_blocks(course_id: uuid.UUID, db: Session, user: CourseAllowedUser
         sub = latest_submissions.get(b.id) if user else None
         under_review = (sub is not None and not sub.is_graded) if sub else False
 
-        block_reads.append(
-            BlockRead(
-                id=b.id,
-                course_id=b.course_id,
-                order_index=pos_index,
-                title=b.title,
-                block_type=b.block_type,
-                text_content=b.text_content,
-                video_url=b.video_url,
-                created_at=b.created_at,
-                audience_label=aud_label,
-                level_label=lvl_label,
-                description=course.description,
-                next_block_id=next_id,
-                stage=pos_stage,
-                under_review=under_review,
-                progress=CourseProgress(
-                    completed=1 if b.id in completed_block_ids else 0,
-                    total=question_counts.get(b.id, 0),
-                    percent=100.0 if b.id in completed_block_ids else 0.0,
-                    status=(
-                        CourseStatus.completed
-                        if b.id in completed_block_ids
-                        else (
-                            CourseStatus.in_progress
-                            if b.id in submitted_block_ids
-                            else CourseStatus.not_started
-                        )
-                    ),
+        total_q = question_counts.get(b.id, 0)
+        effective_limit = b.questions_count if b.questions_count is not None else 5
+        if effective_limit > 0 and effective_limit < total_q:
+            total_q = effective_limit
+
+        b_read = BlockRead(
+            id=b.id,
+            course_id=b.course_id,
+            order_index=pos_index,
+            title=b.title,
+            block_type=b.block_type,
+            text_content=b.text_content,
+            video_url=b.video_url,
+            questions_count=b.questions_count,
+            created_at=b.created_at,
+            audience_label=aud_label,
+            level_label=lvl_label,
+            description=course.description,
+            next_block_id=next_id,
+            stage=pos_stage,
+            under_review=under_review,
+            progress=CourseProgress(
+                completed=1 if b.id in completed_block_ids else 0,
+                total=total_q,
+                percent=100.0 if b.id in completed_block_ids else 0.0,
+                status=(
+                    CourseStatus.completed
+                    if b.id in completed_block_ids
+                    else (
+                        CourseStatus.in_progress
+                        if b.id in submitted_block_ids
+                        else CourseStatus.not_started
+                    )
                 ),
-            )
+            ),
         )
+
+        if not is_admin:
+            if is_course_finished:
+                if pos_stage != all_stages_count:
+                    completed_block_reads.append(b_read)
+                else:
+                    block_reads.append(b_read)
+                    completed_block_reads.append(b_read)
+            else:
+                if stage_passed_100.get(pos_stage, False):
+                    completed_block_reads.append(b_read)
+                else:
+                    block_reads.append(b_read)
+        else:
+            block_reads.append(b_read)
+            if b.id in completed_block_ids or stage_passed_100.get(pos_stage, False):
+                completed_block_reads.append(b_read)
 
     return CourseBlocksResponse(
         blocks=block_reads,
+        completed_blocks=completed_block_reads,
         audience_label=aud_label,
         level_label=lvl_label,
         progress=await _get_course_progress(db, course, user.id if user else None),

@@ -12,12 +12,23 @@ class BlockCreate(BaseModel):
     order_index: int = 0
     text_content: str | None = None
     video_url: str | None = None
+    questions_count: int | None = None
 
     @field_validator("video_url")
     @classmethod
     def validate_url(cls, v: str | None) -> str | None:
         if v is not None and not (v.startswith("http://") or v.startswith("https://")):
             raise ValueError("URL must start with http:// or https://")
+        return v
+
+    @field_validator("questions_count")
+    @classmethod
+    def validate_questions_count(cls, v: int | None) -> int | None:
+        if v is not None:
+            if not isinstance(v, int) or isinstance(v, bool):
+                raise ValueError("questions_count must be an integer between 1 and 1000")
+            if v < 1 or v > 1000:
+                raise ValueError("questions_count must be an integer between 1 and 1000")
         return v
 
     @model_validator(mode="after")
@@ -28,6 +39,7 @@ class BlockCreate(BaseModel):
         elif self.block_type == BlockType.lesson:
             if not self.text_content and not self.video_url:
                 raise ValueError("Lesson block must have text_content or video_url")
+            self.questions_count = None
         return self
 
 
@@ -36,12 +48,23 @@ class BlockUpdate(BaseModel):
     order_index: int | None = None
     text_content: str | None = None
     video_url: str | None = None
+    questions_count: int | None = None
 
     @field_validator("video_url")
     @classmethod
     def validate_url(cls, v: str | None) -> str | None:
         if v is not None and not (v.startswith("http://") or v.startswith("https://")):
             raise ValueError("URL must start with http:// or https://")
+        return v
+
+    @field_validator("questions_count")
+    @classmethod
+    def validate_questions_count(cls, v: int | None) -> int | None:
+        if v is not None:
+            if not isinstance(v, int) or isinstance(v, bool):
+                raise ValueError("questions_count must be an integer between 1 and 1000")
+            if v < 1 or v > 1000:
+                raise ValueError("questions_count must be an integer between 1 and 1000")
         return v
 
 
@@ -53,6 +76,7 @@ class BlockRead(BaseModel):
     block_type: BlockType
     text_content: str | None
     video_url: str | None
+    questions_count: int | None = None
     created_at: datetime
     
     audience_label: str
@@ -68,6 +92,7 @@ class BlockRead(BaseModel):
 
 class CourseBlocksResponse(BaseModel):
     blocks: list[BlockRead]
+    completed_blocks: list[BlockRead] = []
     audience_label: str
     level_label: str
     progress: CourseProgress | None
