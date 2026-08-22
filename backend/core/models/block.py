@@ -24,6 +24,7 @@ class Block(IdUuidPkMixin, Base):
     block_type: Mapped[BlockType] = mapped_column(Enum(BlockType))
     text_content: Mapped[str | None] = mapped_column(Text, nullable=True)
     video_url: Mapped[str | None] = mapped_column(String(1000), nullable=True)
+    questions_count: Mapped[int | None] = mapped_column(Integer, nullable=True, default=None)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )

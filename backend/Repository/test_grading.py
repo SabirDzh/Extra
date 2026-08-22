@@ -33,7 +33,11 @@ async def auto_grade_submission(
         .all()
     )
 
-    max_score = len(questions)
+    effective_limit = block.questions_count if block.questions_count is not None else 5
+    if effective_limit > 0 and effective_limit < len(questions):
+        max_score = effective_limit
+    else:
+        max_score = len(questions)
     score = 0
     has_manual_questions = False
 

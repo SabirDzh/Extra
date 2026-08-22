@@ -136,6 +136,12 @@ async def list_questions(
 
     if user.role == UserRole.admin:
         return [QuestionReadAdmin.model_validate(q) for q in questions]
+
+    effective_limit = block.questions_count if block.questions_count is not None else 5
+    if effective_limit > 0 and effective_limit < len(questions):
+        import random
+        questions = random.sample(questions, effective_limit)
+
     return [QuestionRead.model_validate(q) for q in questions]
 
 
@@ -180,10 +186,17 @@ async def submit_test(
                     detail=f"Answer option {ans.selected_answer_id} does not belong to question {ans.question_id}",
                 )
 
+    effective_limit = block.questions_count if block.questions_count is not None else 5
+    calculated_max_score = (
+        min(len(questions), effective_limit)
+        if effective_limit > 0
+        else len(questions)
+    )
+
     submission = TestSubmission(
         user_id=user.id,
         block_id=block_id,
-        max_score=len(questions),
+        max_score=calculated_max_score,
         is_graded=False,
     )
     db.add(submission)
