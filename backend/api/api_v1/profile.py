@@ -36,7 +36,11 @@ async def list_test_attempts(
     pagination: PaginationParams = Depends(),
 ):
     return await get_test_attempts(
-        db, user.id, offset=pagination.offset, limit=pagination.limit
+        db,
+        user.id,
+        user.role,
+        offset=pagination.offset,
+        limit=pagination.limit,
     )
 
 
@@ -47,7 +51,11 @@ async def list_courses_progress(
     pagination: PaginationParams = Depends(),
 ):
     return await get_courses_progress(
-        db, user.id, offset=pagination.offset, limit=pagination.limit
+        db,
+        user.id,
+        user.role,
+        offset=pagination.offset,
+        limit=pagination.limit,
     )
 
 
@@ -56,7 +64,7 @@ async def list_certificates(
     db: Session,
     user: User = Depends(current_active_user),
 ):
-    return await get_certificates(db, user.id)
+    return await get_certificates(db, user.id, user.role)
 
 
 @router.get("/recent-courses", response_model=list[RecentCourseRead])
@@ -67,4 +75,10 @@ async def list_recent_courses(
     limit: int = Query(5, ge=1, le=20),
 ):
     offset = (page - 1) * limit
-    return await get_recent_courses(db, user.id, limit=limit, offset=offset)
+    return await get_recent_courses(
+        db,
+        user.id,
+        user.role,
+        limit=limit,
+        offset=offset,
+    )

@@ -5,9 +5,9 @@ from core.authentication.fastapi_users import current_active_user
 from core.certificate_pdf import async_generate_certificate_pdf
 from core.models.block import Block
 from core.models.certificates import Certificate
-from core.models.course import Course
 from core.models.db_helper import db_helper
 from Services.test_completion import get_completed_block_ids
+from Services import course as course_crud
 from core.models.user import User
 from core.schemas.certificate import CertificateRead
 from fastapi import APIRouter, Depends, HTTPException, status, Request
@@ -38,7 +38,13 @@ CourseAllowedUser = Annotated[User, Depends(current_course_allowed_user)]
 async def generate_certificate(
     course_id: uuid.UUID, db: Session, user: CourseAllowedUser
 ):
-    course = await db.get(Course, course_id, options=[selectinload(Course.blocks)])
+    course = await course_crud.get_accessible_course(
+        db,
+        course_id,
+        user.role,
+        load_blocks=True,
+        include_unpublished_for_admin=user.role == UserRole.admin,
+    )
     if not course:
         raise HTTPException(status_code=404, detail="Course not found")
 

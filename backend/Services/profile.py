@@ -1,6 +1,7 @@
 from sqlalchemy import and_, exists, func, or_, select, union_all
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from Domain.Enums.user_role import UserRole
 from core.models.block import TEST_BLOCK_TYPES, Block, BlockType
 from core.models.certificates import Certificate
 from core.models.course import Course, CourseEnrollment
@@ -10,11 +11,21 @@ from Services.test_completion import (
     get_completed_block_ids,
     perfect_test_submission_exists,
 )
+from Services.course_access import apply_course_access_policy, get_course_access_policy
+
+
+def _get_profile_course_policy(user_role: UserRole):
+    """Resolve profile visibility, including drafts for administrators."""
+    return get_course_access_policy(
+        user_role,
+        include_unpublished_for_admin=user_role == UserRole.admin,
+    )
 
 
 async def get_test_attempts(
     db: AsyncSession,
     user_id,
+    user_role: UserRole,
     offset: int = 0,
     limit: int = 20,
 ):
@@ -30,6 +41,7 @@ async def get_test_attempts(
         .offset(offset)
         .limit(limit)
     )
+    stmt = apply_course_access_policy(stmt, _get_profile_course_policy(user_role))
     result = await db.execute(stmt)
     items = []
     for submission, block, course in result.all():
@@ -54,6 +66,7 @@ async def get_test_attempts(
 async def get_courses_progress(
     db: AsyncSession,
     user_id,
+    user_role: UserRole,
     offset: int = 0,
     limit: int = 20,
 ):
@@ -65,6 +78,7 @@ async def get_courses_progress(
         .offset(offset)
         .limit(limit)
     )
+    stmt = apply_course_access_policy(stmt, _get_profile_course_policy(user_role))
     result = await db.execute(stmt)
     items = []
     for course, _ in result.all():
@@ -99,7 +113,11 @@ async def get_courses_progress(
     return items
 
 
-async def ensure_completed_certificates(db: AsyncSession, user_id):
+async def ensure_completed_certificates(
+    db: AsyncSession,
+    user_id,
+    user_role: UserRole,
+):
     total_subq = (
         select(
             Block.course_id.label("course_id"),
@@ -151,6 +169,7 @@ async def ensure_completed_certificates(db: AsyncSession, user_id):
             Certificate.id.is_(None),
         )
     )
+    stmt = apply_course_access_policy(stmt, _get_profile_course_policy(user_role))
     result = await db.execute(stmt)
     course_ids = [row[0] for row in result.all()]
     if not course_ids:
@@ -161,8 +180,8 @@ async def ensure_completed_certificates(db: AsyncSession, user_id):
     await db.commit()
 
 
-async def get_certificates(db: AsyncSession, user_id):
-    await ensure_completed_certificates(db, user_id)
+async def get_certificates(db: AsyncSession, user_id, user_role: UserRole):
+    await ensure_completed_certificates(db, user_id, user_role)
     stmt = (
         select(Certificate, Course)
         .join(Course, Certificate.course_id == Course.id)
@@ -188,6 +207,7 @@ async def get_certificates(db: AsyncSession, user_id):
 async def get_recent_courses(
     db: AsyncSession,
     user_id,
+    user_role: UserRole,
     limit: int = 5,
     offset: int = 0,
 ):
@@ -237,6 +257,7 @@ async def get_recent_courses(
         .offset(offset)
         .limit(limit)
     )
+    stmt = apply_course_access_policy(stmt, _get_profile_course_policy(user_role))
     result = await db.execute(stmt)
     items = []
     for course, last_activity in result.all():
