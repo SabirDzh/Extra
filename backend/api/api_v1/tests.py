@@ -51,6 +51,23 @@ Session = Annotated[AsyncSession, Depends(db_helper.session_getter)]
 CourseAllowedUser = Annotated[User, Depends(current_course_allowed_user)]
 
 
+async def _get_accessible_block_or_404(
+    db: AsyncSession,
+    block_id: uuid.UUID,
+    user: User,
+) -> Block:
+    """Return a block only when its parent course is visible to the user."""
+    block = await course_crud.get_accessible_block(
+        db,
+        block_id,
+        user.role,
+        include_unpublished_for_admin=user.role == UserRole.admin,
+    )
+    if not block:
+        raise HTTPException(status_code=404, detail="Block not found")
+    return block
+
+
 async def _get_or_create_pending_attempt(
     db: AsyncSession,
     user_id: uuid.UUID,
@@ -178,9 +195,7 @@ async def delete_question(
 async def list_questions(
     block_id: uuid.UUID, db: Session, user: CourseAllowedUser
 ):
-    block = await db.get(Block, block_id)
-    if not block:
-        raise HTTPException(status_code=404, detail="Block not found")
+    block = await _get_accessible_block_or_404(db, block_id, user)
     questions = (
         (
             await db.execute(
@@ -215,9 +230,7 @@ async def submit_test(
     db: Session,
     user: CourseAllowedUser,
 ):
-    block = await db.get(Block, block_id)
-    if not block:
-        raise HTTPException(status_code=404, detail="Block not found")
+    block = await _get_accessible_block_or_404(db, block_id, user)
     if block.block_type not in (BlockType.auto_test, BlockType.manual_test, BlockType.mixed_test):
         raise HTTPException(status_code=400, detail="Block is not a test")
 
@@ -295,6 +308,7 @@ async def get_submission(
     submission = await _load_submission(db, submission_id)
     if not submission or not submission.is_submitted:
         raise HTTPException(status_code=404, detail="Submission not found")
+    await _get_accessible_block_or_404(db, submission.block_id, user)
     if user.role != UserRole.admin and submission.user_id != user.id:
         raise HTTPException(status_code=403, detail="Forbidden")
     return submission

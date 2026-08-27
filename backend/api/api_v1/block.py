@@ -47,6 +47,23 @@ async def _get_course_or_404(db, course_id: uuid.UUID) -> Course:
     return course
 
 
+async def _get_accessible_course_or_404(
+    db: AsyncSession,
+    course_id: uuid.UUID,
+    user: User,
+) -> Course:
+    """Return a course only when it is visible to the requesting user."""
+    course = await course_crud.get_accessible_course(
+        db,
+        course_id,
+        user.role,
+        include_unpublished_for_admin=user.role == UserRole.admin,
+    )
+    if not course:
+        raise HTTPException(status_code=404, detail="Course not found")
+    return course
+
+
 async def _get_block_or_404(db, block_id: uuid.UUID, course_id: uuid.UUID) -> Block:
     block = await db.get(Block, block_id)
     if not block or block.course_id != course_id:
@@ -210,7 +227,7 @@ async def _format_block_read(
 async def list_blocks(course_id: uuid.UUID, db: Session, user: CourseAllowedUser):
     from core.schemas.course import CourseProgress, CourseStatus
 
-    course = await _get_course_or_404(db, course_id)
+    course = await _get_accessible_course_or_404(db, course_id, user)
     result = await db.execute(
         select(Block).where(Block.course_id == course_id).order_by(Block.order_index)
     )
@@ -469,7 +486,7 @@ async def get_block(
     db: Session,
     user: CourseAllowedUser,
 ):
-    course = await _get_course_or_404(db, course_id)
+    course = await _get_accessible_course_or_404(db, course_id, user)
     block = await _get_block_or_404(db, block_id, course_id)
     if block.block_type == BlockType.lesson and user:
         await _mark_block_completed(db, user.id, block.id, course_id)
@@ -562,6 +579,7 @@ async def get_block_test_results(
     db: Session,
     user: CourseAllowedUser,
 ):
+    await _get_accessible_course_or_404(db, course_id, user)
     block = await _get_block_or_404(db, block_id, course_id)
 
     if block.block_type not in (
@@ -587,6 +605,7 @@ async def get_block_submission_history(
     db: Session,
     user: CourseAllowedUser,
 ):
+    await _get_accessible_course_or_404(db, course_id, user)
     block = await _get_block_or_404(db, block_id, course_id)
 
     if block.block_type not in (
