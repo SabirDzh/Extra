@@ -167,6 +167,9 @@ cython_debug/
 backend/media/user_img/
 "\320\236\321\210\320\270\320\261\320\272\320\270/images/"
 
+# Local agent instructions
+AGENT.md
+
 # Temporary testing & debug artifacts
 *_cookies.txt
 curl_output.txt
