@@ -237,7 +237,7 @@ async def test_enrolled_user_sees_correct_partial_progress(
     """
     user = await create_user("partial_progress@test.com")
     course = await _create_course(session, "Partial Progress Course")
-    blocks = await _add_blocks(session, course.id, 10)
+    blocks = await _add_blocks(session, course.id, 10, block_type=BlockType.lesson)
     await _enroll(session, user.id, course.id)
 
 

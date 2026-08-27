@@ -7,7 +7,7 @@ from core.models.block import Block
 from core.models.certificates import Certificate
 from core.models.course import Course
 from core.models.db_helper import db_helper
-from core.models.progress import UserBlockProgress
+from Services.test_completion import get_completed_block_ids
 from core.models.user import User
 from core.schemas.certificate import CertificateRead
 from fastapi import APIRouter, Depends, HTTPException, status, Request
@@ -58,15 +58,14 @@ async def generate_certificate(
         raise HTTPException(status_code=400, detail="Course has no blocks")
 
     block_ids = [b.id for b in course.blocks]
-    completed = (
-        await db.execute(
-            select(func.count(UserBlockProgress.id)).where(
-                UserBlockProgress.user_id == user.id,
-                UserBlockProgress.block_id.in_(block_ids),
-                UserBlockProgress.is_completed == True,
-            )
+    completed = len(
+        await get_completed_block_ids(
+            db,
+            user.id,
+            course_id=course_id,
+            block_ids=set(block_ids),
         )
-    ).scalar()
+    )
 
     if completed < total:
         raise HTTPException(

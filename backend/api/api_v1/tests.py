@@ -1,4 +1,6 @@
 import uuid
+from datetime import datetime, timezone
+import random
 from typing import Annotated
 
 from core.authentication.fastapi_users import current_active_user
@@ -8,7 +10,13 @@ from core.models.block import (
     TEST_BLOCK_TYPES,
 )
 from core.models.db_helper import db_helper
-from core.models.test import AnswerOption, Question, TestAnswer, TestSubmission
+from core.models.test import (
+    AnswerOption,
+    Question,
+    TestAnswer,
+    TestSubmission,
+    TestSubmissionQuestion,
+)
 from core.models.user import User
 from core.schemas.test import (
     GradeSubmission,
@@ -21,7 +29,10 @@ from core.schemas.test import (
     CorrectTextAnswer,
     CorrectTextAnswerCreate,
 )
+from Services import course as course_crud
+from Services.test_attempts import get_attempt_questions
 from Services.test_grading import auto_grade_submission, _mark_block_completed
+from Services.test_completion import get_test_max_score, is_perfect_score
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -38,6 +49,55 @@ router = APIRouter(
 
 Session = Annotated[AsyncSession, Depends(db_helper.session_getter)]
 CourseAllowedUser = Annotated[User, Depends(current_course_allowed_user)]
+
+
+async def _get_or_create_pending_attempt(
+    db: AsyncSession,
+    user_id: uuid.UUID,
+    block: Block,
+    available_questions: list[Question],
+) -> tuple[TestSubmission, list[Question]]:
+    pending_attempt = await db.scalar(
+        select(TestSubmission)
+        .where(
+            TestSubmission.user_id == user_id,
+            TestSubmission.block_id == block.id,
+            TestSubmission.is_submitted.is_(False),
+        )
+        .order_by(TestSubmission.submitted_at.desc(), TestSubmission.id.desc())
+        .limit(1)
+    )
+    if pending_attempt is not None:
+        return pending_attempt, await get_attempt_questions(db, pending_attempt.id)
+
+    question_limit = get_test_max_score(
+        len(available_questions),
+        block.questions_count,
+    )
+    selected_questions = (
+        random.sample(available_questions, question_limit)
+        if question_limit < len(available_questions)
+        else available_questions
+    )
+    pending_attempt = TestSubmission(
+        user_id=user_id,
+        block_id=block.id,
+        max_score=float(len(selected_questions)),
+        is_graded=False,
+        is_submitted=False,
+    )
+    db.add(pending_attempt)
+    await db.flush()
+    db.add_all(
+        TestSubmissionQuestion(
+            submission_id=pending_attempt.id,
+            question_id=question.id,
+            order_index=index,
+        )
+        for index, question in enumerate(selected_questions)
+    )
+    await db.flush()
+    return pending_attempt, selected_questions
 
 
 @router.post(
@@ -137,10 +197,13 @@ async def list_questions(
     if user.role == UserRole.admin:
         return [QuestionReadAdmin.model_validate(q) for q in questions]
 
-    effective_limit = block.questions_count if block.questions_count is not None else 5
-    if effective_limit > 0 and effective_limit < len(questions):
-        import random
-        questions = random.sample(questions, effective_limit)
+    _, questions = await _get_or_create_pending_attempt(
+        db,
+        user.id,
+        block,
+        questions,
+    )
+    await db.commit()
 
     return [QuestionRead.model_validate(q) for q in questions]
 
@@ -167,14 +230,23 @@ async def submit_test(
         .scalars()
         .all()
     )
-    allowed_question_ids = {q.id for q in questions}
-    question_map = {q.id: q for q in questions}
+    submission, assigned_questions = await _get_or_create_pending_attempt(
+        db,
+        user.id,
+        block,
+        questions,
+    )
+    allowed_question_ids = {question.id for question in assigned_questions}
+    question_map = {question.id: question for question in assigned_questions}
 
     for ans in data.answers:
         if ans.question_id not in allowed_question_ids:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Question {ans.question_id} does not belong to block {block_id}",
+                detail=(
+                    f"Question {ans.question_id} does not belong to the "
+                    "current test attempt"
+                ),
             )
 
         question = question_map[ans.question_id]
@@ -186,21 +258,18 @@ async def submit_test(
                     detail=f"Answer option {ans.selected_answer_id} does not belong to question {ans.question_id}",
                 )
 
-    effective_limit = block.questions_count if block.questions_count is not None else 5
-    calculated_max_score = (
-        min(len(questions), effective_limit)
-        if effective_limit > 0
-        else len(questions)
-    )
+    submitted_question_ids = {answer.question_id for answer in data.answers}
+    if len(submitted_question_ids) > len(assigned_questions):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                f"A test attempt can contain at most {len(assigned_questions)} "
+                "different questions"
+            ),
+        )
 
-    submission = TestSubmission(
-        user_id=user.id,
-        block_id=block_id,
-        max_score=calculated_max_score,
-        is_graded=False,
-    )
-    db.add(submission)
-    await db.flush()
+    submission.is_submitted = True
+    submission.submitted_at = datetime.now(timezone.utc)
 
     for ans in data.answers:
         db.add(
@@ -224,7 +293,7 @@ async def get_submission(
     submission_id: uuid.UUID, db: Session, user: CourseAllowedUser
 ):
     submission = await _load_submission(db, submission_id)
-    if not submission:
+    if not submission or not submission.is_submitted:
         raise HTTPException(status_code=404, detail="Submission not found")
     if user.role != UserRole.admin and submission.user_id != user.id:
         raise HTTPException(status_code=403, detail="Forbidden")
@@ -237,7 +306,10 @@ async def list_submissions(
 ):
     result = await db.execute(
         select(TestSubmission)
-        .where(TestSubmission.block_id == block_id)
+        .where(
+            TestSubmission.block_id == block_id,
+            TestSubmission.is_submitted.is_(True),
+        )
         .options(selectinload(TestSubmission.answers))
     )
     return result.scalars().all()
@@ -259,7 +331,8 @@ async def list_pending_course_submissions(
         .where(
             Block.course_id == course_id,
             Block.block_type.in_(TEST_BLOCK_TYPES),
-            TestSubmission.is_graded == False
+            TestSubmission.is_graded.is_(False),
+            TestSubmission.is_submitted.is_(True),
         )
         .options(selectinload(TestSubmission.answers))
         .order_by(TestSubmission.submitted_at.desc())
@@ -275,7 +348,7 @@ async def grade_submission(
     admin: User = Depends(current_admin),
 ):
     submission = await db.get(TestSubmission, submission_id)
-    if not submission:
+    if not submission or not submission.is_submitted:
         raise HTTPException(status_code=404, detail="Submission not found")
 
     if data.score < 0 or data.score > submission.max_score:
@@ -289,8 +362,24 @@ async def grade_submission(
     submission.is_graded = True
     submission.graded_by = admin.id
 
-    if data.score > 0:
-        await _mark_block_completed(db, submission.user_id, submission.block_id)
+    if is_perfect_score(data.score, submission.max_score):
+        await _mark_block_completed(
+            db,
+            submission.user_id,
+            submission.block_id,
+            submission=submission,
+        )
+    else:
+        from Services.test_completion import sync_test_block_completion
+
+        await sync_test_block_completion(db, submission.user_id, submission.block_id)
+        block = await db.get(Block, submission.block_id)
+        if block:
+            await course_crud.update_course_completion_status(
+                db,
+                submission.user_id,
+                block.course_id,
+            )
 
     await db.commit()
     return await _load_submission(db, submission_id)
@@ -445,4 +534,3 @@ async def delete_correct_text_answer(
         
     await db.delete(correct_option)
     await db.commit()
-

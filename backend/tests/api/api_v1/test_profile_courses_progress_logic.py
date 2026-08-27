@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.models.block import Block, BlockType
 from core.models.course import Course, CourseEnrollment
-from core.models.progress import UserBlockProgress
+from core.models.test import TestSubmission
 
 
 async def _create_admin(session: AsyncSession):
@@ -90,7 +90,16 @@ async def _enroll(session: AsyncSession, user_id, course_id):
 async def _complete_test_blocks(session: AsyncSession, user_id, blocks: list[Block]):
     for b in blocks:
         if b.block_type in {BlockType.auto_test, BlockType.manual_test, BlockType.mixed_test}:
-            session.add(UserBlockProgress(user_id=user_id, block_id=b.id, is_completed=True))
+            session.add(
+                TestSubmission(
+                    user_id=user_id,
+                    block_id=b.id,
+                    score=1.0,
+                    max_score=1.0,
+                    is_graded=True,
+                )
+            )
+            await session.flush()
     await session.commit()
 
 

@@ -108,6 +108,7 @@ async def list_pending_review_courses(
                 order_by=(TestSubmission.submitted_at.desc(), TestSubmission.id.desc())
             ).label("rn")
         )
+        .where(TestSubmission.is_submitted.is_(True))
         .subquery()
     )
     
@@ -118,7 +119,8 @@ async def list_pending_review_courses(
         .join(subq, TestSubmission.id == subq.c.id)
         .where(
             subq.c.rn == 1,
-            TestSubmission.is_graded == False,
+            TestSubmission.is_graded.is_(False),
+            TestSubmission.is_submitted.is_(True),
             Block.block_type.in_(TEST_BLOCK_TYPES)
         )
         .distinct()
@@ -337,4 +339,3 @@ async def delete_courses(
     db: Session, courses_id: Annotated[list[uuid.UUID], Query()], admin: AdminUser
 ):
     await course_crud.delete_courses(db, courses_id)
-

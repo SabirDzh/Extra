@@ -1,11 +1,15 @@
-from sqlalchemy import func, select, union_all
+from sqlalchemy import and_, exists, func, or_, select, union_all
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from core.models.block import Block
+from core.models.block import TEST_BLOCK_TYPES, Block, BlockType
 from core.models.certificates import Certificate
 from core.models.course import Course, CourseEnrollment
 from core.models.progress import UserBlockProgress
 from core.models.test import TestSubmission
+from Services.test_completion import (
+    get_completed_block_ids,
+    perfect_test_submission_exists,
+)
 
 
 async def get_test_attempts(
@@ -18,7 +22,10 @@ async def get_test_attempts(
         select(TestSubmission, Block, Course)
         .join(Block, TestSubmission.block_id == Block.id)
         .join(Course, Block.course_id == Course.id)
-        .where(TestSubmission.user_id == user_id)
+        .where(
+            TestSubmission.user_id == user_id,
+            TestSubmission.is_submitted.is_(True),
+        )
         .order_by(TestSubmission.submitted_at.desc())
         .offset(offset)
         .limit(limit)
@@ -51,34 +58,22 @@ async def get_courses_progress(
     limit: int = 20,
 ):
     stmt = (
-        select(
-            Course,
-            CourseEnrollment.enrolled_at,
-            func.count(Block.id).label("total_blocks"),
-            func.count(UserBlockProgress.id).label("completed_blocks"),
-        )
+        select(Course, CourseEnrollment.enrolled_at)
         .join(CourseEnrollment, CourseEnrollment.course_id == Course.id)
         .where(CourseEnrollment.user_id == user_id)
-        .outerjoin(
-            Block,
-            (Block.course_id == Course.id),
-        )
-        .outerjoin(
-            UserBlockProgress,
-            (UserBlockProgress.block_id == Block.id)
-            & (UserBlockProgress.user_id == user_id)
-            & (UserBlockProgress.is_completed == True),
-        )
-        .group_by(Course.id, CourseEnrollment.enrolled_at)
         .order_by(CourseEnrollment.enrolled_at.desc())
         .offset(offset)
         .limit(limit)
     )
     result = await db.execute(stmt)
     items = []
-    for course, _, total_blocks, completed_blocks in result.all():
-        total_cnt = total_blocks or 0
-        completed_cnt = completed_blocks or 0
+    for course, _ in result.all():
+        total_cnt = await db.scalar(
+            select(func.count(Block.id)).where(Block.course_id == course.id)
+        ) or 0
+        completed_cnt = len(
+            await get_completed_block_ids(db, user_id, course_id=course.id)
+        )
 
         all_total = total_cnt
         completed = completed_cnt
@@ -116,12 +111,25 @@ async def ensure_completed_certificates(db: AsyncSession, user_id):
     completed_subq = (
         select(
             Block.course_id.label("course_id"),
-            func.count(UserBlockProgress.id).label("completed_blocks"),
+            func.count(Block.id).label("completed_blocks"),
         )
-        .join(Block, UserBlockProgress.block_id == Block.id)
         .where(
-            UserBlockProgress.user_id == user_id,
-            UserBlockProgress.is_completed == True,
+            or_(
+                and_(
+                    Block.block_type == BlockType.lesson,
+                    exists(
+                        select(UserBlockProgress.id).where(
+                            UserBlockProgress.user_id == user_id,
+                            UserBlockProgress.block_id == Block.id,
+                            UserBlockProgress.is_completed.is_(True),
+                        )
+                    ),
+                ),
+                and_(
+                    Block.block_type.in_(TEST_BLOCK_TYPES),
+                    perfect_test_submission_exists(user_id, Block.id),
+                ),
+            )
         )
         .group_by(Block.course_id)
         .subquery()
@@ -194,7 +202,10 @@ async def get_recent_courses(
             TestSubmission.submitted_at.label("last_activity"),
         )
         .join(Block, TestSubmission.block_id == Block.id)
-        .where(TestSubmission.user_id == user_id)
+        .where(
+            TestSubmission.user_id == user_id,
+            TestSubmission.is_submitted.is_(True),
+        )
     )
 
     progress_q = (

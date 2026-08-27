@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, Enum, Float, ForeignKey, Integer, String, Text, func
+from sqlalchemy import Boolean, DateTime, Enum, Float, ForeignKey, Integer, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from Domain.Enums.test import QuestionType
@@ -27,6 +27,11 @@ class Question(IdUuidPkMixin, Base):
     )
     answers = relationship(
         "TestAnswer", back_populates="question", cascade="all, delete-orphan"
+    )
+    assigned_submissions = relationship(
+        "TestSubmissionQuestion",
+        back_populates="question",
+        cascade="all, delete-orphan",
     )
 
 
@@ -54,6 +59,7 @@ class TestSubmission(IdUuidPkMixin, Base):
     score: Mapped[float | None] = mapped_column(Float, nullable=True)
     max_score: Mapped[float] = mapped_column(Float, default=0.0)
     is_graded: Mapped[bool] = mapped_column(default=False)
+    is_submitted: Mapped[bool] = mapped_column(Boolean, default=True)
     graded_by: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
     )
@@ -64,6 +70,12 @@ class TestSubmission(IdUuidPkMixin, Base):
     block = relationship("Block", back_populates="submissions")
     answers = relationship(
         "TestAnswer", back_populates="submission", cascade="all, delete-orphan"
+    )
+    assigned_questions = relationship(
+        "TestSubmissionQuestion",
+        back_populates="submission",
+        cascade="all, delete-orphan",
+        order_by="TestSubmissionQuestion.order_index",
     )
 
 
@@ -82,3 +94,18 @@ class TestAnswer(IdUuidPkMixin, Base):
     submission = relationship("TestSubmission", back_populates="answers")
     question = relationship("Question", back_populates="answers")
     selected_option = relationship("AnswerOption")
+
+
+class TestSubmissionQuestion(Base):
+    submission_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("test_submissions.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    question_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("questions.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    order_index: Mapped[int] = mapped_column(Integer)
+
+    submission = relationship("TestSubmission", back_populates="assigned_questions")
+    question = relationship("Question", back_populates="assigned_submissions")

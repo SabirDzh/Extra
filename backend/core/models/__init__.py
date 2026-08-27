@@ -14,6 +14,7 @@ __all__ = (
     "Question",
     "TestAnswer",
     "TestSubmission",
+    "TestSubmissionQuestion",
     "Term",
     "FAQ",
     "Error",
@@ -35,7 +36,7 @@ from .product import Product
 from .progress import UserBlockProgress
 from .recommendation import Recommendation
 from .term import Term
-from .test import AnswerOption, Question, TestAnswer, TestSubmission
+from .test import AnswerOption, Question, TestAnswer, TestSubmission, TestSubmissionQuestion
 from .user import User
 from .notification import Notification
 from .product_attribute import ProductAttribute

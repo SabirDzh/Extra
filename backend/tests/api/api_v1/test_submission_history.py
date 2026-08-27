@@ -514,4 +514,5 @@ class TestSubmissionHistoryEdgeCases:
         subs = resp.json()["submissions"]
         assert len(subs) == 2
         scores = [s["score"] for s in subs]
-        assert scores[0] > scores[1]
+        assert set(scores) == {0.0, 1.0}
+        assert subs[0]["submitted_at"] >= subs[1]["submitted_at"]

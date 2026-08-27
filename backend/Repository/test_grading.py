@@ -12,6 +12,13 @@ from core.models.block import (
 from core.models.progress import UserBlockProgress
 from core.models.test import Question, TestAnswer, TestSubmission
 from Services import course as course_crud
+from Services.test_attempts import get_attempt_questions
+from Services.test_completion import (
+    get_test_max_score,
+    is_block_completed,
+    is_perfect_score,
+    sync_test_block_completion,
+)
 
 
 async def auto_grade_submission(
@@ -21,23 +28,22 @@ async def auto_grade_submission(
     if block.block_type not in (BlockType.auto_test, BlockType.manual_test, BlockType.mixed_test):
         return submission
 
-    questions = (
-        (
-            await db.execute(
-                select(Question)
-                .where(Question.block_id == submission.block_id)
-                .options(selectinload(Question.options))
-            )
-        )
-        .scalars()
-        .all()
-    )
-
-    effective_limit = block.questions_count if block.questions_count is not None else 5
-    if effective_limit > 0 and effective_limit < len(questions):
-        max_score = effective_limit
-    else:
+    questions = await get_attempt_questions(db, submission.id)
+    if questions:
         max_score = len(questions)
+    else:
+        questions = (
+            (
+                await db.execute(
+                    select(Question)
+                    .where(Question.block_id == submission.block_id)
+                    .options(selectinload(Question.options))
+                )
+            )
+            .scalars()
+            .all()
+        )
+        max_score = get_test_max_score(len(questions), block.questions_count)
     score = 0
     has_manual_questions = False
 
@@ -98,21 +104,48 @@ async def auto_grade_submission(
         user_name = user.full_name if user else "Неизвестный пользователь"
         await notify_manual_test_required(db, submission, user_name)
 
-    if block.block_type == BlockType.auto_test or (submission.is_graded and submission.score > 0):
-
-
-        await _mark_block_completed(db, submission.user_id, submission.block_id, block.course_id)
+    await sync_test_block_completion(db, submission.user_id, submission.block_id)
+    if submission.is_graded and is_perfect_score(submission.score, submission.max_score):
+        await _mark_block_completed(
+            db,
+            submission.user_id,
+            submission.block_id,
+            block.course_id,
+            submission=submission,
+        )
+    else:
+        await course_crud.update_course_completion_status(
+            db,
+            submission.user_id,
+            block.course_id,
+        )
 
     return submission
 
 
 async def _mark_block_completed(
-    db: AsyncSession, user_id: uuid.UUID, block_id: uuid.UUID, course_id: uuid.UUID | None = None
+    db: AsyncSession,
+    user_id: uuid.UUID,
+    block_id: uuid.UUID,
+    course_id: uuid.UUID | None = None,
+    submission: TestSubmission | None = None,
 ) -> None:
+    block = await db.get(Block, block_id)
+    if not block:
+        return
     if course_id is None:
-        block = await db.get(Block, block_id)
-        if block:
-            course_id = block.course_id
+        course_id = block.course_id
+
+    if block.block_type in (BlockType.auto_test, BlockType.manual_test, BlockType.mixed_test):
+        if submission is not None:
+            completed = submission.is_graded and is_perfect_score(
+                submission.score,
+                submission.max_score,
+            )
+        else:
+            completed = await is_block_completed(db, user_id, block)
+        if not completed:
+            return
 
     for obj in db.new:
         if isinstance(obj, UserBlockProgress) and obj.user_id == user_id and obj.block_id == block_id:
@@ -146,6 +179,5 @@ async def _mark_block_completed(
         )
     
     await db.flush()
-
     if course_id:
         await course_crud.update_course_completion_status(db, user_id, course_id)

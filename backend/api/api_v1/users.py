@@ -18,6 +18,7 @@ from core.models import (
     UserBlockProgress,
 )
 from core.models.block import TEST_BLOCK_TYPES
+from core.models.test import TestSubmission
 from core.models.user import SQLAlchemyUserDatabase
 from core.schemas.stats import AdminSummaryRead, StatMetric
 from core.schemas.user import (
@@ -57,13 +58,12 @@ async def get_admin_summary(
 
     total_users = await session.scalar(select(func.count(User.id)))
     total_tests_passed = await session.scalar(
-        select(func.count(UserBlockProgress.id))
-        .join(Block)
-        .where(
-            and_(
-                UserBlockProgress.is_completed == True,
-                Block.block_type.in_(TEST_BLOCK_TYPES),
-            )
+        select(func.count(TestSubmission.id)).where(
+            TestSubmission.is_submitted.is_(True),
+            TestSubmission.is_graded.is_(True),
+            TestSubmission.score.is_not(None),
+            TestSubmission.max_score > 0,
+            TestSubmission.score == TestSubmission.max_score,
         )
     )
 

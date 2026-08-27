@@ -9,6 +9,7 @@ import pytest
 from core.models.block import Block, BlockType
 from core.models.course import Course, CourseEnrollment
 from core.models.progress import UserBlockProgress
+from core.models.test import TestSubmission
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -57,8 +58,24 @@ async def _enroll(session: AsyncSession, user_id: uuid.UUID, course_id: uuid.UUI
 
 
 async def _complete_block(session: AsyncSession, user_id: uuid.UUID, block: Block):
-    progress = UserBlockProgress(user_id=user_id, block_id=block.id, is_completed=True)
-    session.add(progress)
+    if block.block_type in {
+        BlockType.auto_test,
+        BlockType.manual_test,
+        BlockType.mixed_test,
+    }:
+        session.add(
+            TestSubmission(
+                user_id=user_id,
+                block_id=block.id,
+                score=1.0,
+                max_score=1.0,
+                is_graded=True,
+            )
+        )
+    else:
+        session.add(
+            UserBlockProgress(user_id=user_id, block_id=block.id, is_completed=True)
+        )
     await session.commit()
 
 

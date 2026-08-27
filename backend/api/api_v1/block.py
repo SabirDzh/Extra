@@ -16,6 +16,11 @@ from core.schemas.test import BlockTestResults, SubmissionHistoryResponse
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, status
 from Services import course as course_crud
 from Services.test_grading import _mark_block_completed
+from Services.test_completion import (
+    get_completed_block_ids,
+    get_test_max_score,
+    is_block_completed,
+)
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from Repository.common import ensure_unique_field
@@ -120,12 +125,7 @@ async def _format_block_read(
     is_attempted = False
     under_review = False
     if user_id:
-        stmt_done = select(UserBlockProgress.is_completed).where(
-            UserBlockProgress.user_id == user_id,
-            UserBlockProgress.block_id == block.id,
-            UserBlockProgress.is_completed,
-        )
-        is_done = (await db.execute(stmt_done)).scalar() or False
+        is_done = await is_block_completed(db, user_id, block)
 
         # Fetch the latest submission to check if it's graded/under review
         stmt_sub = (
@@ -133,6 +133,7 @@ async def _format_block_read(
             .where(
                 TestSubmission.user_id == user_id,
                 TestSubmission.block_id == block.id,
+                TestSubmission.is_submitted.is_(True),
             )
             .order_by(TestSubmission.submitted_at.desc())
             .limit(1)
@@ -148,9 +149,7 @@ async def _format_block_read(
 
     stmt_count = select(func.count(Question.id)).where(Question.block_id == block.id)
     n_questions = (await db.execute(stmt_count)).scalar() or 0
-    effective_limit = block.questions_count if block.questions_count is not None else 5
-    if effective_limit > 0 and effective_limit < n_questions:
-        n_questions = effective_limit
+    n_questions = get_test_max_score(n_questions, block.questions_count)
 
     stmt_pos = select(func.count(Block.id)).where(
         Block.course_id == block.course_id,
@@ -220,23 +219,25 @@ async def list_blocks(course_id: uuid.UUID, db: Session, user: CourseAllowedUser
     completed_block_ids = set()
     latest_submissions = {}
     if user:
-        stmt_progress = select(UserBlockProgress.block_id).where(
-            UserBlockProgress.user_id == user.id,
-            UserBlockProgress.block_id.in_([b.id for b in blocks]),
-            UserBlockProgress.is_completed,
+        completed_block_ids = await get_completed_block_ids(
+            db,
+            user.id,
+            course_id=course_id,
+            block_ids={b.id for b in blocks},
         )
-        completed_block_ids = set((await db.execute(stmt_progress)).scalars().all())
 
         stmt_submissions = select(TestSubmission.block_id).where(
             TestSubmission.user_id == user.id,
             TestSubmission.block_id.in_([b.id for b in blocks]),
+            TestSubmission.is_submitted.is_(True),
         )
         submitted_block_ids = set((await db.execute(stmt_submissions)).scalars().all())
 
         # Get all submissions for this user on these blocks, sorted by submitted_at desc
         stmt_sub_details = select(TestSubmission).where(
             TestSubmission.user_id == user.id,
-            TestSubmission.block_id.in_([b.id for b in blocks])
+            TestSubmission.block_id.in_([b.id for b in blocks]),
+            TestSubmission.is_submitted.is_(True),
         ).order_by(TestSubmission.submitted_at.desc())
         
         sub_details_res = await db.execute(stmt_sub_details)
@@ -279,13 +280,8 @@ async def list_blocks(course_id: uuid.UUID, db: Session, user: CourseAllowedUser
                         if pb.id not in completed_block_ids:
                             is_unlocked = False
                     else:
-                        if pb.id not in interacted_block_ids:
+                        if pb.id not in completed_block_ids:
                             is_unlocked = False
-                        else:
-                            sub = latest_submissions.get(pb.id)
-                            if sub is not None:
-                                if not sub.is_graded or sub.score is None or sub.score < sub.max_score:
-                                    is_unlocked = False
 
             if not is_unlocked:
                 break
@@ -315,17 +311,9 @@ async def list_blocks(course_id: uuid.UUID, db: Session, user: CourseAllowedUser
                     all_passed = False
                     unlocks_next = False
             else: # test block
-                if b.id not in interacted_block_ids:
+                if b.id not in completed_block_ids:
                     all_passed = False
                     unlocks_next = False
-                else:
-                    sub = latest_submissions.get(b.id)
-                    if sub is not None:
-                        if not sub.is_graded:
-                            all_passed = False
-                        elif sub.score is None or sub.score < sub.max_score:
-                            all_passed = False
-                            unlocks_next = False
         
         stage_passed_100[stage_num] = all_passed
         stage_unlocks_next[stage_num] = unlocks_next
@@ -349,12 +337,8 @@ async def list_blocks(course_id: uuid.UUID, db: Session, user: CourseAllowedUser
                 break
         else:
             is_passed = False
-            if b.id in interacted_block_ids:
-                sub = latest_submissions.get(b.id)
-                if sub is None:
-                    is_passed = True
-                elif sub.is_graded and sub.score is not None and sub.score >= sub.max_score:
-                    is_passed = True
+            if b.id in completed_block_ids:
+                is_passed = True
             if not is_passed:
                 current_block_id = b.id
                 break
@@ -382,10 +366,10 @@ async def list_blocks(course_id: uuid.UUID, db: Session, user: CourseAllowedUser
         sub = latest_submissions.get(b.id) if user else None
         under_review = (sub is not None and not sub.is_graded) if sub else False
 
-        total_q = question_counts.get(b.id, 0)
-        effective_limit = b.questions_count if b.questions_count is not None else 5
-        if effective_limit > 0 and effective_limit < total_q:
-            total_q = effective_limit
+        total_q = get_test_max_score(
+            question_counts.get(b.id, 0),
+            b.questions_count,
+        )
 
         b_read = BlockRead(
             id=b.id,

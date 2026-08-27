@@ -17,6 +17,7 @@ from Domain.Enums.notification import NotificationType
 from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import load_only, selectinload
+from Services.test_completion import get_completed_block_ids
 from Repository.search_engine import (
     MAX_SEARCH_CANDIDATES,
     SearchIn,
@@ -141,13 +142,14 @@ async def get_completed_blocks_count(
     user_id: uuid.UUID,
     block_ids: List[uuid.UUID],
 ) -> int:
-    stmt = select(func.count(UserBlockProgress.id)).where(
-        UserBlockProgress.user_id == user_id,
-        UserBlockProgress.block_id.in_(block_ids),
-        UserBlockProgress.is_completed,
+    if not block_ids:
+        return 0
+    completed_ids = await get_completed_block_ids(
+        session,
+        user_id,
+        block_ids=block_ids,
     )
-    result = await session.execute(stmt)
-    return result.scalar() or 0
+    return len(completed_ids)
 
 
 async def search_courses(
@@ -335,16 +337,12 @@ async def update_course_completion_status(
     if total == 0:
         return
 
-    stmt_done = (
-        select(func.count(UserBlockProgress.id))
-        .join(Block, UserBlockProgress.block_id == Block.id)
-        .where(
-            Block.course_id == course_id,
-            UserBlockProgress.user_id == user_id,
-            UserBlockProgress.is_completed == True,
-        )
+    completed_ids = await get_completed_block_ids(
+        session,
+        user_id,
+        course_id=course_id,
     )
-    completed: int = (await session.execute(stmt_done)).scalar() or 0
+    completed = len(completed_ids)
 
     if completed >= total:
 
@@ -388,20 +386,10 @@ async def attach_course_progress(
     enrolled_courses: set[uuid.UUID] = set()
 
     if user_id:
-        stmt_completed = (
-            select(Block.course_id, func.count(UserBlockProgress.id).label("completed"))
-            .join(UserBlockProgress, Block.id == UserBlockProgress.block_id)
-            .where(
-                Block.course_id.in_(course_ids),
-                UserBlockProgress.user_id == user_id,
-                UserBlockProgress.is_completed == True,
+        for course_id in course_ids:
+            completed_blocks_map[course_id] = len(
+                await get_completed_block_ids(session, user_id, course_id=course_id)
             )
-            .group_by(Block.course_id)
-        )
-        result_completed = await session.execute(stmt_completed)
-        completed_blocks_map = {
-            row.course_id: row.completed for row in result_completed
-        }
 
         stmt_enroll = select(CourseEnrollment.course_id).where(
             CourseEnrollment.course_id.in_(course_ids),
@@ -499,26 +487,29 @@ async def complete_course_for_user(
         await session.flush()
 
     for block in course.blocks:
+        if block.block_type != BlockType.lesson:
+            continue
         stmt = select(UserBlockProgress).where(
             UserBlockProgress.user_id == user_id,
-            UserBlockProgress.block_id == block.id
+            UserBlockProgress.block_id == block.id,
         )
         res = await session.execute(stmt)
         progress = res.scalar_one_or_none()
         if not progress:
-            progress = UserBlockProgress(
-                user_id=user_id,
-                block_id=block.id,
-                is_completed=True,
-                completed_at=datetime.now(timezone.utc)
+            session.add(
+                UserBlockProgress(
+                    user_id=user_id,
+                    block_id=block.id,
+                    is_completed=True,
+                    completed_at=datetime.now(timezone.utc),
+                )
             )
-            session.add(progress)
         else:
             progress.is_completed = True
             if not progress.completed_at:
                 progress.completed_at = datetime.now(timezone.utc)
 
-    enrollment.completed_at = datetime.now(timezone.utc)
+    await update_course_completion_status(session, user_id, course_id)
     await session.commit()
     return True
 
