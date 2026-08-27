@@ -1,7 +1,8 @@
 import uuid
 from datetime import datetime
+from typing import Annotated
 
-from pydantic import BaseModel, Field, computed_field
+from pydantic import AfterValidator, BaseModel, Field, computed_field
 
 from core.models.course import (
     AUDIENCE_DISPLAY_NAMES,
@@ -12,11 +13,24 @@ from core.models.course import (
 )
 
 
+def validate_assignable_course_audience(audience: CourseAudience) -> CourseAudience:
+    """Reject buyer-only courses while keeping legacy rows readable by admins."""
+    if audience == CourseAudience.buyer:
+        raise ValueError("Buyer cannot be a course audience")
+    return audience
+
+
+AssignableCourseAudience = Annotated[
+    CourseAudience,
+    AfterValidator(validate_assignable_course_audience),
+]
+
+
 class CourseCreate(BaseModel):
     title: str = Field(min_length=1, max_length=256)
     description: str = Field("", max_length=2048)
     level: CourseLevel = Field(default=CourseLevel.beginner)
-    audience: CourseAudience = Field(default=CourseAudience.everyone)
+    audience: AssignableCourseAudience = Field(default=CourseAudience.everyone)
     is_published: bool = True
 
 
@@ -24,7 +38,7 @@ class CourseUpdate(BaseModel):
     title: str | None = Field(None, min_length=1, max_length=256)
     description: str | None = Field(None, max_length=2048)
     level: CourseLevel | None = None
-    audience: CourseAudience | None = None
+    audience: AssignableCourseAudience | None = None
     is_published: bool | None = None
 
 
@@ -70,4 +84,3 @@ class CourseProgress(BaseModel):
     all_total: int = 0
     current_stage: int = 0
     progress: dict[str, int] | None = None
-

@@ -40,18 +40,10 @@ from datetime import datetime, timezone
 from core.models.notification import Notification
 from Domain.Enums.notification import NotificationType
 from Domain.Enums.user_role import UserRole
-from Domain.Enums.course import CourseAudience
+from Services.course_access import get_course_notification_roles
 
 async def notify_new_course(db: AsyncSession, course) -> None:
-    target_roles = []
-    if course.audience == CourseAudience.installer:
-        target_roles = [UserRole.installer]
-    elif course.audience == CourseAudience.seller:
-        target_roles = [UserRole.seller]
-    elif course.audience == CourseAudience.serviceman:
-        target_roles = [UserRole.serviceman]
-    elif course.audience == CourseAudience.everyone:
-        target_roles = [UserRole.installer, UserRole.seller, UserRole.serviceman]
+    target_roles = get_course_notification_roles(course.audience)
     
     if not target_roles:
         return
