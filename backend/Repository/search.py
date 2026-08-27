@@ -7,8 +7,10 @@ from core.models.faq import FAQ
 from core.models.product import Product
 from core.models.term import Term
 from core.models.recommendation import Recommendation
+from Domain.Enums.user_role import UserRole
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from Services.course_access import apply_course_access_policy, get_course_access_policy
 from Repository.search_engine import (
     MAX_SEARCH_CANDIDATES,
     MIN_RELEVANCE_SCORE,
@@ -37,6 +39,7 @@ async def global_search_entities(
     search_in: SearchIn = "all",
     sort: SearchSort = "alphabet_asc",
     debug: bool = False,
+    user_role: UserRole | None = None,
 ) -> dict:
     empty_result: dict[str, list[Any]] = {
         "courses": [],
@@ -50,7 +53,15 @@ async def global_search_entities(
     async def search_single_model(model):
         stmt = select(model).limit(MAX_SEARCH_CANDIDATES)
 
-        if hasattr(model, "is_published"):
+        if model is Course:
+            stmt = apply_course_access_policy(
+                stmt,
+                get_course_access_policy(
+                    user_role,
+                    include_unpublished_for_admin=user_role == UserRole.admin,
+                ),
+            )
+        elif hasattr(model, "is_published"):
             stmt = stmt.where(model.is_published)
 
         title_field = getattr(model, "title", getattr(model, "question", None))

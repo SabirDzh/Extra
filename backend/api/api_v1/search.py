@@ -1,7 +1,9 @@
 from typing import Annotated, Literal
 
+from core.authentication.fastapi_users import current_optional_user
 from core.config import settings
 from core.models.db_helper import db_helper
+from core.models.user import User
 from core.schemas.search import GlobalSearchResponse
 from Services import search as search_crud
 from fastapi import APIRouter, Depends, Query
@@ -38,6 +40,7 @@ async def global_search(
             )
         ),
     ] = "asc",
+    user: User | None = Depends(current_optional_user),
 ):
     results = await search_crud.global_search_entities(
         db,
@@ -45,5 +48,6 @@ async def global_search(
         limit_per_category=limit,
         search_in=sort_by,
         sort="alphabet_desc" if order == "desc" else "alphabet_asc",
+        user_role=user.role if user else None,
     )
     return GlobalSearchResponse(**results)
