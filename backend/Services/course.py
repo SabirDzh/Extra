@@ -7,9 +7,11 @@ from typing import Literal
 from core.config import BASE_DIR
 from core.models.block import Block
 from core.models.course import Course, CourseAudience, CourseEnrollment, CourseLevel, CourseStatus
+from Domain.Enums.user_role import UserRole
 from core.schemas.course import CourseCreate, CourseUpdate
 from Repository import course as repo
 from Repository.search_engine import SearchIn, SearchSort
+from Services.course_access import get_course_access_policy
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from Repository.common import ensure_unique_field
@@ -30,6 +32,53 @@ async def get_course(
     load_blocks: bool = False,
 ) -> Course | None:
     return await repo.get_course(session, course_id, load_blocks)
+
+
+async def get_accessible_course(
+    session: AsyncSession,
+    course_id: uuid.UUID,
+    user_role: UserRole,
+    *,
+    load_blocks: bool = False,
+    include_unpublished_for_admin: bool = False,
+) -> Course | None:
+    """Load a course through the canonical role visibility policy.
+
+    Args:
+        session: Active database session.
+        course_id: Requested course identifier.
+        user_role: Role of the requesting user.
+        load_blocks: Whether blocks are needed by the caller.
+        include_unpublished_for_admin: Allows direct admin management lookup.
+
+    Returns:
+        Course when the user may view it, otherwise ``None``.
+    """
+    policy = get_course_access_policy(
+        user_role,
+        include_unpublished_for_admin=include_unpublished_for_admin,
+    )
+    return await repo.get_accessible_course(
+        session,
+        course_id,
+        policy,
+        load_blocks=load_blocks,
+    )
+
+
+async def get_accessible_block(
+    session: AsyncSession,
+    block_id: uuid.UUID,
+    user_role: UserRole,
+    *,
+    include_unpublished_for_admin: bool = False,
+) -> Block | None:
+    """Load a block only when its parent course is visible to the viewer."""
+    policy = get_course_access_policy(
+        user_role,
+        include_unpublished_for_admin=include_unpublished_for_admin,
+    )
+    return await repo.get_accessible_block(session, block_id, policy)
 
 
 async def create_course(
@@ -136,6 +185,7 @@ async def search_courses(
     ) = None,
     level: CourseLevel | None = None,
     audience: CourseAudience | None = None,
+    user_role: UserRole | None = None,
 ):
     return await repo.search_courses(
         session=session,
@@ -148,6 +198,10 @@ async def search_courses(
         filter_type=filter_type,
         level=level,
         audience=audience,
+        policy=get_course_access_policy(
+            user_role,
+            include_unpublished_for_admin=user_role == UserRole.admin,
+        ),
     )
 
 
@@ -187,4 +241,3 @@ async def complete_course_for_user(
     course_id: uuid.UUID,
 ) -> bool:
     return await repo.complete_course_for_user(session, user_id, course_id)
-

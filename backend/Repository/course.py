@@ -17,6 +17,7 @@ from Domain.Enums.notification import NotificationType
 from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import load_only, selectinload
+from Services.course_access import CourseAccessPolicy, apply_course_access_policy
 from Services.test_completion import get_completed_block_ids
 from Repository.search_engine import (
     MAX_SEARCH_CANDIDATES,
@@ -50,6 +51,50 @@ async def get_course(
     if load_blocks:
         options.append(selectinload(Course.blocks))
     return await session.get(Course, course_id, options=options)
+
+
+async def get_accessible_course(
+    session: AsyncSession,
+    course_id: uuid.UUID,
+    policy: CourseAccessPolicy,
+    *,
+    load_blocks: bool = False,
+) -> Course | None:
+    """Load one course only when it is visible under the supplied policy.
+
+    Args:
+        session: Active database session.
+        course_id: Course to resolve.
+        policy: Viewer visibility constraints.
+        load_blocks: Eagerly load blocks for progress calculations.
+
+    Returns:
+        Visible course or ``None`` without disclosing inaccessible rows.
+    """
+    statement = apply_course_access_policy(
+        select(Course).where(Course.id == course_id),
+        policy,
+    )
+    if load_blocks:
+        statement = statement.options(selectinload(Course.blocks))
+    result = await session.execute(statement)
+    return result.scalar_one_or_none()
+
+
+async def get_accessible_block(
+    session: AsyncSession,
+    block_id: uuid.UUID,
+    policy: CourseAccessPolicy,
+) -> Block | None:
+    """Load a block only when its parent course is visible to the viewer."""
+    statement = apply_course_access_policy(
+        select(Block)
+        .join(Course, Block.course_id == Course.id)
+        .where(Block.id == block_id),
+        policy,
+    )
+    result = await session.execute(statement)
+    return result.scalar_one_or_none()
 
 
 async def create_course(session: AsyncSession, course: Course) -> Course:
@@ -165,13 +210,11 @@ async def search_courses(
     ) = None,
     level: CourseLevel | None = None,
     audience: CourseAudience | None = None,
+    policy: CourseAccessPolicy | None = None,
 ):
     from datetime import timedelta
 
-    query = (
-        select(Course)
-        .where(Course.is_published)
-        .options(
+    query = select(Course).options(
             load_only(
                 Course.id,
                 Course.title,
@@ -181,7 +224,10 @@ async def search_courses(
                 Course.created_at,
             )
         )
-    )
+    if policy is None:
+        query = query.where(Course.is_published.is_(True))
+    else:
+        query = apply_course_access_policy(query, policy)
 
     if level is not None:
         query = query.where(Course.level == level)
@@ -512,4 +558,3 @@ async def complete_course_for_user(
     await update_course_completion_status(session, user_id, course_id)
     await session.commit()
     return True
-

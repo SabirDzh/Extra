@@ -13,6 +13,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from api.dependencies.authorization import current_admin, current_course_allowed_user
+from Domain.Enums.user_role import UserRole
 
 router = APIRouter(
     prefix=settings.api.v1.courses,
@@ -47,6 +48,7 @@ async def list_courses(
         level=level,
         audience=audience,
         sort=sort,
+        user_role=user.role,
     )
     await course_crud.attach_course_progress(db, courses, user.id)
     return courses
@@ -63,14 +65,10 @@ async def search_courses(
         | None
     ) = Query(None, description="Filter type for courses"),
     level: CourseLevel | None = Query(None, description="Filter by course level"),
-    audience: Literal["installer", "seller", "serviceman", "buyer"] | None = Query(
-        None, description="Filter by audience role (without admin)"
-    ),
+    audience: CourseAudience | None = Query(None, description="Filter by audience"),
     search_in: Literal["title", "description", "all"] = Query("all"),
     sort: SearchSort = Query("alphabet_asc"),
 ):
-    audience_filter = CourseAudience(audience) if audience else None
-
     courses = await course_crud.search_courses(
         db,
         q=q,
@@ -79,9 +77,10 @@ async def search_courses(
         user_id=user.id,
         filter_type=filter_type,
         level=level,
-        audience=audience_filter,
+        audience=audience,
         search_in=search_in,
         sort=sort,
+        user_role=user.role,
     )
     await course_crud.attach_course_progress(db, courses, user.id)
     return courses
@@ -155,7 +154,12 @@ async def get_course(
         | None
     ) = Query(None, description="Filter type for courses"),
 ):
-    course = await course_crud.get_course(db, course_id)
+    course = await course_crud.get_accessible_course(
+        db,
+        course_id,
+        user.role,
+        include_unpublished_for_admin=user.role == UserRole.admin,
+    )
     if not course:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Course not found"
@@ -192,7 +196,12 @@ async def update_course(
     db: Session,
     admin: AdminUser,
 ):
-    course = await course_crud.get_course(db, course_id)
+    course = await course_crud.get_accessible_course(
+        db,
+        course_id,
+        admin.role,
+        include_unpublished_for_admin=True,
+    )
     if not course:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Course not found"
@@ -227,7 +236,11 @@ async def enroll(
     db: Session,
     user: CourseAllowedUser,
 ):
-    course = await course_crud.get_course(db, course_id)
+    course = await course_crud.get_accessible_course(
+        db,
+        course_id,
+        user.role,
+    )
     if not course:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Course not found"
@@ -255,7 +268,12 @@ async def get_progress(
     db: Session,
     user: CourseAllowedUser,
 ):
-    course = await course_crud.get_course(db, course_id, load_blocks=True)
+    course = await course_crud.get_accessible_course(
+        db,
+        course_id,
+        user.role,
+        load_blocks=True,
+    )
     if not course:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Course not found"
