@@ -63,7 +63,7 @@ async def test_auto_grading_fractional_scores(client: AsyncClient, session: Asyn
 
 @pytest.mark.anyio
 async def test_course_progress_percentage_calculation(client: AsyncClient, session: AsyncSession, math_setup, create_user):
-    """Verify that course progress percentage counts only tests, not lessons."""
+    """Verify that test progress requires successful test submissions."""
     admin, course = math_setup
     
 
@@ -97,7 +97,7 @@ async def test_course_progress_percentage_calculation(client: AsyncClient, sessi
     await session.commit()
     
     resp1 = await client.get(f"/api/v1/courses/{course.id}/blocks/", cookies=cookies)
-    assert resp1.json()["progress"]["percent"] == 14.29
+    assert resp1.json()["progress"]["percent"] == 0.0
     
 
     for l in lessons:
@@ -105,14 +105,14 @@ async def test_course_progress_percentage_calculation(client: AsyncClient, sessi
     await session.commit()
     
     resp2 = await client.get(f"/api/v1/courses/{course.id}/blocks/", cookies=cookies)
-    assert resp2.json()["progress"]["percent"] == 85.71
+    assert resp2.json()["progress"]["percent"] == 71.43
     
 
     await _mark_block_completed(session, student.id, tests[1].id, course.id)
     await session.commit()
     
     resp3 = await client.get(f"/api/v1/courses/{course.id}/blocks/", cookies=cookies)
-    assert resp3.json()["progress"]["percent"] == 100.0
+    assert resp3.json()["progress"]["percent"] == 71.43
 
 @pytest.mark.anyio
 async def test_multi_select_partial_grading_zero(client: AsyncClient, session: AsyncSession, math_setup, create_user):

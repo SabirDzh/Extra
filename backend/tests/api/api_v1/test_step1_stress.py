@@ -10,7 +10,7 @@ from core.models.progress import UserBlockProgress
 
 @pytest.mark.anyio
 async def test_empty_questions_block(client: AsyncClient, session: AsyncSession, create_user):
-    """Stress Test 1: Block with zero questions should be marked completed on submission."""
+    """Stress Test 1: A test with zero questions must not be marked completed."""
     admin = await create_user("stress1@test.com", is_superuser=True, role="administrator")
     course = Course(title="Stress Course 1", created_by=admin.id, is_published=True)
     session.add(course)
@@ -37,12 +37,11 @@ async def test_empty_questions_block(client: AsyncClient, session: AsyncSession,
 
     stmt = select(UserBlockProgress).where(UserBlockProgress.user_id == student.id, UserBlockProgress.block_id == b1.id)
     progress = (await session.execute(stmt)).scalar_one_or_none()
-    assert progress is not None
-    assert progress.is_completed is True
+    assert progress is None
 
 @pytest.mark.anyio
 async def test_empty_answers_submission(client: AsyncClient, session: AsyncSession, create_user):
-    """Stress Test 2: Submitting empty answers to a block WITH questions should mark it completed."""
+    """Stress Test 2: Empty answers must not complete a test block."""
     admin = await create_user("stress2@test.com", is_superuser=True, role="administrator")
     course = Course(title="Stress Course 2", created_by=admin.id, is_published=True)
     session.add(course)
@@ -67,12 +66,11 @@ async def test_empty_answers_submission(client: AsyncClient, session: AsyncSessi
     
     stmt = select(UserBlockProgress).where(UserBlockProgress.user_id == student.id, UserBlockProgress.block_id == b.id)
     progress = (await session.execute(stmt)).scalar_one_or_none()
-    assert progress is not None
-    assert progress.is_completed is True
+    assert progress is None
 
 @pytest.mark.anyio
 async def test_incorrect_answers_submission(client: AsyncClient, session: AsyncSession, create_user):
-    """Stress Test 3: Submitting incorrect answers should mark the block as completed."""
+    """Stress Test 3: Incorrect answers must not complete a test block."""
     admin = await create_user("stress3@test.com", is_superuser=True, role="administrator")
     course = Course(title="Stress Course 3", created_by=admin.id, is_published=True)
     session.add(course)
@@ -104,8 +102,7 @@ async def test_incorrect_answers_submission(client: AsyncClient, session: AsyncS
     
     stmt = select(UserBlockProgress).where(UserBlockProgress.user_id == student.id, UserBlockProgress.block_id == b.id)
     progress = (await session.execute(stmt)).scalar_one_or_none()
-    assert progress is not None
-    assert progress.is_completed is True, "Block should be completed even with wrong answers"
+    assert progress is None
 
 @pytest.mark.anyio
 async def test_invalid_block_id_submission(client: AsyncClient, session: AsyncSession, create_user):
@@ -120,7 +117,7 @@ async def test_invalid_block_id_submission(client: AsyncClient, session: AsyncSe
 
 @pytest.mark.anyio
 async def test_multiple_submissions_consistency(client: AsyncClient, session: AsyncSession, create_user):
-    """Stress Test 5: Multiple submissions should maintain completion and not error."""
+    """Stress Test 5: Failed submissions must not create completion progress."""
     admin = await create_user("stress5@test.com", is_superuser=True, role="administrator")
     course = Course(title="Stress Course 5", created_by=admin.id, is_published=True)
     session.add(course)
@@ -146,5 +143,4 @@ async def test_multiple_submissions_consistency(client: AsyncClient, session: As
     
     stmt = select(UserBlockProgress).where(UserBlockProgress.user_id == student.id, UserBlockProgress.block_id == b.id)
     progress = (await session.execute(stmt)).scalars().all()
-    assert len(progress) == 1, "There should be only 1 progress record"
-    assert progress[0].is_completed is True
+    assert progress == []

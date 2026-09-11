@@ -246,14 +246,42 @@ async def test_get_block_details(client: AsyncClient, session: AsyncSession, adm
 
 
 @pytest.mark.anyio
-async def test_auth_user_complete_block_manual(client: AsyncClient, session: AsyncSession, admin_user, create_user):
+async def test_admin_can_complete_block_manually(
+    client: AsyncClient,
+    session: AsyncSession,
+    admin_user,
+    superuser_token_headers,
+):
     course = await _create_course(session, admin_user.id)
     block = await _create_block(session, course.id, block_type=BlockType.lesson)
-    user = await create_user("completer@test.com")
-    headers = await _get_auth_headers(client, {"email": "completer@test.com", "password": "Password12345!"})
 
-    resp = await client.post(f"/api/v1/courses/{course.id}/blocks/{block.id}/complete", headers=headers)
+    resp = await client.post(
+        f"/api/v1/courses/{course.id}/blocks/{block.id}/complete",
+        headers=superuser_token_headers,
+    )
     assert resp.status_code == 200
+
+
+@pytest.mark.anyio
+async def test_non_admin_cannot_complete_block_manually(
+    client: AsyncClient,
+    session: AsyncSession,
+    admin_user,
+    create_user,
+):
+    course = await _create_course(session, admin_user.id)
+    block = await _create_block(session, course.id, block_type=BlockType.lesson)
+    await create_user("completer@test.com", role="installer")
+    headers = await _get_auth_headers(
+        client,
+        {"email": "completer@test.com", "password": "Password12345!"},
+    )
+
+    resp = await client.post(
+        f"/api/v1/courses/{course.id}/blocks/{block.id}/complete",
+        headers=headers,
+    )
+    assert resp.status_code == 403
 
 
 @pytest.mark.anyio

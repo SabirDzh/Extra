@@ -348,7 +348,12 @@ async def complete_progress(
             status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
         )
 
-    await course_crud.complete_course_for_user(db, user_id, course_id)
+    is_completed = await course_crud.complete_course_for_user(db, user_id, course_id)
+    if not is_completed:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Course has incomplete blocks",
+        )
     return {"detail": "Course marked as completed for user successfully"}
 
 

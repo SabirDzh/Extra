@@ -51,3 +51,28 @@ async def test_non_admin_cannot_update_user_permissions(
         json={"role": "seller", "is_superuser": True},
     )
     assert resp.status_code in (401, 403)
+
+
+@pytest.mark.anyio
+async def test_user_cannot_elevate_own_role(client: AsyncClient, create_user, session):
+    user = await create_user("role_escalation@test.com", role="buyer")
+    await client.post(
+        "/api/v1/auth/login",
+        data={"username": user.email, "password": "Password12345!"},
+    )
+
+    response = await client.patch(
+        "/api/v1/users/me",
+        json={"role": "administrator"},
+    )
+
+    assert response.status_code == 422
+    await session.refresh(user)
+    assert user.role.value == "buyer"
+
+
+@pytest.mark.anyio
+async def test_admin_panel_requires_authentication(client: AsyncClient):
+    response = await client.get("/admin/")
+
+    assert response.status_code == 401

@@ -161,7 +161,9 @@ class TestUnlockingLogic:
         
         await client.post("/api/v1/auth/login", data={"username": "u6@test.com", "password": "Password12345!"})
         resp = await client.get(f"/api/v1/courses/{course.id}/blocks/")
-        assert len(resp.json()["blocks"]) == 1
+        # A stale progress flag is insufficient for a test block: no submission
+        # with a perfect score exists, so stage two remains locked.
+        assert len(resp.json()["blocks"]) == 2
 
 
 
@@ -256,8 +258,9 @@ class TestStatsProgress:
         await client.post("/api/v1/auth/login", data={"username": user.email, "password": "Password12345!"})
         resp = await client.get(f"/api/v1/courses/{course.id}/blocks/")
         data = resp.json()
-        assert data["progress"]["percent"] == 75.0
-        assert data["progress"]["completed"] == 3
+        # The flagged test is not a completed block without a perfect submission.
+        assert data["progress"]["percent"] == 25.0
+        assert data["progress"]["completed"] == 1
         assert data["progress"]["total"] == 4
 
     async def test_all_blocks_constant_regardless_of_unlocking(self, client, session):
@@ -412,8 +415,9 @@ class TestSecurityPermissions:
         await client.post("/api/v1/auth/login", data={"username": user.email, "password": "Password12345!"})
         resp = await client.get(f"/api/v1/courses/{course.id}/blocks/")
         data = resp.json()
-        assert len(data["blocks"]) == 1
-        assert data["blocks"][0]["stage"] == 3
+        # Stale test flags cannot unlock stages two and three.
+        assert len(data["blocks"]) == 2
+        assert {block["stage"] for block in data["blocks"]} == {1}
 
     async def test_root_progress_completed_stages_only(self, client, session):
         admin = await _create_user(session, "admfails4@test.com", is_superuser=True)
@@ -431,7 +435,8 @@ class TestSecurityPermissions:
         await _mark_block_completed(session, user.id, blocks[1].id, course.id)
         await session.commit()
         resp = await client.get(f"/api/v1/courses/{course.id}/blocks/")
-        assert resp.json()["progress"]["completed"] == 3
+        # Direct completion does not bypass the perfect-test submission rule.
+        assert resp.json()["progress"]["completed"] == 1
 
     async def test_next_block_id_navigation_across_stages(self, client, session):
         admin = await _create_user(session, "admstat6@test.com", is_superuser=True)

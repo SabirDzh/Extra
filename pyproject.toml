@@ -36,5 +36,17 @@ apscheduler = "^3.11.3"
 xhtml2pdf = "^0.2.17"
 playwright = "^1.61.0"
 
+[tool.poetry.group.dev.dependencies]
+ruff = "^0.12.12"
+
 [tool.pytest.ini_options]
 python_classes = ["Test*", "*Test", "!TestSubmission"]
+addopts = "--strict-config --strict-markers"
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+extend-exclude = ["backend/alembic/versions"]
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I"]

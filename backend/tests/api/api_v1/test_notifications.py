@@ -4,10 +4,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 from core.models.notification import Notification
+from core.models.block import Block, BlockType
+from core.models.test import TestSubmission
 from core.models.user import User
 from Domain.Enums.notification import NotificationType
 from Domain.Enums.user_role import UserRole
 from Domain.Enums.course import CourseAudience
+from Services.course import delete_course
 from Services.notifications import notify_new_course, notify_manual_test_required
 
 @pytest.mark.anyio

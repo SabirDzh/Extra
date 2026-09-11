@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Сертификат</title>
+    <link rel="stylesheet" href="certificate.css" />
+  </head>
+  <body>
+    <article class="certificate">
+      <div class="certificate__decor certificate__decor--top" aria-hidden="true">
+        <span class="certificate__decor-layer certificate__decor-layer--navy"></span>
+        <span class="certificate__decor-layer certificate__decor-layer--red-dark"></span>
+        <span class="certificate__decor-layer certificate__decor-layer--white"></span>
+        <span class="certificate__decor-layer certificate__decor-layer--red"></span>
+      </div>
+
+      <div class="certificate__body">
+        <header class="certificate__header">
+          <h1 class="certificate__title">СЕРТИФИКАТ</h1>
+          <p class="certificate__role">{{role_label}}</p>
+          <div class="certificate__divider"></div>
+        </header>
+
+        <section class="certificate__main">
+          <p class="certificate__intro">Прослушал(а) лекцию по теме:</p>
+          <p class="certificate__course">{{course_title}}</p>
+        </section>
+
+        <footer class="certificate__footer">
+          <div class="certificate__issued">
+            <p class="certificate__issued-label">Сертификат выдан</p>
+            <p class="certificate__issued-name">{{recipient_name}}</p>
+            <div class="certificate__issued-line"></div>
+          </div>
+
+          <div class="certificate__stamp">
+            <img src="stamp.png" alt="" class="certificate__stamp-image" />
+          </div>
+        </footer>
+      </div>
+
+      <div class="certificate__brand">
+        <p class="certificate__extra">EXTRA<span class="certificate__extra-reg">®</span></p>
+        <p class="certificate__brand-label">АКВАКОНТРОЛЬ</p>
+      </div>
+
+      <div
+        class="certificate__decor certificate__decor--bottom"
+        aria-hidden="true"
+      >
+        <span class="certificate__decor-layer certificate__decor-layer--navy"></span>
+        <span class="certificate__decor-layer certificate__decor-layer--red-dark"></span>
+        <span class="certificate__decor-layer certificate__decor-layer--white"></span>
+        <span class="certificate__decor-layer certificate__decor-layer--red"></span>
+      </div>
+    </article>
+  </body>
+</html>

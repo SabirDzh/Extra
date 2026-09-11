@@ -1,6 +1,7 @@
 from fastapi_users import schemas
 from pydantic import (
     BaseModel,
+    ConfigDict,
     Field,
     field_validator,
     field_serializer,
@@ -58,8 +59,9 @@ class UserCreate(schemas.BaseUserCreate):
 
 
 class UserUpdate(schemas.BaseUserUpdate):
+    model_config = ConfigDict(extra="forbid")
+
     password: str | None = None
-    role: UserRole | None = None
     fullname: str | None = None
     image_url: str | None = None
 
@@ -77,14 +79,6 @@ class UserUpdate(schemas.BaseUserUpdate):
             if len(v.strip()) < 4:
                 raise ValueError("Пароль должен содержать не менее 4 символов (без учета внешних пробелов)")
         return v
-
-    @field_validator("role", mode="before")
-    @classmethod
-    def normalize_role(cls, v):
-        if v is None:
-            return v
-        return normalize_user_role(v)
-
 
 class UserPermissionsUpdate(BaseModel):
     role: UserRole | None = None

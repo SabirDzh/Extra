@@ -1,4 +1,5 @@
 import pytest
+from api.api_v1 import product as product_api
 from httpx import AsyncClient
 
 
@@ -139,3 +140,76 @@ async def test_get_product_detail_filters_attributes_and_extracts_article(
         "wifi_min": 2.4,
         "wifi_max": 5.0,
     }
+
+
+@pytest.mark.anyio
+async def test_static_product_routes_are_reachable(client: AsyncClient):
+    summary_response = await client.get("/api/v1/products/summary/")
+    popular_response = await client.get("/api/v1/products/popular/")
+
+    assert summary_response.status_code == 200
+    assert popular_response.status_code == 200
+
+
+@pytest.mark.anyio
+async def test_schema_upload_rejects_untrusted_content(
+    client: AsyncClient,
+    superuser_token_headers,
+    monkeypatch,
+    tmp_path,
+):
+    monkeypatch.setattr(product_api, "SCHEMA_MEDIA_DIR", tmp_path)
+    payload = {
+        "title": "Schema Upload Product",
+        "description": "Desc",
+        "attributes": {},
+        "image_url": [],
+    }
+    product_response = await client.post(
+        "/api/v1/products/",
+        json=payload,
+        headers=superuser_token_headers,
+    )
+    product_id = product_response.json()["id"]
+
+    response = await client.post(
+        f"/api/v1/products/{product_id}/schema-connect/upload",
+        files={"file": ("unsafe.html", b"<script>alert(1)</script>", "text/html")},
+        headers=superuser_token_headers,
+    )
+
+    assert response.status_code == 400
+    assert list(tmp_path.iterdir()) == []
+
+
+@pytest.mark.anyio
+async def test_schema_upload_accepts_valid_pdf(
+    client: AsyncClient,
+    superuser_token_headers,
+    monkeypatch,
+    tmp_path,
+):
+    monkeypatch.setattr(product_api, "SCHEMA_MEDIA_DIR", tmp_path)
+    payload = {
+        "title": "Valid Schema Upload Product",
+        "description": "Desc",
+        "attributes": {},
+        "image_url": [],
+    }
+    product_response = await client.post(
+        "/api/v1/products/",
+        json=payload,
+        headers=superuser_token_headers,
+    )
+    product_id = product_response.json()["id"]
+
+    response = await client.post(
+        f"/api/v1/products/{product_id}/schema-connect/upload",
+        files={"file": ("schema.pdf", b"%PDF-1.7\ncontent", "application/pdf")},
+        headers=superuser_token_headers,
+    )
+
+    assert response.status_code == 200
+    stored_files = list(tmp_path.iterdir())
+    assert len(stored_files) == 1
+    assert stored_files[0].suffix == ".pdf"

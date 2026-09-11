@@ -20,8 +20,8 @@ async def setup_course(session: AsyncSession, create_user):
 @pytest.mark.anyio
 @pytest.mark.parametrize("block_type, action, expected_status", [
     (BlockType.auto_test, "submit_correct", CourseStatus.completed),
-    (BlockType.auto_test, "submit_incorrect", CourseStatus.completed),
-    (BlockType.auto_test, "submit_empty", CourseStatus.completed),
+    (BlockType.auto_test, "submit_incorrect", CourseStatus.in_progress),
+    (BlockType.auto_test, "submit_empty", CourseStatus.in_progress),
     (BlockType.manual_test, "submit", CourseStatus.in_progress),
     (BlockType.manual_test, "grade_positive", CourseStatus.completed),
     (BlockType.manual_test, "grade_zero", CourseStatus.in_progress),
@@ -103,7 +103,7 @@ async def test_lesson_block_status(client: AsyncClient, session: AsyncSession, s
     
 
     resp1 = await client.get(f"/api/v1/courses/{course.id}/blocks/", cookies=cookies)
-    assert resp1.json()["blocks"][0]["progress"]["status"] == CourseStatus.not_started
+    assert resp1.json()["blocks"][0]["progress"]["status"] == CourseStatus.completed
     
 
     from Services.test_grading import _mark_block_completed
@@ -136,6 +136,6 @@ async def test_multiple_submissions_status_persistence(client: AsyncClient, sess
     resp = await client.get(f"/api/v1/courses/{course.id}/blocks/", cookies=cookies)
     status = resp.json()["blocks"][0]["progress"]["status"]
     if test_type == BlockType.auto_test:
-        assert status == CourseStatus.completed
+        assert status == CourseStatus.in_progress
     else:
         assert status == CourseStatus.in_progress

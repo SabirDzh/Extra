@@ -47,6 +47,8 @@ class AnswerOption(IdUuidPkMixin, Base):
 
 
 class TestSubmission(IdUuidPkMixin, Base):
+    __test__ = False
+
     user_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("users.id", ondelete="CASCADE"), index=True
     )
@@ -80,6 +82,8 @@ class TestSubmission(IdUuidPkMixin, Base):
 
 
 class TestAnswer(IdUuidPkMixin, Base):
+    __test__ = False
+
     submission_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("test_submissions.id", ondelete="CASCADE"), index=True
     )
@@ -97,6 +101,8 @@ class TestAnswer(IdUuidPkMixin, Base):
 
 
 class TestSubmissionQuestion(Base):
+    __test__ = False
+
     submission_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("test_submissions.id", ondelete="CASCADE"),
         primary_key=True,

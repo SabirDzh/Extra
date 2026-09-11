@@ -5,7 +5,6 @@ from typing import Awaitable, Callable
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
-from starlette.middleware.base import BaseHTTPMiddleware
 
 from middlewares.requests_count_middleware import requests_count_middleware_dispatch
 
@@ -36,23 +35,6 @@ async def add_process_time_to_requests(
     return response
 
 
-class ProcessTimeHeaderMiddleware(BaseHTTPMiddleware):
-    def __init__(self, *args, process_time_header_name: str, **kwargs) -> None:
-        super().__init__(*args, **kwargs)
-        self.header_name = process_time_header_name
-
-    async def dispatch(
-        self,
-        request: Request,
-        call_next: CallNext,
-    ) -> Response:
-        start_time = time.perf_counter()
-        response = await call_next(request)
-        process_time = time.perf_counter() - start_time
-        response.headers[self.header_name] = f"{process_time:.5f}"
-        return response
-
-
 def register_middlewares(app: FastAPI) -> None:
     @app.middleware("http")
     async def log_new_requests(
@@ -69,15 +51,7 @@ def register_middlewares(app: FastAPI) -> None:
 
     app.middleware("http")(add_process_time_to_requests)
 
-    app.add_middleware(
-        ProcessTimeHeaderMiddleware,
-        process_time_header_name="X-Process-Time-New-Again",
-    )
-
-    app.add_middleware(
-        BaseHTTPMiddleware,
-        dispatch=requests_count_middleware_dispatch,
-    )
+    app.middleware("http")(requests_count_middleware_dispatch)
 
     app.add_middleware(
         CORSMiddleware,

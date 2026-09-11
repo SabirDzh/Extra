@@ -1,7 +1,7 @@
 import uuid
 import re
 from pathlib import Path
-from typing import Annotated, Literal
+from typing import Annotated, Final, Literal
 
 from core.config import BASE_DIR, settings
 from core.models.db_helper import db_helper
@@ -47,16 +47,21 @@ Session = Annotated[AsyncSession, Depends(db_helper.session_getter)]
 AdminUser = Annotated[User, Depends(current_admin)]
 RedisDep = Annotated[Redis, Depends(get_redis)]
 SCHEMA_MEDIA_DIR = BASE_DIR / "media" / "product_schema_connect"
+SCHEMA_UPLOAD_CHUNK_SIZE: Final[int] = 64 * 1024
+SCHEMA_FILE_SIGNATURES: Final[dict[str, bytes]] = {
+    ".pdf": b"%PDF-",
+    ".png": b"\x89PNG\r\n\x1a\n",
+    ".jpg": b"\xff\xd8\xff",
+    ".jpeg": b"\xff\xd8\xff",
+}
 
 
 def _get_client_identifier(request: Request) -> str:
+    """Return an identifier derived only from trusted application context."""
     user = getattr(request.state, "user", None)
     if user and hasattr(user, "id"):
         return str(user.id)
 
-    forwarded_for = request.headers.get("X-Forwarded-For")
-    if forwarded_for:
-        return forwarded_for.split(",")[0].strip()
     return request.client.host if request.client else "unknown"
 
 
@@ -69,6 +74,45 @@ def _schema_url_to_file_path(schema_url: str) -> Path:
         )
     relative_path = schema_url[len(media_prefix) :]
     return (BASE_DIR / "media" / relative_path).resolve()
+
+
+def _validate_schema_file_signature(extension: str, content: bytes) -> None:
+    """Reject schema uploads whose content does not match an allowed format."""
+    signature = SCHEMA_FILE_SIGNATURES.get(extension)
+    if signature is None or not content.startswith(signature):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Only PDF, PNG, and JPEG schema files are allowed",
+        )
+
+
+async def _save_schema_file(file: UploadFile, destination: Path, extension: str) -> None:
+    """Stream a validated schema file to disk without unbounded memory use."""
+    max_file_size = settings.product_upload.max_schema_file_bytes
+    total_size = 0
+    first_chunk = True
+
+    try:
+        with destination.open("wb") as destination_file:
+            while chunk := await file.read(SCHEMA_UPLOAD_CHUNK_SIZE):
+                if first_chunk:
+                    _validate_schema_file_signature(extension, chunk)
+                    first_chunk = False
+                total_size += len(chunk)
+                if total_size > max_file_size:
+                    raise HTTPException(
+                        status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                        detail="Schema file is too large",
+                    )
+                destination_file.write(chunk)
+        if first_chunk:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Schema file is empty",
+            )
+    except Exception:
+        destination.unlink(missing_ok=True)
+        raise
 
 
 def _extract_detail_attributes(
@@ -209,6 +253,10 @@ async def create_product(
     product.views = 0
     try:
         await redis.zadd("products:popularity", {str(product.id): 0})
+        await redis.expire(
+            "products:popularity",
+            settings.product_analytics.retention_seconds,
+        )
     except Exception:
         pass
     return product
@@ -235,6 +283,36 @@ async def clear_all_products(
         "msg": f"Успешно удалено товаров: {count}. Данные в Redis сброшены.",
         "status": "OK",
     }
+
+
+@router.get("/summary/", response_model=list[ProductSummaryInfo])
+async def get_product_summary(db: Session, pagination: PaginationParams = Depends()):
+    """Return a compact, paginated product catalogue."""
+    return await product_crud.get_product_summary(
+        db,
+        pagination.limit,
+        pagination.offset,
+    )
+
+
+@router.get("/popular/", response_model=list[ProductListRead])
+@cache(expire=60)
+async def get_popular_product(
+    db: Session,
+    redis: RedisDep,
+    pagination: PaginationParams = Depends(),
+):
+    """Return products ordered by unique views in the retention window."""
+    top_ids_str = await get_top_product_ids(
+        redis,
+        limit=pagination.limit,
+        offset=pagination.offset,
+    )
+    if not top_ids_str:
+        return []
+
+    product_ids = [uuid.UUID(product_id) for product_id in top_ids_str]
+    return await product_crud.get_products_by_ids(db, product_ids)
 
 
 @router.get("/{product_id}", response_model=ProductRead)
@@ -309,13 +387,17 @@ async def upload_product_schema_connect_file(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Filename is required"
         )
 
-    SCHEMA_MEDIA_DIR.mkdir(parents=True, exist_ok=True)
-    ext = Path(file.filename).suffix
-    stored_filename = f"{uuid.uuid4()}{ext}"
-    destination = SCHEMA_MEDIA_DIR / stored_filename
+    extension = Path(file.filename).suffix.lower()
+    if extension not in SCHEMA_FILE_SIGNATURES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Only PDF, PNG, and JPEG schema files are allowed",
+        )
 
-    content = await file.read()
-    destination.write_bytes(content)
+    SCHEMA_MEDIA_DIR.mkdir(parents=True, exist_ok=True)
+    stored_filename = f"{uuid.uuid4()}{extension}"
+    destination = SCHEMA_MEDIA_DIR / stored_filename
+    await _save_schema_file(file, destination, extension)
     schema_url = f"/media/product_schema_connect/{stored_filename}"
 
     if product.schema_connect:
@@ -327,9 +409,15 @@ async def upload_product_schema_connect_file(
         except Exception:
             pass
 
-    updated_product = await product_crud.update_product(
-        db, product, ProductUpdate(schema_connect=schema_url)
-    )
+    try:
+        updated_product = await product_crud.update_product(
+            db,
+            product,
+            ProductUpdate(schema_connect=schema_url),
+        )
+    except Exception:
+        destination.unlink(missing_ok=True)
+        raise
     updated_product.views = await get_product_views(redis, product_id)
     return updated_product
 
@@ -373,13 +461,6 @@ async def delete_products(
             pass
 
 
-@router.get("/summary/", response_model=list[ProductSummaryInfo])
-async def get_product_summary(db: Session, pagination: PaginationParams = Depends()):
-    return await product_crud.get_product_summary(
-        db, pagination.limit, pagination.offset
-    )
-
-
 @router.post("/import", status_code=status.HTTP_201_CREATED)
 async def import_products(
     db: Session,
@@ -387,28 +468,3 @@ async def import_products(
     file: UploadFile = File(),
 ):
     return await product_crud.import_products(db, file)
-
-
-@router.get("/popular/", response_model=list[ProductListRead])
-@cache(expire=60)
-async def get_popular_product(
-    db: Session,
-    redis: RedisDep,
-    pagination: PaginationParams = Depends(),
-):
-    """
-    Returns products sorted by unique views (popularity).
-    Uses Redis Sorted Set for efficient ranking.
-    """
-    top_ids_str = await get_top_product_ids(
-        redis, limit=pagination.limit, offset=pagination.offset
-    )
-
-    if not top_ids_str:
-        return []
-
-    product_ids = [uuid.UUID(pid) for pid in top_ids_str]
-
-    products = await product_crud.get_products_by_ids(db, product_ids)
-
-    return products

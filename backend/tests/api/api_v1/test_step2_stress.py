@@ -132,7 +132,7 @@ async def test_submission_read_float_schema(client: AsyncClient, session: AsyncS
     admin = await create_user("adm_schema@test.com", role="administrator")
     b = Block(course_id=uuid.uuid4(), title="B", block_type=BlockType.auto_test)
 
-    course = Course(title="Schema Course", created_by=admin.id)
+    course = Course(title="Schema Course", created_by=admin.id, is_published=True)
     session.add(course)
     await session.flush()
     block = Block(course_id=course.id, title="Test", block_type=BlockType.auto_test)

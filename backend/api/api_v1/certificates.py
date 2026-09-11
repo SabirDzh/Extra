@@ -3,23 +3,23 @@ from typing import Annotated
 
 from core.authentication.fastapi_users import current_active_user
 from core.certificate_pdf import async_generate_certificate_pdf
-from core.models.block import Block
+from core.config import settings
 from core.models.certificates import Certificate
 from core.models.db_helper import db_helper
-from Services.test_completion import get_completed_block_ids
-from Services import course as course_crud
 from core.models.user import User
 from core.schemas.certificate import CertificateRead
-from fastapi import APIRouter, Depends, HTTPException, status, Request
+from Domain.Enums.user_role import UserRole
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import HTMLResponse, Response
 from jinja_templates import templates
-from sqlalchemy import func, select
+from playwright.async_api import Error as PlaywrightError
+from Services import course as course_crud
+from Services.test_completion import get_completed_block_ids
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
-from core.config import settings
 
 from api.dependencies.authorization import current_course_allowed_user
-from Domain.Enums.user_role import UserRole
 
 router = APIRouter(
     prefix=settings.api.v1.certificates,
@@ -35,9 +35,7 @@ CourseAllowedUser = Annotated[User, Depends(current_course_allowed_user)]
     response_model=CertificateRead,
     status_code=status.HTTP_201_CREATED,
 )
-async def generate_certificate(
-    course_id: uuid.UUID, db: Session, user: CourseAllowedUser
-):
+async def generate_certificate(course_id: uuid.UUID, db: Session, user: CourseAllowedUser):
     course = await course_crud.get_accessible_course(
         db,
         course_id,
@@ -86,9 +84,7 @@ async def generate_certificate(
 
 
 @router.get("/courses/{course_id}/certificate", response_model=CertificateRead)
-async def get_certificate(
-    course_id: uuid.UUID, db: Session, user: CourseAllowedUser
-):
+async def get_certificate(course_id: uuid.UUID, db: Session, user: CourseAllowedUser):
     cert = (
         await db.execute(
             select(Certificate).where(
@@ -124,12 +120,19 @@ async def download_certificate(
     if user.role != UserRole.admin and cert.user_id != user.id:
         raise HTTPException(status_code=403, detail="Forbidden")
 
-    pdf_bytes = await async_generate_certificate_pdf(
-        full_name=cert.user.full_name,
-        course_title=cert.course.title,
-        certificate_number=cert.certificate_number,
-        issued_at=cert.issued_at,
-    )
+    try:
+        pdf_bytes = await async_generate_certificate_pdf(
+            full_name=cert.user.full_name,
+            course_title=cert.course.title,
+            certificate_number=cert.certificate_number,
+            issued_at=cert.issued_at,
+        )
+    except (TimeoutError, PlaywrightError) as error:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Certificate generation is temporarily unavailable",
+        ) from error
+
     return Response(
         content=pdf_bytes,
         media_type="application/pdf",
@@ -163,9 +166,9 @@ async def view_certificate_html(
         raise HTTPException(status_code=403, detail="Forbidden")
 
     return templates.TemplateResponse(
+        request,
         "certificate.html",
         {
-            "request": request,
             "full_name": cert.user.full_name,
             "course_title": cert.course.title,
             "certificate_number": cert.certificate_number,

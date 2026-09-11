@@ -111,9 +111,8 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
         request: Optional["Request"] = None,
     ):
         log.warning(
-            "Verification requested for user %r. Verification token: %r",
+            "Verification requested for user %r",
             user.id,
-            token,
         )
         verification_link = ""
         if request is not None:

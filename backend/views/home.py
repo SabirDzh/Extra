@@ -24,9 +24,9 @@ def home(
     ],
 ):
     return templates.TemplateResponse(
+        request,
         "home.html",
         {
-            "request": request,
             "user": user,
         },
     )

@@ -557,4 +557,4 @@ async def complete_course_for_user(
 
     await update_course_completion_status(session, user_id, course_id)
     await session.commit()
-    return True
+    return enrollment.completed_at is not None

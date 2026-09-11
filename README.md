@@ -258,6 +258,11 @@ source /etc/extra_backend/backup.env
 
 ### Планировщик (cron)
 
+API-процесс не запускает внутренний scheduler: это исключает дублирование backup-задач
+при нескольких workers/replicas. Для production предпочтителен внешний cron ниже. Если
+нужен APScheduler, запускайте ровно один отдельный процесс с
+`APP_CONFIG__SCHEDULER__ENABLED=true poetry run python -m scripts.run_scheduler`.
+
 Открыть cron:
 
 ```bash

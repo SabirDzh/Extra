@@ -23,7 +23,11 @@ async def _get_auth_headers(client: AsyncClient, user_data: dict) -> dict:
     return {"cookie": f"auth_user={token}"} if token else {}
 
 async def _create_course_and_block(session: AsyncSession, admin_id: uuid.UUID, block_type=BlockType.auto_test):
-    course = Course(title=f"Course {uuid.uuid4().hex[:4]}", created_by=admin_id)
+    course = Course(
+        title=f"Course {uuid.uuid4().hex[:4]}",
+        created_by=admin_id,
+        is_published=True,
+    )
     session.add(course)
     await session.flush()
     block = Block(course_id=course.id, title="Test Block", block_type=block_type, order_index=1, text_content="X" if block_type == BlockType.lesson else None)

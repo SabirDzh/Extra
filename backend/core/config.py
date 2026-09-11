@@ -2,7 +2,7 @@ import logging
 from pathlib import Path
 from typing import Literal
 
-from pydantic import BaseModel, PostgresDsn
+from pydantic import BaseModel, Field, PostgresDsn
 from pydantic_settings import (
     BaseSettings,
     SettingsConfigDict,
@@ -128,6 +128,32 @@ class CookieConfig(BaseModel):
 
 class SecurityConfig(BaseModel):
     admin_role_whitelist: list[str] = []
+    admin_session_secret: str | None = None
+
+
+class BackupConfig(BaseModel):
+    command_timeout_seconds: int = Field(default=600, ge=1)
+
+
+class CertificateConfig(BaseModel):
+    render_timeout_seconds: int = Field(default=30, ge=1)
+    max_parallel_generations: int = Field(default=2, ge=1)
+
+
+class SchedulerConfig(BaseModel):
+    enabled: bool = False
+
+
+class ProductUploadConfig(BaseModel):
+    max_schema_file_bytes: int = Field(default=10 * 1024 * 1024, ge=1)
+
+
+class ProductAnalyticsConfig(BaseModel):
+    retention_seconds: int = Field(default=30 * 24 * 60 * 60, ge=1)
+
+
+class ObservabilityConfig(BaseModel):
+    request_path_cardinality_limit: int = Field(default=1_000, ge=1)
 
 
 class Settings(BaseSettings):
@@ -150,6 +176,12 @@ class Settings(BaseSettings):
     cache: CacheConfig = CacheConfig()
     cookie: CookieConfig = CookieConfig()
     security: SecurityConfig = SecurityConfig()
+    backup: BackupConfig = BackupConfig()
+    certificate: CertificateConfig = CertificateConfig()
+    scheduler: SchedulerConfig = SchedulerConfig()
+    product_upload: ProductUploadConfig = ProductUploadConfig()
+    product_analytics: ProductAnalyticsConfig = ProductAnalyticsConfig()
+    observability: ObservabilityConfig = ObservabilityConfig()
 
     UPLOAD_DIR: str = "uploads/videos"
 

@@ -1,0 +1,28 @@
+# Secrets and local configuration must never enter an image layer.
+.env
+backend/.env
+
+# Local runtime data and artifacts.
+backups/
+backend/backups/
+media/
+backend/media/
+certificate/
+*.sqlite3
+*.db
+
+# Development and test artifacts.
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+htmlcov/
+.coverage*
+*.log
+*_cookies.txt
+curl_output.txt
+TODO.md
+PROJECT_REVIEW_*.md
+.git/

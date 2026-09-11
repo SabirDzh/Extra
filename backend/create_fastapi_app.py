@@ -2,6 +2,7 @@ from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 
 from admin import register_admin_views
+from admin.authentication import admin_authentication_backend
 from api.webhooks import webhooks_router
 from core.config import BASE_DIR, settings
 from core.models import db_helper
@@ -21,8 +22,6 @@ from sqladmin import Admin
 from starlette.responses import HTMLResponse
 from starlette.staticfiles import StaticFiles
 
-from core.scheduler import start_scheduler, stop_scheduler
-
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
@@ -34,11 +33,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         prefix=settings.cache.prefix,
     )
     
-    start_scheduler()
-
     yield
 
-    stop_scheduler()
     await db_helper.dispose()
     await redis_pool.disconnect()
 
@@ -92,6 +88,7 @@ def create_app(
     admin = Admin(
         app=app,
         session_maker=db_helper.session_factory,
+        authentication_backend=admin_authentication_backend,
     )
     register_admin_views(admin)
     return app

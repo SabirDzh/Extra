@@ -41,8 +41,7 @@ async def verify_email(
         return RedirectResponse(url=redirect_url, status_code=302)
 
     return templates.TemplateResponse(
+        request,
         "verification.html",
-        {
-            "request": request,
-        },
+        {},
     )

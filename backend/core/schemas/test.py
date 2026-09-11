@@ -8,6 +8,8 @@ from core.models.test import QuestionType
 
 
 class TestResultStatus(str, Enum):
+    __test__ = False
+
     CORRECT = "Верно"
     INCORRECT = "Неверно"
     REQUIRES_REVIEW = "Требует проверки"
@@ -160,5 +162,4 @@ class CorrectTextAnswer(BaseModel):
     text: str
 
     model_config = {"from_attributes": True}
-
 
