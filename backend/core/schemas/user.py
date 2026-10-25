@@ -44,12 +44,22 @@ class UserCreate(schemas.BaseUserCreate):
             raise ValueError("Email не должен содержать пробелов")
         return v
 
+    @field_validator("password", mode="before")
+    @classmethod
+    def validate_password_no_spaces(cls, v):
+        if v is not None and isinstance(v, str):
+            if any(c.isspace() for c in v):
+                raise ValueError("Пароль не должен содержать пробелов")
+        return v
+
     @field_validator("password", mode="after")
     @classmethod
     def validate_password_min_non_space(cls, v):
         if v is not None and isinstance(v, str):
-            if len(v.strip()) < 4:
+            stripped = v.strip()
+            if len(stripped) < 4:
                 raise ValueError("Пароль должен содержать не менее 4 символов (без учета внешних пробелов)")
+            return stripped
         return v
 
     @field_validator("role", mode="before")
@@ -72,12 +82,22 @@ class UserUpdate(schemas.BaseUserUpdate):
             raise ValueError("Email не должен содержать пробелов")
         return v
 
+    @field_validator("password", mode="before")
+    @classmethod
+    def validate_password_no_spaces(cls, v):
+        if v is not None and isinstance(v, str):
+            if any(c.isspace() for c in v):
+                raise ValueError("Пароль не должен содержать пробелов")
+        return v
+
     @field_validator("password", mode="after")
     @classmethod
     def validate_password_min_non_space(cls, v):
         if v is not None and isinstance(v, str):
-            if len(v.strip()) < 4:
+            stripped = v.strip()
+            if len(stripped) < 4:
                 raise ValueError("Пароль должен содержать не менее 4 символов (без учета внешних пробелов)")
+            return stripped
         return v
 
 class UserPermissionsUpdate(BaseModel):

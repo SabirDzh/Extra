@@ -191,6 +191,8 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
         if getattr(credentials, "username", None) and isinstance(credentials.username, str):
             credentials.username = credentials.username.strip()
         if getattr(credentials, "password", None) and isinstance(credentials.password, str):
+            if any(c.isspace() for c in credentials.password):
+                return None
             credentials.password = credentials.password.strip()
             if len(credentials.password) < 4:
                 return None
@@ -200,6 +202,10 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
         self, token: str, password: str, request: Optional["Request"] = None
     ) -> User:
         if isinstance(password, str):
+            if any(c.isspace() for c in password):
+                raise exceptions.InvalidPasswordException(
+                    reason="Password must not contain spaces"
+                )
             password = password.strip()
             if len(password) < 4:
                 raise exceptions.InvalidPasswordException(
